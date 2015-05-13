@@ -13,6 +13,7 @@
 #![feature(asm)]	//< As a kernel, we need inline assembly
 #![feature(core)]	//< libcore (see below) is not yet stablized
 #![feature(alloc)]
+#![feature(collections)]
 #![no_std]	//< Kernels can't use std
 
 use prelude::*;
@@ -23,6 +24,7 @@ use prelude::*;
 extern crate core;
 
 extern crate alloc;
+extern crate collections;
 extern crate libc;
 
 /// A dummy 'std' module to work around a set of issues in rustc
@@ -39,6 +41,7 @@ mod std {
 	// #16803 - Derive references marker/ops
 	pub use core::marker;
     pub use alloc::boxed::Box;
+    pub use collections::Vec;
 }
 
 /// Macros, need to be loaded before everything else due to how rust parses
@@ -84,8 +87,16 @@ pub unsafe extern fn __error() -> &'static mut libc::c_int {
 #[lang="start"]
 #[no_mangle]
 pub fn kmain() {
-    let one = std::Box::new(1);
-	log!("Hello world! 1={}", one);
+    let mut stack = std::Vec::new();
+    
+    stack.push(1);
+    stack.push(2);
+    stack.push(3);
+    
+    while let Some(top) = stack.pop() {
+        // Prints 3, 2, 1
+        log!("{}", top);
+    }
 	loop {}
 }
 

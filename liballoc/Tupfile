@@ -1,4 +1,4 @@
 include_rules
 
-: lib.rs | ../libcore/libcore.rlib ../liblibc/liblibc.rlib *.rs |> !RUSTC_LIB --extern core=../libcore/libcore.rlib --extern libc=../liblibc/liblibc.rlib |> liballoc.rlib
+: lib.rs | ../libcore/libcore.rlib ../liblibc/liblibc.rlib *.rs |> !RUSTC_LIB --extern core=../libcore/libcore.rlib --extern libc=../liblibc/liblibc.rlib |> %d.rlib
 
