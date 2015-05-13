@@ -1,0 +1,7 @@
+include_rules
+
+: foreach *.c |> !CC -DHAVE_MMAP=0 -DLACKS_UNISTD_H -DLACKS_SYS_PARAM_H -nostdinc -I../include |> %B.o {objs}
+: foreach arch/$(ARCH)/*.S |> !AS -D__USER_LABEL_PREFIX__= |> %B.o {objs}
+: {objs} |> !AR |> libc.a
+
+

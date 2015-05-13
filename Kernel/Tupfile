@@ -1,0 +1,21 @@
+include_rules
+
+LINKFLAGS := -T arch/$(ARCH)/link.ld
+LINKFLAGS += --gc-sections
+LINKFLAGS += -z max-page-size=0x1000
+!LD = |> $(LD) $(LINKFLAGS) -o %o %f |>
+!RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
+
+KERNEL_LIBS = ../liballoc/liballoc.rlib ../libcore/libcore.rlib ../liblibc/liblibc.rlib ../libc/libc.a
+
+: arch/$(ARCH)/start.S |> !AS |> start.o {objs}
+: main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ -L ../liblibc --extern alloc=../liballoc/liballoc.rlib --extern core=../libcore/libcore.rlib |> kernel.o {objs}
+: {objs} $(KERNEL_LIBS) | arch/$(ARCH)/link.ld |> !LD |> kernel.$(ARCH).bin
+
+ifeq ($(ARCH),amd64)
+: kernel.$(ARCH).bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin
+else
+: kernel.$(ARCH).bin |> ln -s %f %o |> kernel.bin
+endif
+
+

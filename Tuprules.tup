@@ -1,0 +1,41 @@
+.gitignore
+
+# CONFIG: Architecture to build for
+ARCH = amd64
+
+# Toolchain commands (can be overridden)
+RUSTC = rustc
+ifeq ($(ARCH),amd64)
+    LD := x86_64-elf-ld
+    AS := x86_64-elf-as
+    OBJDUMP := x86_64-elf-objdump
+    OBJCOPY := x86_64-elf-objcopy
+    AR := x86_64-elf-ar
+	CC := clang -target x86_64-elf
+else
+    ifeq ($(ARCH),x86)
+        LD := i586-elf-ld
+        AS := i586-elf-as
+        OBJDUMP := i586-elf-objdump
+        AR := i586-elf-ar
+        CC := clang -target i586-elf
+    else
+        $(error Unknown architecture $(ARCH))
+    endif
+endif
+
+TARGETSPEC := $(TUP_CWD)/Kernel/arch/$(ARCH)/target.json
+
+RUSTFLAGS := -O --cfg arch__$(ARCH) --target=$(TARGETSPEC)
+# - amd64 needs to be set to use soft floating point
+ifeq ($(ARCH),amd64)
+RUSTFLAGS += -C soft-float
+CCFLAGS += -mcmodel=kernel
+endif
+
+ARFLAGS += crus
+
+!AR = |> $(AR) $(ARFLAGS) -o %o %f |>
+!AS = |> $(CC) $(ASFLAGS) -c -o %o %f |>
+!CC = |> $(CC) $(CCFLAGS) -c -o %o %f |>
+!RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type=lib --emit=link %f |>
