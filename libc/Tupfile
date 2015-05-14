@@ -1,7 +1,13 @@
 include_rules
 
-: foreach *.c |> !CC -DHAVE_MMAP=0 -DLACKS_UNISTD_H -DLACKS_SYS_PARAM_H -nostdinc -I../include |> %B.o {objs}
-: foreach arch/$(ARCH)/*.S |> !AS -D__USER_LABEL_PREFIX__= |> %B.o {objs}
+CCFLAGS += -DHAVE_MMAP=0 -DLACKS_UNISTD_H -DLACKS_SYS_PARAM_H -nostdinc -I../include
+
+: foreach *.c |> !CC |> %B.o {objs}
+
+ifeq (@(ARCH),amd64)
+: foreach arch/amd64/*.S |> !AS -D__USER_LABEL_PREFIX__= |> %B.o {objs}
+endif
+
 : {objs} |> !AR |> libc.a
 
 

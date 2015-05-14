@@ -1,21 +1,24 @@
 include_rules
 
-LINKFLAGS := -T arch/$(ARCH)/link.ld
-LINKFLAGS += --gc-sections
-LINKFLAGS += -z max-page-size=0x1000
 !LD = |> $(LD) $(LINKFLAGS) -o %o %f |>
+!RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type bin %f |>
 !RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
 
+ifeq (@(ARCH),test)
+: main.rs | *.rs |> !RUSTC_BIN |> kernel.bin
+else
+LINKFLAGS += --gc-sections
+LINKFLAGS += -z max-page-size=0x1000
 KERNEL_LIBS = ../liballoc/liballoc.rlib ../libcollections/libcollections.rlib ../libcore/libcore.rlib ../liblibc/liblibc.rlib ../libc/libc.a
 
-: arch/$(ARCH)/start.S |> !AS |> start.o {objs}
+: arch/@(ARCH)/start.S |> !AS |> start.o {objs}
 : main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ -L ../liblibc -L ../librustc_unicode --extern alloc=../liballoc/liballoc.rlib --extern collections=../libcollections/libcollections.rlib --extern core=../libcore/libcore.rlib |> kernel.o {objs}
-: {objs} $(KERNEL_LIBS) | arch/$(ARCH)/link.ld |> !LD |> kernel.$(ARCH).bin
 
-ifeq ($(ARCH),amd64)
-: kernel.$(ARCH).bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin
+ifeq (@(ARCH),amd64)
+: {objs} $(KERNEL_LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
+: kernel.amd64.bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin
 else
-: kernel.$(ARCH).bin |> ln -s %f %o |> kernel.bin
+: {objs} $(KERNEL_LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
 endif
 
-
+endif

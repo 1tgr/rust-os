@@ -8,13 +8,14 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
-#![feature(no_std)]	//< unwind needs to define lang items
-#![feature(lang_items)]	//< unwind needs to define lang items
-#![feature(asm)]	//< As a kernel, we need inline assembly
-#![feature(core)]	//< libcore (see below) is not yet stablized
 #![feature(alloc)]
+#![feature(asm)]	//< As a kernel, we need inline assembly
 #![feature(collections)]
-#![no_std]	//< Kernels can't use std
+#![feature(core)]	//< libcore (see below) is not yet stablized
+#![feature(lang_items)]	//< unwind needs to define lang items
+#![feature(libc)]
+#![feature(no_std)]	//< unwind needs to define lang items
+#![cfg_attr(not(test), no_std)]	//< Kernels can't use std
 
 use prelude::*;
 
@@ -28,6 +29,7 @@ extern crate collections;
 extern crate libc;
 
 /// A dummy 'std' module to work around a set of issues in rustc
+#[cfg(not(test))]
 mod std {
 	// #18491 - write!() expands to std::fmt::Arguments::new
 	pub use core::fmt;
@@ -49,9 +51,14 @@ mod std {
 mod macros;
 
 // Achitecture-specific modules
-#[cfg(target_arch="x86_64")] #[path="arch/amd64/mod.rs"]
+#[cfg(all(not(test), target_arch="x86_64"))]
+#[path="arch/amd64/mod.rs"]
 pub mod arch;
-#[cfg(target_arch="x86")] #[path="arch/x86/mod.rs"]
+#[cfg(all(not(test), target_arch="x86"))]
+#[path="arch/x86/mod.rs"]
+pub mod arch;
+#[cfg(test)]
+#[path="arch/test/mod.rs"]
 pub mod arch;
 
 // Prelude
@@ -83,7 +90,13 @@ pub unsafe extern fn __error() -> &'static mut libc::c_int {
     &mut errno
 }
 
+#[test]
+pub fn say_hello() {
+    log!("hello world");
+}
+
 // Kernel entrypoint
+#[cfg(not(test))]
 #[lang="start"]
 #[no_mangle]
 pub fn kmain() {
