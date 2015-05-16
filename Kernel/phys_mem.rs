@@ -67,7 +67,6 @@ impl PhysicalBitmap {
 
     pub fn reserve_pages(&self, start_page: usize, page_count: usize) {
         let mut free = self.free.write();
-        log!("reserved {} bytes ({}KB) at {:x}", page_count * PAGE_SIZE, (page_count * PAGE_SIZE) / 1024, start_page * PAGE_SIZE);
         for i in 0..page_count - 1 {
             free.set(i, false);
         }

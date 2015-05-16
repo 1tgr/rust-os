@@ -1,6 +1,8 @@
 use ::phys_mem::{self,PhysicalBitmap};
+use ::thread;
 use std::marker::PhantomData;
 use std::ops::Fn;
+use std::option::Option::*;
 
 pub struct ArchProcess {
     dummy: i32
@@ -29,7 +31,7 @@ impl<T> PageEntry<T> {
     pub fn ensure_present(&mut self, alloc: &Fn() -> usize) -> bool {
         let flags = self.entry & (PageFlags::All as usize);
         if (flags & (PageFlags::Present as usize)) == 0 {
-            self.entry = alloc() | flags | (PageFlags::Present as usize) | (PageFlags::Writable as usize);
+            self.entry = alloc() | flags | (PageFlags::Present as usize) | (PageFlags::Writable as usize) | (PageFlags::User as usize);
             true
         } else {
             false
@@ -113,6 +115,17 @@ fn invlpg<T>(ptr: *const T) {
     }
 }
 
+unsafe fn sysret<T>(ptr: *const T) -> ! {
+    asm!("sysretq" :: "{rcx}" (ptr), "{r11}" (0) :: "volatile");
+    unreachable!()
+}
+
+unsafe fn wrmsr(reg: u32, value: u64) {
+    let value_hi = (value >> 32) as u32;
+    let value_lo = value as u32;
+    asm!("wrmsr" :: "{edx}" (value_hi), "{eax}" (value_lo), "{ecx}" (reg) :: "volatile");
+}
+
 fn map<T>(alloc: &Fn() -> usize, ptr: *const T, addr: usize, user: bool, writable: bool) {
     if pml4_entry(ptr).ensure_present(&alloc) {
         let pdpt = pdpt(ptr);
@@ -189,6 +202,34 @@ test! {
         unsafe {
             *ptr1 = sentinel;
             assert_eq!(sentinel, *ptr2);
+        }
+    }
+
+    fn can_run_code_in_user_mode() {
+        let bitmap = PhysicalBitmap::parse_multiboot();
+        let alloc = || bitmap.alloc_page().unwrap();
+        let code_ptr = 0x1000 as *mut u8;
+        let code_addr = bitmap.alloc_page().unwrap();
+        map(&alloc, code_ptr, code_addr, true, true);
+
+        unsafe {
+            const IA32_STAR: u32 = 0xC0000081;
+            const IA32_LSTAR: u32 = 0xC0000082;
+            wrmsr(IA32_STAR, 0x00100008_00000000);
+
+            *code_ptr.offset(0) = 0x0f;
+            *code_ptr.offset(1) = 0x05;
+
+            match thread::setjmp() {
+                Some(jmp_buf) => {
+                    wrmsr(IA32_LSTAR, jmp_buf.rip as u64);
+                    log!("sysret...");
+                    sysret(code_ptr);
+                }
+                None => {
+                    log!("...syscall");
+                }
+            }
         }
     }
 }

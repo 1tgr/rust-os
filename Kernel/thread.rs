@@ -14,7 +14,7 @@ use std::vec::Vec;
 use super::arch::thread;
 use super::process::Process;
 
-fn setjmp() -> Option<jmp_buf> {
+pub fn setjmp() -> Option<jmp_buf> {
     unsafe {
         let mut jmp_buf = mem::uninitialized();
         if libc::setjmp(&mut jmp_buf) == 0 {

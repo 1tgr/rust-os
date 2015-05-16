@@ -199,10 +199,10 @@ GDTPtr:
 .globl GDT
 GDT:
 	.long 0, 0
-        .long 0x00000000, 0x00209A00	/* 0x08: 64-bit Code */
-        .long 0x00000000, 0x00009200    /* 0x10: 64-bit Data */
-        .long 0x00000000, 0x0040FA00    /* 0x18: 32-bit User Code */
-        .long 0x00000000, 0x0040F200    /* 0x20: User Data        */
-        .long 0x00000000, 0x0020FA00    /* 0x28: 64-bit User Code       */
-        .long 0x00000000, 0x0000F200    /* 0x30: User Data (64 version) */
+		.long 0x00000000, 0x00209A00    /* 0x08: 64-bit Code */
+		.long 0x00000000, 0x00009200    /* 0x10: 64-bit Data */
+		.long 0x00000000, 0x0000F200    /* 0x18: User Data (64 version) */
+		.long 0x00000000, 0x0020FA00    /* 0x20: 64-bit User Code       */
+		.long 0x00000000, 0x0040FA00    /* 0x28: 32-bit User Code */
+		.long 0x00000000, 0x0040F200    /* 0x30: User Data        */
 GDTEnd:
