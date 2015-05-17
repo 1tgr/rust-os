@@ -1,11 +1,12 @@
 include_rules
 
 CCFLAGS += -DHAVE_MMAP=0 -DLACKS_UNISTD_H -DLACKS_SYS_PARAM_H -nostdinc -I../include
+ASFLAGS += -D__USER_LABEL_PREFIX__= -D_I386MACH_ALLOW_HW_INTERRUPTS
 
 : foreach *.c |> !CC |> %B.o {objs}
 
 ifeq (@(ARCH),amd64)
-: foreach arch/amd64/*.S |> !AS -D__USER_LABEL_PREFIX__= |> %B.o {objs}
+: foreach arch/amd64/*.S |> !AS |> %B.o {objs}
 endif
 
 : {objs} |> !AR |> libc.a

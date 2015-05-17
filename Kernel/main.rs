@@ -100,16 +100,24 @@ pub fn say_hello() {
 #[lang="start"]
 #[no_mangle]
 pub fn kmain() {
-    let mut stack = std::Vec::new();
-    
-    stack.push(1);
-    stack.push(2);
-    stack.push(3);
-    
-    while let Some(top) = stack.pop() {
-        // Prints 3, 2, 1
-        log!("{}", top);
+    log!("kmain");
+
+    let mut buf = Default::default();
+    let is_second;
+
+    unsafe {
+        is_second = libc::setjmp(&mut buf);
     }
+
+    if is_second == 0 {
+        log!("first: buf = {:?}", buf);
+        unsafe {
+            libc::longjmp(&buf, 1);
+        }
+    } else {
+        log!("second: is_second = {}", is_second);
+    }
+
 	loop {}
 }
 

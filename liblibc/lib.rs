@@ -115,6 +115,26 @@ pub mod types {
                 pub type wchar_t = i32;
                 #[cfg(target_arch = "aarch64")]
                 pub type wchar_t = u32;
+
+                /*
+                 **  jmp_buf:
+                 **   rbx rbp r12 r13 r14 r15 rsp rip
+                 **   0   8   16  24  32  40  48  56
+                 */
+
+                #[repr(C)]
+                #[derive(Copy, Clone, Debug, Default)]
+                pub struct jmp_buf {
+                    pub rbx: i64,
+                    pub rbp: i64,
+                    pub r12: i64,
+                    pub r13: i64,
+                    pub r14: i64,
+                    pub r15: i64,
+                    pub rsp: i64,
+                    pub rip: i64
+                }
+
             }
             pub mod c99 {
                 pub type c_longlong = i64;
@@ -131,13 +151,15 @@ pub mod types {
 pub mod funcs {
     pub mod c95 {
         pub mod stdlib {
-            use types::common::c95::c_void;
-            use types::os::arch::c95::{size_t};
+            use types::common::c95::{c_void};
+            use types::os::arch::c95::{jmp_buf,size_t,c_int};
 
             extern {
                 pub fn malloc(size: size_t) -> *mut c_void;
                 pub fn realloc(p: *mut c_void, size: size_t) -> *mut c_void;
                 pub fn free(p: *mut c_void);
+                pub fn setjmp(env: &mut jmp_buf) -> c_int;
+                pub fn longjmp(env: &jmp_buf, val: c_int);
             }
         }
     }
