@@ -123,7 +123,7 @@ pub mod types {
                  */
 
                 #[repr(C)]
-                #[derive(Copy, Clone, Debug, Default)]
+                #[derive(Copy, Clone)]
                 pub struct jmp_buf {
                     pub rbx: i64,
                     pub rbp: i64,
@@ -159,7 +159,7 @@ pub mod funcs {
                 pub fn realloc(p: *mut c_void, size: size_t) -> *mut c_void;
                 pub fn free(p: *mut c_void);
                 pub fn setjmp(env: &mut jmp_buf) -> c_int;
-                pub fn longjmp(env: &jmp_buf, val: c_int);
+                pub fn longjmp(env: &jmp_buf, val: c_int) -> !;
             }
         }
     }

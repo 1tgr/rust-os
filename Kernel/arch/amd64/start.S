@@ -141,6 +141,11 @@ start64.loop:
 	jmp start64.loop
 
 
+.globl thread_entry_asm
+thread_entry_asm:
+    mov %rbx, %rdi
+    jmp thread_entry
+
 
 /* === Page-aligned data === */
 .section .padata

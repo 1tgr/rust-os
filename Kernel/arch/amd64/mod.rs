@@ -18,3 +18,4 @@ mod x86_io;
 #[path = "../x86_common/debug.rs"]
 pub mod debug;
 
+pub mod thread;
