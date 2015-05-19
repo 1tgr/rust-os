@@ -13,12 +13,10 @@
 #![feature(core)]
 #![feature(lang_items)]	//< unwind needs to define lang items
 
-use std::boxed::Box;
-use libc::{c_int,c_void};
-
 #[macro_use]
 extern crate core;
 extern crate libc;
+extern crate spin;
 
 /// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use]
@@ -40,6 +38,9 @@ pub mod unwind;
 mod logging;
 mod thread;
 
+use libc::{c_int,c_void};
+use thread::Scheduler;
+
 extern {
     static mut kernel_end: i8;
 }
@@ -50,6 +51,7 @@ static mut brk: isize = 0;
 pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
     let begin = (&mut kernel_end as *mut i8).offset(brk);
     brk = brk + incr as isize;
+    log!("sbrk({}) = {:x}", incr, begin as isize);
     begin as *mut c_void
 }
 
@@ -72,9 +74,14 @@ pub fn say_hello() {
 pub fn kmain() -> ! {
     log!("begin kmain");
 
-    let who = "world abc";
-    let say_hello = move || log!("hello {}", who);
-    let t = thread::Thread::new(Box::new(say_hello));
-    t.jump();
+    let scheduler = Scheduler::new();
+    let greeting = "hello";
+    scheduler.spawn(move || log!("{} world", greeting));
+    scheduler.spawn(move || log!("{} second thread", greeting));
+    scheduler.schedule();
+    log!("end kmain");
+    loop {
+        scheduler.schedule();
+    }
 }
 

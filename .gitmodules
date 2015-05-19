@@ -1,0 +1,3 @@
+[submodule "modules/spinlock-rs"]
+	path = modules/spinlock-rs
+	url = https://github.com/mvdnes/spinlock-rs.git

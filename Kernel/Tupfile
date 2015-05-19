@@ -4,6 +4,9 @@ include_rules
 !RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type bin %f |>
 !RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
 
+KERNEL_LIBS += ../modules/libspin.rlib
+RUSTFLAGS += --extern spin=../modules/libspin.rlib
+
 ifeq (@(ARCH),test)
 : main.rs | *.rs |> !RUSTC_BIN |> kernel.bin
 else
@@ -11,7 +14,7 @@ LINKFLAGS += --gc-sections
 LINKFLAGS += -z max-page-size=0x1000
 RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode
 
-KERNEL_LIBS = ../liballoc/liballoc.rlib ../libcollections/libcollections.rlib ../libcore/libcore.rlib ../liblibc/liblibc.rlib ../libstd/libstd.rlib ../libc/libc.a
+KERNEL_LIBS = ../liballoc/liballoc.rlib ../libcollections/libcollections.rlib ../libcore/libcore.rlib ../liblibc/liblibc.rlib ../libstd/libstd.rlib ../libc/libc.a ../modules/libspin.rlib
 
 RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib --extern collections=../libcollections/libcollections.rlib --extern core=../libcore/libcore.rlib --extern std=../libstd/libstd.rlib
 

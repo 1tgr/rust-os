@@ -18,7 +18,7 @@ pub fn thread_entry(p: *mut c_void) -> ! {
     loop { }
 }
 
-pub fn new_jmp_buf(p: Box<FnBox()>, stack: &mut Vec<isize>) -> jmp_buf {
+pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack: &mut Vec<isize>) -> jmp_buf {
     let pp = Box::new(p);
     let rsp : *const isize = &stack[stack.len() - 1];
     let rip : *const c_void = &thread_entry_asm;

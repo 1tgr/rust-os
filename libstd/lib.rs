@@ -1,14 +1,18 @@
 #![feature(alloc)]
 #![feature(collections)]
 #![feature(core)]
+#![feature(macro_reexport)]
 #![feature(no_std)]
 #![cfg_attr(not(test), no_std)]
 
 #[macro_use]
 extern crate core;
 
+#[macro_use]
+#[macro_reexport(vec, format)]
+extern crate collections as core_collections;
+
 extern crate alloc;
-extern crate collections;
 extern crate libc;
 
 pub mod prelude {
@@ -30,8 +34,8 @@ pub use core::marker;
 pub use alloc::*;
 pub use core::clone;
 pub use core::mem;
+pub use core_collections::vec;
 
-pub mod vec {
-    pub use collections::vec::*;
+pub mod collections {
+    pub use core_collections::LinkedList;
 }
-

@@ -10,14 +10,14 @@
  * its use, and the author takes no liability.
  */
 use prelude::*;
+use core::fmt::Arguments;
 
 #[cfg(not(test))]
 #[lang="panic_fmt"]
 #[no_mangle]
-pub fn rust_begin_unwind(args: ::core::fmt::Arguments, file: &str, line: usize) -> !
-{
+pub extern fn rust_begin_unwind(msg: Arguments, file: &'static str, line: u32) -> ! {
 	// 'args' will print to the formatted string passed to panic!
-	log!("file='{}', line={} :: {}", file, line, args);
+	log!("file='{}', line={} :: {}", file, line, msg);
 	loop {}
 }
 
