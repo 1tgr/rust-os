@@ -35,7 +35,11 @@ pub use alloc::*;
 pub use core::clone;
 pub use core::mem;
 pub use core_collections::vec;
+pub use core::default;
+pub use core::result;
 
 pub mod collections {
+    pub use core_collections::BitSet;
+    pub use core_collections::bit_vec;
     pub use core_collections::LinkedList;
 }

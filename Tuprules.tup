@@ -31,7 +31,7 @@ endif
 
 TARGETSPEC := $(TUP_CWD)/Kernel/arch/@(ARCH)/target.json
 
-RUSTFLAGS := -O --cfg arch__@(ARCH)
+RUSTFLAGS := -O --cfg arch__@(ARCH) -A dead_code
 
 ifeq (@(ARCH),test)
 RUSTFLAGS += --test

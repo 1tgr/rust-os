@@ -15,6 +15,7 @@ SECTIONS {
 	}
 
 	. += KERNEL_BASE;
+    kernel_start = .;
 	
 	.text ALIGN(0x1000) : AT(ADDR(.text) - KERNEL_BASE) {
 		*(.text .text.*)
