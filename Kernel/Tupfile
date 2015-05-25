@@ -7,9 +7,6 @@ include_rules
 KERNEL_LIBS += ../modules/libspin.rlib
 RUSTFLAGS += --extern spin=../modules/libspin.rlib
 
-ifeq (@(ARCH),test)
-: main.rs | *.rs |> !RUSTC_BIN |> kernel.bin
-else
 LINKFLAGS += --gc-sections
 LINKFLAGS += -z max-page-size=0x1000
 RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode
@@ -28,7 +25,5 @@ ifeq (@(ARCH),amd64)
 else
 : {objs} $(KERNEL_LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
 : kernel.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
-
-endif
 
 endif

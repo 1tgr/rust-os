@@ -17,27 +17,13 @@ else
         AR := i586-elf-ar
         CC := clang -target i586-elf
     else
-        ifeq (@(ARCH),test)
-            LD := ld
-            AS := as
-            OBJDUMP := objdump
-            AR := ar
-            CC := clang
-        else
-            error Unknown architecture @(ARCH)
-        endif
+        error Unknown architecture @(ARCH)
     endif
 endif
 
 TARGETSPEC := $(TUP_CWD)/Kernel/arch/@(ARCH)/target.json
 
-RUSTFLAGS := -O --cfg arch__@(ARCH) -A dead_code
-
-ifeq (@(ARCH),test)
-RUSTFLAGS += --test
-else
-RUSTFLAGS += --target=$(TARGETSPEC)
-endif
+RUSTFLAGS := -O --cfg arch__@(ARCH) -A dead_code --target=$(TARGETSPEC)
 
 # - amd64 needs to be set to use soft floating point
 ifeq (@(ARCH),amd64)

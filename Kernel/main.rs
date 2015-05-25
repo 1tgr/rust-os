@@ -23,6 +23,9 @@ extern crate spin;
 #[macro_use]
 mod macros;
 
+#[macro_use]
+mod test;
+
 // Achitecture-specific modules
 #[cfg(all(not(test), target_arch="x86_64"))]
 #[path="arch/amd64/mod.rs"]
@@ -45,6 +48,7 @@ use libc::{c_int,c_void};
 use multiboot::{multiboot_info_t,multiboot_memory_map_t};
 use phys_mem::PhysicalBitmap;
 use std::cmp;
+use test::Fixture;
 use thread::Scheduler;
 
 extern {
@@ -70,14 +74,13 @@ pub unsafe extern fn __error() -> &'static mut c_int {
     &mut errno
 }
 
-#[test]
-pub fn say_hello() {
-    log!("hello world");
-}
-
 fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
     ptr1 as isize - ptr2 as isize
 }
+
+const TEST_FIXTURES: &'static [Fixture] = &[
+    phys_mem::TESTS
+];
 
 // Kernel entrypoint
 #[cfg(not(test))]
@@ -85,6 +88,14 @@ fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
 #[no_mangle]
 pub fn kmain() -> ! {
     log!("begin kmain");
+
+    for &(fixture_name, fixture) in TEST_FIXTURES {
+        for &(test_name, test_fn) in fixture {
+            log!("begin {}::{}", fixture_name, test_name);
+            test_fn();
+            log!("end {}::{}", fixture_name, test_name);
+        }
+    }
 
     let bitmap = {
         let info: &multiboot::multiboot_info_t = phys_mem::phys2virt(mboot_ptr as usize);

@@ -77,3 +77,21 @@ pub fn virt2phys<T>(ptr: *const T) -> usize {
     ptr as usize - kernel_base_ptr as usize
 }
 
+test!(
+    fn can_alloc_free() {
+        let bitmap = PhysicalBitmap::new(640 * 1024);
+        let addr1 = bitmap.alloc_page().unwrap();
+        bitmap.free_page(addr1);
+
+        let addr2 = bitmap.alloc_page().unwrap();
+        assert_eq!(addr1, addr2);
+    }
+
+    fn can_handle_out_of_memory() {
+        let bitmap = PhysicalBitmap::new(2 * PAGE_SIZE);
+        bitmap.alloc_page().unwrap();
+        bitmap.alloc_page().unwrap();
+        let err = bitmap.alloc_page().unwrap_err();
+        assert_eq!(err, "out of memory");
+    }
+);
