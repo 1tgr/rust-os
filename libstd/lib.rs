@@ -43,3 +43,7 @@ pub mod collections {
     pub use core_collections::bit_vec;
     pub use core_collections::LinkedList;
 }
+
+pub mod sync {
+    pub use alloc::arc::{Arc, Weak};
+}

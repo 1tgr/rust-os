@@ -79,7 +79,8 @@ fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
 }
 
 const TEST_FIXTURES: &'static [Fixture] = &[
-    phys_mem::TESTS
+    phys_mem::TESTS,
+    thread::TESTS,
 ];
 
 // Kernel entrypoint
