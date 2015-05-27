@@ -14,17 +14,19 @@
 #![feature(core)]
 #![feature(lang_items)]	//< unwind needs to define lang items
 
+/// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use]
 extern crate core;
-extern crate libc;
-extern crate spin;
 
-/// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use]
 mod macros;
 
 #[macro_use]
 mod test;
+
+extern crate alloc;
+extern crate libc;
+extern crate spin;
 
 // Achitecture-specific modules
 #[cfg(all(not(test), target_arch="x86_64"))]
@@ -44,10 +46,13 @@ mod prelude;
 mod thread;
 pub mod unwind;
 
-use libc::{c_int,c_void};
+use core::fmt::Write;
+use libc::{c_char,c_int,c_void};
+use logging::Writer;
 use multiboot::{multiboot_info_t,multiboot_memory_map_t};
 use phys_mem::PhysicalBitmap;
 use std::cmp;
+use std::mem;
 use test::Fixture;
 use thread::Scheduler;
 
@@ -74,6 +79,16 @@ pub unsafe extern fn __error() -> &'static mut c_int {
     &mut errno
 }
 
+#[no_mangle]
+pub unsafe extern fn __assert(file: *const c_char, line: c_int, msg: *const c_char) -> ! {
+    let mut writer = Writer::get(module_path!());
+    arch::debug::put_cstr(file);
+    let _ = write!(&mut writer, "({}): ", line);
+    arch::debug::put_cstr(msg);
+    mem::drop(writer);
+    panic!("assertion failed in C code");
+}
+
 fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
     ptr1 as isize - ptr2 as isize
 }
@@ -94,7 +109,7 @@ pub fn kmain() -> ! {
         for &(test_name, test_fn) in fixture {
             log!("begin {}::{}", fixture_name, test_name);
             test_fn();
-            log!("end {}::{}", fixture_name, test_name);
+            log!("end {}::{}\n", fixture_name, test_name);
         }
     }
 

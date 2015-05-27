@@ -20,10 +20,7 @@ RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib --extern collections=../li
 
 ifeq (@(ARCH),amd64)
 : {objs} $(KERNEL_LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
-: kernel.amd64.bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin
-: kernel.amd64.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
+: kernel.amd64.bin |> $(OBJCOPY) -S -F elf32-i386 %f %o |> kernel.bin
 else
 : {objs} $(KERNEL_LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
-: kernel.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
-
 endif

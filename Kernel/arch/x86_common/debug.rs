@@ -12,6 +12,7 @@
  * its use, and the author takes no liability.
  */
 use prelude::*;
+use libc::c_char;
 
 /// Write a string to the output channel
 ///
@@ -22,6 +23,14 @@ pub unsafe fn puts(s: &str)
 	{
 		putb(b);
 	}
+}
+
+pub unsafe fn put_cstr(s: *const c_char) {
+    let mut s = s;
+    while *s != 0 {
+        putb(*s as u8);
+        s = s.offset(1);
+    }
 }
 
 /// Write a single byte to the output channel
