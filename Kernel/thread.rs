@@ -68,8 +68,6 @@ impl Scheduler {
             stack_len: 0
         };
 
-        log!("Scheduler::new: idle thread is {}", idle.id);
-
         let state = SchedulerState {
             current: idle,
             threads: VecDeque::new(),
@@ -87,7 +85,6 @@ impl Scheduler {
 
                 match setjmp() {
                     Some(old_jmp_buf) => {
-                        log!("schedule({} -> {}: longjmp to rip = {:x}, rsp = {:x})", old_current.id, state.current.id, new_jmp_buf.rip, new_jmp_buf.rsp);
                         state.threads.push_back((old_jmp_buf, old_current));
                         drop_write_guard(state);
 
@@ -113,8 +110,6 @@ impl Scheduler {
                 Some(front) => front,
                 None => panic!("exit_current({}): no more threads", state.current.id)
             };
-
-        log!("exit_current({} -> {}, stack = {:x}: longjmp to rip = {:x}, rsp = {:x})", state.current.id, new_current.id, state.current.stack as usize, new_jmp_buf.rip, new_jmp_buf.rsp);
 
         let old_current = mem::replace(&mut state.current, new_current);
         state.garbage_stacks.push((old_current.stack, old_current.stack_len));
@@ -144,9 +139,7 @@ impl Scheduler {
 
             match setjmp() {
                 Some(old_jmp_buf) => {
-                    log!("block({} -> {}, longjmp to rip = {:x}, rsp = {:x})", old_current.id, state.current.id, new_jmp_buf.rip, new_jmp_buf.rsp);
                     dstate.waiters.push_back((old_jmp_buf, old_current));
-                    log!("block(waiters = {})", dstate.waiters.len());
                     drop_write_guard(state);
                     drop_write_guard(dstate);
 
@@ -173,15 +166,8 @@ impl Scheduler {
         let mut state = self.state.write();
         dstate.result = Some(result);
 
-        let waiters = mem::replace(&mut dstate.waiters, VecDeque::new());
-        if waiters.is_empty() {
-            log!("resolve_deferred({}): nothing blocked", state.current.id);
-        } else {
-            for (jmp_buf, thread) in waiters {
-                log!("resolve_deferred({}): unblocking {}", state.current.id, thread.id);
-                state.threads.push_back((jmp_buf, thread));
-            }
-        }
+        let mut waiters = mem::replace(&mut dstate.waiters, VecDeque::new());
+        state.threads.append(&mut waiters);
     }
 
     fn spawn_inner<'a>(&'a self, start: Box<FnBox() + 'a>) {
@@ -194,8 +180,6 @@ impl Scheduler {
             stack: stack,
             stack_len: stack_len
         };
-
-        log!("spawn({}: stack = {:x}, rip = {:x}, rsp = {:x})", thread.id, thread.stack as usize, jmp_buf.rip, jmp_buf.rsp);
 
         {
             let mut state = self.state.write();
@@ -232,7 +216,6 @@ impl Drop for Scheduler {
         };
 
         for (stack, stack_len) in garbage_stacks {
-            log!("garbage_stacks: {:x}", stack as usize);
             unsafe {
                 heap::deallocate(stack, stack_len, 16);
             }
