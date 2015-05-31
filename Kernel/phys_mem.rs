@@ -8,7 +8,7 @@ use std::result::Result::{self,Ok,Err};
 use super::multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
 
 extern {
-    static KERNEL_BASE: u8;
+    static mut KERNEL_BASE: u8;
     static kernel_start: u8;
     static mut kernel_end: u8;
     static mboot_ptr: multiboot_uint32_t;
@@ -49,7 +49,7 @@ impl PhysicalBitmap {
         {
             let mut mmap_offset = 0;
             while mmap_offset < info.mmap_length {
-                let mmap: &multiboot_memory_map_t = phys2virt((info.mmap_addr + mmap_offset) as usize);
+                let mmap: &multiboot_memory_map_t = unsafe { phys2virt((info.mmap_addr + mmap_offset) as usize) };
                 if mmap._type != 1 {
                     bitmap.reserve_addr(mmap.addr as usize, mmap.len as usize);
                 }
@@ -105,17 +105,15 @@ impl PhysicalBitmap {
     }
 }
 
-pub fn phys2virt<T>(addr: usize) -> &'static T {
-    let kernel_base_ptr: *const u8 = &KERNEL_BASE as *const u8;
-    unsafe {
-        let ptr: *const u8 = kernel_base_ptr.offset(addr as isize);
-        let ptr: *const T = ptr as *const T;
-        &*ptr
-    }
+pub unsafe fn phys2virt<T>(addr: usize) -> &'static mut T {
+    let kernel_base_ptr: *mut u8 = &mut KERNEL_BASE as *mut u8;
+    let ptr: *mut u8 = kernel_base_ptr.offset(addr as isize);
+    let ptr: *mut T = ptr as *mut T;
+    &mut *ptr
 }
 
 pub fn virt2phys<T>(ptr: *const T) -> usize {
-    let kernel_base_ptr: *const u8 = &KERNEL_BASE as *const u8;
+    let kernel_base_ptr: *const u8 = unsafe { &KERNEL_BASE as *const u8 };
     ptr as usize - kernel_base_ptr as usize
 }
 
@@ -146,7 +144,7 @@ test!(
     }
 
     fn can_parse_multiboot() {
-        let info: &multiboot_info_t = phys2virt(mboot_ptr as usize);
+        let info: &multiboot_info_t = unsafe { phys2virt(mboot_ptr as usize) };
         let kernel_len = unsafe { ptrdiff(&kernel_end, &kernel_start) + brk };
         PhysicalBitmap::parse_multiboot(&info, &kernel_start as *const u8, kernel_len as usize);
     }

@@ -1,3 +1,4 @@
+use ::arch::debug;
 use core::fmt::{Error,Write};
 use spin::{MutexGuard,StaticMutex,STATIC_MUTEX_INIT};
 use std::result::Result::{self,Ok};
@@ -24,7 +25,7 @@ impl<'a> Writer<'a> {
 impl<'a> Write for Writer<'a>
 {
 	fn write_str(&mut self, s: &str) -> Result<(), Error> {
-        unsafe { ::arch::debug::puts(s) };
+        debug::puts(s);
 		Ok(())
 	}
 }

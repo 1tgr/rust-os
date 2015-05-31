@@ -79,6 +79,7 @@ const TEST_FIXTURES: &'static [Fixture] = &[
 #[lang="start"]
 #[no_mangle]
 pub fn kmain() -> ! {
+    arch::init();
     log!("begin kmain");
 
     for &(fixture_name, fixture) in TEST_FIXTURES {
