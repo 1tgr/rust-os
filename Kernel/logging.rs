@@ -1,34 +1,17 @@
-/*
- * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
- *
- * logging.rs
- * - Debug output using rust's core::fmt system
- *
- * This code has been put into the public domain, there are no restrictions on
- * its use, and the author takes no liability.
- */
-use prelude::*;
-use core::atomic;
-use core::fmt;
+use core::fmt::{Error,Write};
+use spin::{MutexGuard,StaticMutex,STATIC_MUTEX_INIT};
+use std::result::Result::{self,Ok};
 
-/// A formatter object
-pub struct Writer(bool);
+pub struct Writer<'a> {
+    state: MutexGuard<'a, ()>
+}
 
-/// A primitive lock for the logging output
-///
-/// This is not really a lock. Since there is no threading at the moment, all
-/// it does is prevent writing when a collision would occur.
-static LOGGING_LOCK: atomic::AtomicBool = atomic::ATOMIC_BOOL_INIT;
+static LOGGING_LOCK: StaticMutex = STATIC_MUTEX_INIT;
 
-impl Writer
-{
-	/// Obtain a logger for the specified module
+impl<'a> Writer<'a> {
 	pub fn get(module: &str) -> Writer {
-		// This "acquires" the lock (actually just disables output if paralel writes are attempted
-		let mut ret = Writer( ! LOGGING_LOCK.swap(true, atomic::Ordering::Acquire) );
+		let mut ret = Writer { state: LOGGING_LOCK.lock() };
 		
-		// Print the module name before returning (prefixes all messages)
 		{
 			use core::fmt::Write;
 			let _ = write!(&mut ret, "[{}] ", module);
@@ -38,34 +21,11 @@ impl Writer
 	}
 }
 
-impl ::core::ops::Drop for Writer
+impl<'a> Write for Writer<'a>
 {
-	fn drop(&mut self)
-	{
-		// Write a terminating newline before releasing the lock
-		{
-			use core::fmt::Write;
-			let _ = write!(self, "\n");
-		}
-		// On drop, "release" the lock
-		if self.0 {
-			LOGGING_LOCK.store(false, atomic::Ordering::Release);
-		}
-	}
-}
-
-impl fmt::Write for Writer
-{
-	fn write_str(&mut self, s: &str) -> fmt::Result
-	{
-		// If the lock is owned by this instance, then we can safely write to the output
-		if self.0
-		{
-			unsafe {
-				::arch::debug::puts( s );
-			}
-		}
-		Ok( () )
+	fn write_str(&mut self, s: &str) -> Result<(), Error> {
+        unsafe { ::arch::debug::puts(s) };
+		Ok(())
 	}
 }
 
