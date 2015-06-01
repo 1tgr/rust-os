@@ -1,104 +1,112 @@
 use ::phys_mem;
 use core::intrinsics;
 use libc::c_char;
-use spin::{Mutex,MutexGuard};
+use spin::Mutex;
 use super::io;
 
 struct VgaState {
     base_ptr: *mut u16,
+    ptr: *mut u16,
     row: isize,
     col: isize
 }
 
-unsafe fn update_cursor(state: &VgaState) {
-    let position = state.row * 80 + state.col;
-    let low = position & 0xff;
-    let high = (position >> 8) & 0xff;
- 
-    io::outb(0x3D4, 0x0F);
-    io::outb(0x3D5, low as u8);
-    io::outb(0x3D4, 0x0E);
-    io::outb(0x3D5, high as u8);
-}
+impl VgaState {
+    pub fn new() -> VgaState {
+        let base_ptr = unsafe { phys_mem::phys2virt::<u16>(0xb8000) as *mut u16 };
 
-unsafe fn newline<'a>(state: &mut MutexGuard<'a, VgaState>, ptr: *mut u16) -> *mut u16 {
-    let col = state.col;
-    state.col = 0;
-
-    if state.row < 24 {
-        state.row += 1;
-        ptr.offset(80 - col)
-    } else {
-        intrinsics::copy(state.base_ptr.offset(80), state.base_ptr, 80 * 24);
-
-        let line_base_ptr = state.base_ptr.offset(80 * 24);
-        let mut ptr = line_base_ptr;
-        for _ in 0..80 {
-            *ptr = 0x1700;
-            ptr = ptr.offset(1);
-        }
-
-        line_base_ptr
-    }
-}
-
-unsafe fn putb<'a>(state: &mut MutexGuard<'a, VgaState>, ptr: *mut u16, b: u8) -> *mut u16 {
-    return
-        match b {
-            10 => newline(state, ptr),
-
-            _ => {
-                *ptr = 0x1700 | (b as u16);
-                state.col += 1;
-
-                if state.col >= 80 {
-                    newline(state, ptr)
-                } else {
-                    ptr.offset(1)
-                }
-            }
-        }
-}
-
-lazy_static! {
-    static ref STATE: Mutex<VgaState> = {
         let state = VgaState {
-            base_ptr: phys_mem::phys2virt::<u16>(0xb8000) as *mut u16,
+            base_ptr: base_ptr,
+            ptr: base_ptr,
             row: 0,
             col: 0
         };
 
-        let mut ptr = state.base_ptr;
-        for _ in 0..80 * 25 {
-            *ptr = 0x1700;
-            ptr = ptr.offset(1);
+        let mut ptr = base_ptr;
+        unsafe {
+            for _ in 0..80 * 25 {
+                *ptr = 0x1700;
+                ptr = ptr.offset(1);
+            }
         }
 
-        update_cursor(&state);
-        Mutex::new(state)
-    };
+        state.update_cursor();
+        state
+    }
+
+    fn update_cursor(&self) {
+        let position = self.row * 80 + self.col;
+        let low = position & 0xff;
+        let high = (position >> 8) & 0xff;
+     
+        unsafe {
+            io::outb(0x3D4, 0x0F);
+            io::outb(0x3D5, low as u8);
+            io::outb(0x3D4, 0x0E);
+            io::outb(0x3D5, high as u8);
+        }
+    }
+
+    fn newline(&mut self) {
+        let col = self.col;
+        self.col = 0;
+
+        if self.row < 24 {
+            self.row += 1;
+            self.ptr = unsafe { self.ptr.offset(80 - col) };
+        } else {
+            unsafe {
+                intrinsics::copy(self.base_ptr.offset(80), self.base_ptr, 80 * 24);
+
+                self.ptr = self.base_ptr.offset(80 * 24);
+
+                let mut ptr = self.ptr;
+                for _ in 0..80 {
+                    *ptr = 0x1700;
+                    ptr = ptr.offset(1);
+                }
+            }
+        }
+    }
+
+    pub fn putb(&mut self, b: u8) {
+        match b {
+            10 => self.newline(),
+            _ => {
+                unsafe { *self.ptr = 0x1700 | (b as u16); }
+
+                self.col += 1;
+
+                if self.col >= 80 {
+                    self.newline();
+                } else {
+                    self.ptr = unsafe { self.ptr.offset(1) };
+                }
+            }
+        }
+    }
+}
+
+lazy_static! {
+    static ref STATE: Mutex<VgaState> = Mutex::new(VgaState::new());
 }
 
 pub fn puts(s: &str) {
     let mut state = STATE.lock();
-    unsafe {
-        let mut ptr = state.base_ptr.offset(state.row * 80 + state.col);
-        for b in s.bytes() {
-            ptr = putb(&mut state, ptr, b);
-        }
-
-        update_cursor(&mut state);
+    for b in s.bytes() {
+        state.putb(b);
     }
+
+    state.update_cursor();
 }
 
 pub unsafe fn put_cstr(s: *const c_char) {
     let mut state = STATE.lock();
-    let mut ptr = state.base_ptr.offset(state.row * 80 + state.col);
     let mut s = s;
     while *s != 0 {
-        ptr = putb(&mut state, ptr, *s as u8);
+        state.putb(*s as u8);
         s = s.offset(1);
     }
 
-    update_cursor(&mut state);
+    state.update_cursor();
 }
