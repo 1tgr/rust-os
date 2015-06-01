@@ -4,16 +4,25 @@ include_rules
 !RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type bin %f |>
 !RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
 
-KERNEL_LIBS += ../modules/libspin.rlib
-RUSTFLAGS += --extern spin=../modules/libspin.rlib
-
 LINKFLAGS += --gc-sections
 LINKFLAGS += -z max-page-size=0x1000
-RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode
+RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
 
-KERNEL_LIBS = ../liballoc/liballoc.rlib ../libcollections/libcollections.rlib ../libcore/libcore.rlib ../liblibc/liblibc.rlib ../libstd/libstd.rlib ../libc/libc.a ../modules/libspin.rlib
+KERNEL_LIBS += ../liballoc/liballoc.rlib
+KERNEL_LIBS += ../libc/libc.a
+KERNEL_LIBS += ../libcollections/libcollections.rlib
+KERNEL_LIBS += ../libcore/libcore.rlib
+KERNEL_LIBS += ../liblibc/liblibc.rlib
+KERNEL_LIBS += ../libstd/libstd.rlib
+KERNEL_LIBS += ../modules/liblazy-static.rlib
+KERNEL_LIBS += ../modules/libspin.rlib
 
-RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib --extern collections=../libcollections/libcollections.rlib --extern core=../libcore/libcore.rlib --extern std=../libstd/libstd.rlib
+RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib
+RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
+RUSTFLAGS += --extern core=../libcore/libcore.rlib
+RUSTFLAGS += --extern lazy_static=../modules/liblazy-static.rlib
+RUSTFLAGS += --extern spin=../modules/libspin.rlib
+RUSTFLAGS += --extern std=../libstd/libstd.rlib
 
 : arch/@(ARCH)/start.S |> !AS |> start.o {objs}
 : main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ |> kernel.o {objs}

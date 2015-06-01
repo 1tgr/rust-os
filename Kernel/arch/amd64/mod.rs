@@ -16,7 +16,3 @@ mod x86_common;
 pub use self::x86_common::debug;
 
 pub mod thread;
-
-pub fn init() {
-    x86_common::vga::init();
-}

@@ -19,6 +19,9 @@
 extern crate core;
 
 #[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
 mod macros;
 
 #[macro_use]
@@ -79,7 +82,6 @@ const TEST_FIXTURES: &'static [Fixture] = &[
 #[lang="start"]
 #[no_mangle]
 pub fn kmain() -> ! {
-    arch::init();
     log!("begin kmain");
 
     for &(fixture_name, fixture) in TEST_FIXTURES {

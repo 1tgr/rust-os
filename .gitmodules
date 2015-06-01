@@ -1,3 +1,6 @@
 [submodule "modules/spinlock-rs"]
 	path = modules/spinlock-rs
 	url = https://github.com/mvdnes/spinlock-rs.git
+[submodule "modules/lazy-static.rs"]
+	path = modules/lazy-static.rs
+	url = https://github.com/Kimundi/lazy-static.rs.git

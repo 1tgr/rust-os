@@ -2,6 +2,8 @@ include_rules
 
 RUSTFLAGS += --cfg feature=\"no_std\"
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
+RUSTFLAGS += -L ../libcore
 
-: spinlock-rs/src/lib.rs | ../libcore/libcore.rlib spinlock-rs/src/*.rs |> !RUSTC_LIB  |> libspin.rlib
+: spinlock-rs/src/lib.rs | ../libcore/libcore.rlib spinlock-rs/src/*.rs |> !RUSTC_LIB |> libspin.rlib
+: lazy-static.rs/src/lib.rs | ../libcore/libcore.rlib libspin.rlib lazy-static.rs/src/*.rs |> !RUSTC_LIB --extern spin=libspin.rlib |> liblazy-static.rlib
 
