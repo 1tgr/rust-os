@@ -15,4 +15,5 @@ mod x86_common;
 
 pub use self::x86_common::debug;
 
+pub mod process;
 pub mod thread;

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::vec::Vec;
 use super::arch::thread;
+use super::process::Process;
 
 fn setjmp() -> Option<jmp_buf> {
     unsafe {
@@ -34,10 +35,11 @@ fn forget_write_guard<'a, T>(guard: RwLockWriteGuard<'a, T>) {
 
 static NEXT_THREAD_ID: AtomicUsize = ATOMIC_USIZE_INIT;
 
-pub struct Thread {
+struct Thread {
     id: usize,
     stack: *mut u8,
-    stack_len: usize
+    stack_len: usize,
+    process: Arc<Process>
 }
 
 struct DeferredState<A> {
@@ -61,11 +63,12 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-    pub fn new() -> Scheduler {
+    pub fn new(idle_process: Arc<Process>) -> Scheduler {
         let idle = Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             stack: 0 as *mut u8,
-            stack_len: 0
+            stack_len: 0,
+            process: idle_process
         };
 
         let state = SchedulerState {
@@ -170,7 +173,7 @@ impl Scheduler {
         state.threads.append(&mut waiters);
     }
 
-    fn spawn_inner<'a>(&'a self, start: Box<FnBox() + 'a>) {
+    fn spawn_inner<'a>(&'a self, process: Arc<Process>, start: Box<FnBox() + 'a>) {
         let stack_len = 4096;
         let stack = unsafe { heap::allocate(stack_len, 16) };
         let jmp_buf = thread::new_jmp_buf(Box::new(start), stack, stack_len);
@@ -178,7 +181,8 @@ impl Scheduler {
         let thread = Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             stack: stack,
-            stack_len: stack_len
+            stack_len: stack_len,
+            process: process
         };
 
         {
@@ -187,7 +191,7 @@ impl Scheduler {
         }
     }
 
-    pub fn spawn<T, A>(&self, start: T) -> Deferred<A> where T : FnOnce() -> A, A : Clone {
+    pub fn spawn_remote<T, A>(&self, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A, A : Clone {
         let dstate = Arc::new(RwLock::new(DeferredState {
             result: None,
             waiters: VecDeque::new()
@@ -202,9 +206,14 @@ impl Scheduler {
             self.exit_current();
         };
 
-        self.spawn_inner(Box::new(start));
+        self.spawn_inner(process, Box::new(start));
 
         Deferred { scheduler: &self, state: dstate2 }
+    }
+
+    pub fn spawn<T, A>(&self, start: T) -> Deferred<A> where T : FnOnce() -> A, A : Clone {
+        let process = self.state.read().current.process.clone();
+        self.spawn_remote(process, start)
     }
 }
 
@@ -242,13 +251,15 @@ impl<'a, A> Promise<A> for Deferred<'a, A> where A : Clone {
 
 test! {
     fn can_spawn_exit_thread() {
-        let scheduler = Scheduler::new();
+        let p = Arc::new(Process::kernel());
+        let scheduler = Scheduler::new(p.clone());
         let d = scheduler.spawn(|| 123);
         assert_eq!(123, d.get());
     }
 
     fn can_spawn_exit_two_threads() {
-        let scheduler = Scheduler::new();
+        let p = Arc::new(Process::kernel());
+        let scheduler = Scheduler::new(p.clone());
         let d1 = scheduler.spawn(|| 456);
         let d2 = scheduler.spawn(|| 789);
         assert_eq!(456, d1.get());
@@ -256,14 +267,16 @@ test! {
     }
 
     fn can_closure() {
-        let scheduler = Scheduler::new();
+        let p = Arc::new(Process::kernel());
+        let scheduler = Scheduler::new(p.clone());
         let s = String::from_str("hello");
         let d = scheduler.spawn(move || s + &" world");
         assert_eq!("hello world", d.get());
     }
 
     fn threads_can_spawn_more_threads() {
-        let scheduler = Scheduler::new();
+        let p = Arc::new(Process::kernel());
+        let scheduler = Scheduler::new(p.clone());
 
         let thread2_fn = || 1234;
 

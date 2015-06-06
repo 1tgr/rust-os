@@ -45,7 +45,9 @@ pub mod arch;
 mod logging;
 mod multiboot;
 mod prelude;
+mod process;
 mod thread;
+mod virt_mem;
 pub mod phys_mem;
 pub mod unwind;
 
@@ -73,8 +75,10 @@ pub unsafe extern fn __assert(file: *const c_char, line: c_int, msg: *const c_ch
 }
 
 const TEST_FIXTURES: &'static [Fixture] = &[
+    arch::process::TESTS,
     phys_mem::TESTS,
     thread::TESTS,
+    virt_mem::TESTS,
 ];
 
 // Kernel entrypoint

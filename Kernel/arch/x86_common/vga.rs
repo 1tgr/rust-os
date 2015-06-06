@@ -88,7 +88,7 @@ impl VgaState {
 }
 
 lazy_static! {
-    static ref STATE: Mutex<VgaState> = Mutex::new(VgaState::new());
+    static noalloc STATE: Mutex<VgaState> = Mutex::new(VgaState::new());
 }
 
 pub fn puts(s: &str) {

@@ -26,7 +26,7 @@ pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
 
 pub const PAGE_SIZE: usize = 4096;
 
-fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
+pub fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
     ptr1 as isize - ptr2 as isize
 }
 
@@ -41,10 +41,12 @@ impl PhysicalBitmap {
         PhysicalBitmap { free: RwLock::new(free) }
     }
 
-    pub fn parse_multiboot(info: &multiboot_info_t, kernel_start_ptr: *const u8, kernel_len: usize) -> PhysicalBitmap {
+    pub fn parse_multiboot() -> PhysicalBitmap {
+        let info: &multiboot_info_t = unsafe { phys2virt(mboot_ptr as usize) };
+        let kernel_len = unsafe { ptrdiff(&kernel_end, &kernel_start) + brk };
         let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
         let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
-        bitmap.reserve_ptr(kernel_start_ptr, kernel_len as usize);
+        bitmap.reserve_ptr(&kernel_start as *const u8, kernel_len as usize);
 
         {
             let mut mmap_offset = 0;
@@ -58,8 +60,8 @@ impl PhysicalBitmap {
             }
         }
 
-        let bytes_free = bitmap.bytes_free();
-        log!("free memory: {} bytes ({}KB)", bytes_free, bytes_free / 1024);
+        let free_bytes = bitmap.free_bytes();
+        log!("free memory: {} bytes ({}KB)", free_bytes, free_bytes / 1024);
         bitmap
     }
 
@@ -80,7 +82,12 @@ impl PhysicalBitmap {
         self.reserve_addr(addr, len)
     }
 
-    pub fn bytes_free(&self) -> usize {
+    pub fn total_bytes(&self) -> usize {
+        let total_count = self.free.read().len();
+        total_count * PAGE_SIZE
+    }
+
+    pub fn free_bytes(&self) -> usize {
         let free = self.free.read();
         let free_count = free.iter().filter(|x| *x).count();
         free_count * PAGE_SIZE
@@ -117,7 +124,7 @@ pub fn virt2phys<T>(ptr: *const T) -> usize {
     ptr as usize - kernel_base_ptr as usize
 }
 
-test!(
+test! {
     fn can_alloc_two_pages() {
         let bitmap = PhysicalBitmap::new(640 * 1024);
         let addr1 = bitmap.alloc_page().unwrap();
@@ -144,8 +151,11 @@ test!(
     }
 
     fn can_parse_multiboot() {
-        let info: &multiboot_info_t = unsafe { phys2virt(mboot_ptr as usize) };
-        let kernel_len = unsafe { ptrdiff(&kernel_end, &kernel_start) + brk };
-        PhysicalBitmap::parse_multiboot(&info, &kernel_start as *const u8, kernel_len as usize);
+        let bitmap = PhysicalBitmap::parse_multiboot();
+        let total_bytes = bitmap.total_bytes();
+        let free_bytes = bitmap.free_bytes();
+        assert!(total_bytes > 0);
+        assert!(free_bytes > 0);
+        assert!(free_bytes < total_bytes);
     }
-);
+}

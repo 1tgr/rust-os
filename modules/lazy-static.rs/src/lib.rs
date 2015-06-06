@@ -81,40 +81,20 @@ pub mod once;
 #[macro_export]
 macro_rules! lazy_static {
     (static ref $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-        lazy_static!(PRIV static ref $N : $T = $e; $($t)*);
+        lazy_static!(PRIV ALLOC static ref $N : $T = $e; $($t)*);
     };
     (pub static ref $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
-        lazy_static!(PUB static ref $N : $T = $e; $($t)*);
+        lazy_static!(PUB ALLOC static ref $N : $T = $e; $($t)*);
     };
-    ($VIS:ident static ref $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
+    (static noalloc $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
+        lazy_static!(PRIV NOALLOC static ref $N : $T = $e; $($t)*);
+    };
+    (pub static noalloc $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
+        lazy_static!(PUB NOALLOC static ref $N : $T = $e; $($t)*);
+    };
+    ($VIS:ident $ALLOC:ident static ref $N:ident : $T:ty = $e:expr; $($t:tt)*) => {
         lazy_static!(MAKE TY $VIS $N);
-        impl ::std::ops::Deref for $N {
-            type Target = $T;
-            fn deref<'a>(&'a self) -> &'a $T {
-                unsafe {
-                    use $crate::once::{Once, ONCE_INIT};
-                    use core::option::Option::{self,Some,None};
-                    use core::marker::Sync;
-
-                    #[inline(always)]
-                    fn require_sync<T: Sync>(_: &T) { }
-
-                    static mut DATA: Option<$T> = None;
-                    static mut ONCE: Once = ONCE_INIT;
-                    ONCE.call_once(|| {
-                        DATA = Some($e);
-                    });
-                    match DATA {
-                        Some(ref static_ref) => {
-                            require_sync(static_ref);
-                            static_ref
-                        },
-
-                        None => panic!(concat!(stringify!($N), " was not lazy initialized"))
-                    }
-                }
-            }
-        }
+        lazy_static!(MAKE DEREF $ALLOC $N, $T, $e);
         lazy_static!($($t)*);
     };
     (MAKE TY PUB $N:ident) => {
@@ -130,6 +110,64 @@ macro_rules! lazy_static {
         #[allow(dead_code)]
         struct $N {__private_field: ()}
         static $N: $N = $N {__private_field: ()};
+    };
+    (MAKE DEREF ALLOC $N:ident, $T:ty, $e:expr) => {
+        impl ::std::ops::Deref for $N {
+            type Target = $T;
+            fn deref<'a>(&'a self) -> &'a $T {
+                use $crate::once::{Once, ONCE_INIT};
+                use alloc::boxed::Box;
+                use core::marker::Sync;
+
+                #[inline(always)]
+                fn require_sync<T: Sync>(_: &T) { }
+
+                static mut DATA: *const $T = 0 as *const $T;
+                static ONCE: Once = ONCE_INIT;
+                ONCE.call_once(|| {
+                    let b = Box::new($e);
+                    unsafe {
+                        DATA = &*b as *const $T;
+                    }
+                });
+                unsafe {
+                    require_sync(&*DATA);
+                    &*DATA
+                }
+            }
+        }
+    };
+    (MAKE DEREF NOALLOC $N:ident, $T:ty, $e:expr) => {
+        impl ::std::ops::Deref for $N {
+            type Target = $T;
+            fn deref<'a>(&'a self) -> &'a $T {
+                use $crate::once::{Once, ONCE_INIT};
+                use core::option::Option::{self,Some,None};
+                use core::marker::Sync;
+
+                #[inline(always)]
+                fn require_sync<T: Sync>(_: &T) { }
+
+                static mut DATA: Option<$T> = None;
+                static ONCE: Once = ONCE_INIT;
+                ONCE.call_once(|| {
+                    let value = $e;
+                    unsafe {
+                        DATA = Some(value);
+                    }
+                });
+                unsafe {
+                    match DATA {
+                        Some(ref static_ref) => {
+                            require_sync(static_ref);
+                            static_ref
+                        },
+
+                        None => panic!(concat!(stringify!($N), " was not lazy initialized"))
+                    }
+                }
+            }
+        }
     };
     () => ()
 }

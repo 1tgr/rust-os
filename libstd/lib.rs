@@ -40,10 +40,12 @@ pub use core::result;
 pub use core_collections::string;
 
 pub mod collections {
+    pub use core_collections::BTreeMap;
     pub use core_collections::BitSet;
-    pub use core_collections::bit_vec;
+    pub use core_collections::Bound;
     pub use core_collections::LinkedList;
     pub use core_collections::VecDeque;
+    pub use core_collections::bit_vec;
 }
 
 pub mod sync {
