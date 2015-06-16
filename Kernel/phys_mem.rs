@@ -37,7 +37,6 @@ pub struct PhysicalBitmap {
 impl PhysicalBitmap {
     pub fn new(total_bytes: usize) -> PhysicalBitmap {
         let free = BitVec::from_elem(total_bytes / PAGE_SIZE, true);
-        log!("total memory: {} bytes ({}KB)", free.len() * PAGE_SIZE, (free.len() * PAGE_SIZE) / 1024);
         PhysicalBitmap { free: RwLock::new(free) }
     }
 
@@ -46,7 +45,7 @@ impl PhysicalBitmap {
         let kernel_len = unsafe { ptrdiff(&kernel_end, &kernel_start) + brk };
         let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
         let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
-        bitmap.reserve_ptr(&kernel_start as *const u8, kernel_len as usize);
+        bitmap.reserve_ptr(&kernel_start, kernel_len as usize);
 
         {
             let mut mmap_offset = 0;
@@ -60,15 +59,16 @@ impl PhysicalBitmap {
             }
         }
 
-        let free_bytes = bitmap.free_bytes();
-        log!("free memory: {} bytes ({}KB)", free_bytes, free_bytes / 1024);
         bitmap
     }
 
     pub fn reserve_pages(&self, start_page: usize, page_count: usize) {
         let mut free = self.free.write();
-        for i in 0..page_count - 1 {
-            free.set(i, false);
+        if start_page <= free.len() {
+            let page_count = cmp::min(page_count, free.len() - start_page);
+            for i in start_page..start_page + page_count {
+                free.set(i, false);
+            }
         }
     }
 

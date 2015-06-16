@@ -33,6 +33,7 @@ pub use core::option;
 pub use core::marker;
 pub use alloc::*;
 pub use core::clone;
+pub use core::intrinsics;
 pub use core::mem;
 pub use core_collections::vec;
 pub use core::default;

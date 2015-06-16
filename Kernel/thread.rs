@@ -1,3 +1,7 @@
+use ::arch::thread;
+use ::phys_mem::PhysicalBitmap;
+use ::process::Process;
+use ::virt_mem::VirtualTree;
 use alloc::heap;
 use core::ops::{Drop,FnOnce};
 use libc::{self,jmp_buf};
@@ -11,8 +15,6 @@ use std::string::String;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::vec::Vec;
-use super::arch::thread;
-use super::process::Process;
 
 pub fn setjmp() -> Option<jmp_buf> {
     unsafe {
@@ -251,14 +253,18 @@ impl<'a, A> Promise<A> for Deferred<'a, A> where A : Clone {
 
 test! {
     fn can_spawn_exit_thread() {
-        let p = Arc::new(Process::kernel());
+        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let kernel_virt = Arc::new(VirtualTree::new());
+        let p = Arc::new(Process::kernel(phys, kernel_virt));
         let scheduler = Scheduler::new(p.clone());
         let d = scheduler.spawn(|| 123);
         assert_eq!(123, d.get());
     }
 
     fn can_spawn_exit_two_threads() {
-        let p = Arc::new(Process::kernel());
+        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let kernel_virt = Arc::new(VirtualTree::new());
+        let p = Arc::new(Process::kernel(phys, kernel_virt));
         let scheduler = Scheduler::new(p.clone());
         let d1 = scheduler.spawn(|| 456);
         let d2 = scheduler.spawn(|| 789);
@@ -267,7 +273,9 @@ test! {
     }
 
     fn can_closure() {
-        let p = Arc::new(Process::kernel());
+        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let kernel_virt = Arc::new(VirtualTree::new());
+        let p = Arc::new(Process::kernel(phys, kernel_virt));
         let scheduler = Scheduler::new(p.clone());
         let s = String::from_str("hello");
         let d = scheduler.spawn(move || s + &" world");
@@ -275,7 +283,9 @@ test! {
     }
 
     fn threads_can_spawn_more_threads() {
-        let p = Arc::new(Process::kernel());
+        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let kernel_virt = Arc::new(VirtualTree::new());
+        let p = Arc::new(Process::kernel(phys, kernel_virt));
         let scheduler = Scheduler::new(p.clone());
 
         let thread2_fn = || 1234;

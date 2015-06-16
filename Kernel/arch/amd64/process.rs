@@ -1,5 +1,6 @@
 use ::phys_mem::{self,PhysicalBitmap};
 use ::thread;
+use std::intrinsics;
 use std::marker::PhantomData;
 use std::ops::Fn;
 use std::option::Option::*;
@@ -169,6 +170,10 @@ impl ArchProcess {
             dummy: 0
         }
     }
+
+    pub fn map<T>(&self, alloc: &Fn() -> usize, ptr: *const T, addr: usize, user: bool, writable: bool) {
+        map(&alloc, ptr, addr, user, writable)
+    }
 }
 
 test! {
@@ -200,8 +205,8 @@ test! {
         let ptr2 = unsafe { phys_mem::phys2virt(addr) };
         let sentinel = 0x55aa;
         unsafe {
-            *ptr1 = sentinel;
-            assert_eq!(sentinel, *ptr2);
+            intrinsics::volatile_store(ptr1, sentinel);
+            assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
         }
     }
 

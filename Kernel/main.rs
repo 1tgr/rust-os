@@ -77,6 +77,7 @@ pub unsafe extern fn __assert(file: *const c_char, line: c_int, msg: *const c_ch
 const TEST_FIXTURES: &'static [Fixture] = &[
     arch::process::TESTS,
     phys_mem::TESTS,
+    process::TESTS,
     thread::TESTS,
     virt_mem::TESTS,
 ];
