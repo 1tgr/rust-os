@@ -33,8 +33,13 @@ CCFLAGS += -fPIC
 endif
 
 ARFLAGS += crus
+LINKFLAGS += --gc-sections -z max-page-size=0x1000
 
 !AR = |> $(AR) $(ARFLAGS) -o %o %f |>
 !AS = |> $(CC) $(ASFLAGS) -c -o %o %f |>
 !CC = |> $(CC) $(CCFLAGS) -c -o %o %f |>
+!LD = |> $(LD) $(LINKFLAGS) -o %o %f |>
+!RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type bin %f |>
 !RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type=lib --emit=link %f |>
+!RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
+

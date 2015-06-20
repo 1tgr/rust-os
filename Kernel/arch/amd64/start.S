@@ -151,7 +151,6 @@ start64_high:
 #include "interrupts.h"
 
     lidtq IDTPtr
-    sti
 
 	/* call the rust code */
 	call kmain
@@ -232,7 +231,7 @@ irq_##n: \
 	.globl	interrupt_##n ;\
 	\
 interrupt_##n: \
-	pushq	$0 ;\
+	pushq	$-2 ;\
 	pushq	$0x##n; \
 	jmp		isr_asm ;\
 	.align	8
@@ -243,6 +242,7 @@ interrupt_##n: \
 .section .padata
 /* Initial paging structures, four levels */
 /* The +3 for sub-pages indicates "present (1) + writable (2)" */
+.globl init_pml4
 init_pml4:
 	.quad low_pdpt - KERNEL_BASE + 3	/* low map for startup, will be cleared before rust code runs */
 	.rept 512 - 3

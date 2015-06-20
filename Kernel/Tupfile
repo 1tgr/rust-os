@@ -1,11 +1,5 @@
 include_rules
 
-!LD = |> $(LD) $(LINKFLAGS) -o %o %f |>
-!RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type bin %f |>
-!RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
-
-LINKFLAGS += --gc-sections
-LINKFLAGS += -z max-page-size=0x1000
 RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
 
 KERNEL_LIBS += ../liballoc/liballoc.rlib
@@ -27,7 +21,7 @@ RUSTFLAGS += --extern spin=../modules/libspin.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 
 : arch/@(ARCH)/start.S |> !AS |> start.o {objs}
-: main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ |> kernel.o {objs}
+: main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}
 #: main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 
 ifeq (@(ARCH),amd64)

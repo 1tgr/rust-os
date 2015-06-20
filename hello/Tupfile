@@ -1,0 +1,23 @@
+include_rules
+
+RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
+
+LIBS += ../libcore/libcore.rlib
+LIBS += ../liblibc/liblibc.rlib
+LIBS += ../liballoc/liballoc.rlib
+LIBS += ../librustc_unicode/librustc_unicode.rlib
+LIBS += ../libcollections/libcollections.rlib
+LIBS += ../libstd/libstd.rlib
+
+RUSTFLAGS += --extern std=../libstd/libstd.rlib
+
+ifeq ($(ARCH),amd64)
+NDISASMFLAGS += -b64
+else
+NDISASMFLAGS += -b32
+endif
+
+: main.rs | $(LIBS) |> !RUSTC_OBJ |> hello.o {objs}
+: {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> hello.bin
+: hello.bin |> ndisasm $(NDISASMFLAGS) %f > %o |> hello.txt
+

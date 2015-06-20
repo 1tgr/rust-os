@@ -1,11 +1,13 @@
+use ::multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
+use ::ptr;
 use libc::{c_int,c_void};
 use spin::RwLock;
 use std::cmp;
 use std::collections::bit_vec::BitVec;
+use std::intrinsics;
 use std::iter::Iterator;
 use std::option::Option::{Some,None};
 use std::result::Result::{self,Ok,Err};
-use super::multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
 
 extern {
     static mut KERNEL_BASE: u8;
@@ -14,21 +16,17 @@ extern {
     static mboot_ptr: multiboot_uint32_t;
 }
 
-static mut brk: isize = 0;
+pub static mut brk: usize = 0;
 
 #[no_mangle]
 pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
-    let begin = (&mut kernel_end as *mut u8).offset(brk);
-    brk += incr as isize;
-    log!("sbrk({}) = {:x}", incr, begin as isize);
+    let begin = (&mut kernel_end as *mut u8).offset(brk as isize);
+    brk += incr as usize;
+    log!("sbrk({}) = {:p}", incr, begin);
     begin as *mut c_void
 }
 
 pub const PAGE_SIZE: usize = 4096;
-
-pub fn ptrdiff<T>(ptr1: *const T, ptr2: *const T) -> isize {
-    ptr1 as isize - ptr2 as isize
-}
 
 pub struct PhysicalBitmap {
     free: RwLock<BitVec>
@@ -42,7 +40,7 @@ impl PhysicalBitmap {
 
     pub fn parse_multiboot() -> PhysicalBitmap {
         let info: &multiboot_info_t = unsafe { phys2virt(mboot_ptr as usize) };
-        let kernel_len = unsafe { ptrdiff(&kernel_end, &kernel_start) + brk };
+        let kernel_len = unsafe { ptr::bytes_between(&kernel_start, &kernel_end) + brk };
         let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
         let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
         bitmap.reserve_ptr(&kernel_start, kernel_len as usize);
@@ -93,15 +91,24 @@ impl PhysicalBitmap {
     }
 
     pub fn alloc_page(&self) -> Result<usize, &'static str> {
-        let mut free = self.free.write();
-        match free.iter().position(|x| x) {
-            Some(i) => {
-                free.set(i, false);
-                Ok(i * PAGE_SIZE)
-            }
+        let addr = {
+            let mut free = self.free.write();
+            match free.iter().position(|x| x) {
+                Some(i) => {
+                    free.set(i, false);
+                    i * PAGE_SIZE
+                }
 
-            None => Err("out of memory")
+                None => { return Err("out of memory"); }
+            }
+        };
+
+        unsafe {
+            let ptr: &mut u8 = phys2virt(addr);
+            intrinsics::write_bytes(ptr, 0, PAGE_SIZE);
         }
+
+        Ok(addr)
     }
 
     pub fn free_page(&self, addr: usize) {
@@ -156,5 +163,12 @@ test! {
         assert!(total_bytes > 0);
         assert!(free_bytes > 0);
         assert!(free_bytes < total_bytes);
+    }
+
+    fn alloc_returns_zeroed_memory() {
+        let bitmap = PhysicalBitmap::parse_multiboot();
+        let addr = bitmap.alloc_page().unwrap();
+        let ptr: &[u8; PAGE_SIZE] = unsafe { phys2virt(addr) };
+        assert!(ptr.iter().all(|&b| b == 0));
     }
 }

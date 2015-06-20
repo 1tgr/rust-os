@@ -41,6 +41,7 @@ mod logging;
 mod multiboot;
 mod prelude;
 mod process;
+mod ptr;
 mod thread;
 mod virt_mem;
 pub mod phys_mem;
@@ -70,8 +71,10 @@ pub unsafe extern fn __assert(file: *const c_char, line: c_int, msg: *const c_ch
 }
 
 const TEST_FIXTURES: &'static [Fixture] = &[
+    ptr::TESTS,
+
     arch::isr::TESTS,
-    arch::process::TESTS,
+    arch::mmu::TESTS,
     phys_mem::TESTS,
     process::TESTS,
     thread::TESTS,

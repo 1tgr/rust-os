@@ -22,8 +22,6 @@ pub mod prelude {
     }
 }
 
-// #18491 - write!() expands to std::fmt::Arguments::new
-pub use core::fmt;
 // #16803 - #[derive] references std::cmp
 pub use core::cmp;
 // #21827 - Slicing syntax references std::ops
@@ -33,14 +31,18 @@ pub use core::iter;
 pub use core::option;
 // #16803 - Derive references marker/ops
 pub use core::marker;
+
 pub use alloc::*;
 pub use core::clone;
+pub use core::default;
+pub use core::hash;
 pub use core::intrinsics;
 pub use core::mem;
-pub use core_collections::vec;
-pub use core::default;
+pub use core::ptr;
 pub use core::result;
+pub use core_collections::fmt;
 pub use core_collections::string;
+pub use core_collections::vec;
 
 pub mod collections {
     pub use core_collections::BTreeMap;

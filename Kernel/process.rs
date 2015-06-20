@@ -1,7 +1,10 @@
+use ::arch::mmu;
 use ::arch::process::ArchProcess;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::virt_mem::VirtualTree;
+use std::clone::Clone;
 use std::intrinsics;
+use std::ptr;
 use std::result::Result::{self,Ok};
 use std::sync::Arc;
 
@@ -13,39 +16,32 @@ pub struct Process {
 }
 
 impl Process {
-    pub fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree>) -> Process {
+    pub fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree>) -> Result<Process, &'static str> {
+        let arch = try!(ArchProcess::new(phys.clone()));
         let user_virt = VirtualTree::new();
         user_virt.reserve(0 as *mut u8, 4096);
 
-        Process {
-            arch: ArchProcess::new(),
+        Ok(Process {
+            arch: arch,
             phys: phys,
             user_virt: user_virt,
             kernel_virt: kernel_virt
-        }
+        })
     }
 
-    pub fn kernel(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree>) -> Process {
-        let user_virt = VirtualTree::new();
-        user_virt.reserve(0 as *mut u8, 4096);
-
-        Process {
-            arch: ArchProcess::kernel(),
-            phys: phys,
-            user_virt: user_virt,
-            kernel_virt: kernel_virt
-        }
+    pub fn switch(&self) {
+        self.arch.switch();
     }
 
     pub fn alloc(&self, len: usize, user: bool, writable: bool) -> Result<*mut u8, &'static str> {
         let virt = if user { &self.user_virt } else { &*self.kernel_virt };
         let base_ptr = try!(virt.alloc(len));
-        let alloc = || self.phys.alloc_page().unwrap();
         let mut offset = 0;
         while offset < len  {
             let ptr = unsafe { base_ptr.offset(offset as isize) };
             let addr = try!(self.phys.alloc_page());
-            self.arch.map(&alloc, ptr, addr, user, writable);
+            log!("alloc({}): map {:p} -> {:x}", len, ptr, addr);
+            try!(self.arch.map(ptr, addr, user, writable));
             offset += phys_mem::PAGE_SIZE;
         }
 
@@ -56,8 +52,10 @@ impl Process {
 test!{
     fn can_alloc() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Process::new(phys, kernel_virt);
+        let kernel_virt = Arc::new(VirtualTree::for_kernel());
+        let p = Process::new(phys, kernel_virt).unwrap();
+        p.switch();
+
         let len = 8192;
         let base_ptr = p.alloc(8192, false, true).unwrap();
         let sentinel = 0xaa55;
@@ -70,6 +68,25 @@ test!{
             }
 
             i += phys_mem::PAGE_SIZE;
+        }
+    }
+
+    fn can_run_hello_world() {
+        static HELLO: &'static [u8] = include_bytes!("../hello/hello.bin");
+        log!("HELLO = {} bytes @ {:p}", HELLO.len(), HELLO.as_ptr());
+        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let kernel_virt = Arc::new(VirtualTree::for_kernel());
+        let p = Process::new(phys, kernel_virt).unwrap();
+        p.switch();
+
+        let stack_len = phys_mem::PAGE_SIZE;
+        let code_ptr = p.alloc(HELLO.len(), true, true).unwrap();
+        let stack_ptr = p.alloc(stack_len, true, true).unwrap();
+        log!("code_ptr = {:p}, stack_ptr = {:p}", code_ptr, stack_ptr);
+        unsafe {
+            ptr::copy(HELLO.as_ptr(), code_ptr, HELLO.len());
+            log!("code_ptr[0] = 0x{:x}", *code_ptr);
+            mmu::call_user_mode(code_ptr, stack_ptr.offset(stack_len as isize));
         }
     }
 }

@@ -255,7 +255,7 @@ test! {
     fn can_spawn_exit_thread() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::kernel(phys, kernel_virt));
+        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Scheduler::new(p.clone());
         let d = scheduler.spawn(|| 123);
         assert_eq!(123, d.get());
@@ -264,7 +264,7 @@ test! {
     fn can_spawn_exit_two_threads() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::kernel(phys, kernel_virt));
+        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Scheduler::new(p.clone());
         let d1 = scheduler.spawn(|| 456);
         let d2 = scheduler.spawn(|| 789);
@@ -275,7 +275,7 @@ test! {
     fn can_closure() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::kernel(phys, kernel_virt));
+        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Scheduler::new(p.clone());
         let s = String::from_str("hello");
         let d = scheduler.spawn(move || s + &" world");
@@ -285,7 +285,7 @@ test! {
     fn threads_can_spawn_more_threads() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::kernel(phys, kernel_virt));
+        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Scheduler::new(p.clone());
 
         let thread2_fn = || 1234;

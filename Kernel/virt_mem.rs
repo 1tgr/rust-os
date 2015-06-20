@@ -5,7 +5,13 @@ use std::mem;
 use std::option::Option::{Some,None};
 use std::result::Result::{self,Ok,Err};
 use std::vec::Vec;
-use super::phys_mem;
+use ::phys_mem;
+use ::ptr::{self,Align};
+
+extern {
+    static kernel_start: u8;
+    static kernel_end: u8;
+}
 
 struct Block {
     ptr: *mut u8,
@@ -43,6 +49,9 @@ impl VirtualState {
     }
 
     pub fn reserve(&mut self, ptr: *mut u8, len: usize) -> bool {
+        let (ptr, len) = Align::range(ptr, len, phys_mem::PAGE_SIZE);
+        log!("reserve({:p} -> {:p})", ptr, unsafe { ptr.offset(len as isize) });
+
         let pos =
             match self.blocks.iter().position(|block| block.free && block.ptr <= ptr && block.len >= len) {
                 Some(pos) => pos,
@@ -51,7 +60,7 @@ impl VirtualState {
 
         let (orig_len, len0) = {
             let block0 = &mut self.blocks[pos];
-            let len0 = phys_mem::ptrdiff(ptr, block0.ptr) as usize;
+            let len0 = ptr::bytes_between(block0.ptr, ptr);
             let orig_len = mem::replace(&mut block0.len, len0);
             (orig_len, len0)
         };
@@ -107,6 +116,17 @@ impl VirtualTree {
                 }]
             })
         }
+    }
+
+    pub fn for_kernel() -> VirtualTree {
+        let tree = VirtualTree::new();
+        let kernel_start_ptr = &kernel_start as *const u8;
+        let kernel_end_ptr = &kernel_end as *const u8;
+        let kernel_len = ptr::bytes_between(kernel_start_ptr, kernel_end_ptr) + unsafe { phys_mem::brk };
+        let four_meg = 4 * 1024 * 1024;
+        let (kernel_start_ptr, kernel_len) = Align::range(kernel_start_ptr, kernel_len, four_meg);
+        tree.reserve(0 as *mut u8, kernel_start_ptr as usize + kernel_len);
+        tree
     }
 
     pub fn block_count(&self) -> usize {
