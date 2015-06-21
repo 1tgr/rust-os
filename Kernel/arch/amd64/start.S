@@ -132,6 +132,27 @@ start64_high:
 	/* Set up stack pointer */
 	mov $init_stack, %rsp
 	
+    /* Load IDTR */
+#define IDT_FIXUP(which) \
+    movq $which, %rax ;\
+    movw %ax, IDT_low_##which(%rip) ;\
+    shrl $16, %eax ;\
+    movw %ax, IDT_mid_##which(%rip)
+
+#undef exception
+#define exception(n) IDT_FIXUP(exception_##n)
+
+#undef irq
+#define irq(n) IDT_FIXUP(irq_##n)
+	
+#undef interrupt	
+#define interrupt(n) IDT_FIXUP(interrupt_##n)
+
+#include "interrupts.h"
+
+    lidtq IDTPtr
+    sti
+
 	/* call the rust code */
 	call kmain
 
@@ -146,6 +167,77 @@ thread_entry_asm:
     mov %rbx, %rdi
     jmp thread_entry
 
+
+isr_asm:
+    push %rax
+    push %rbx
+    push %rcx
+    push %rdx
+    push %rbp
+    push %rdi
+    push %rsi
+    push %r8
+    push %r9
+    push %r10
+    push %r11
+    push %r12
+    push %r13
+    push %r14
+    push %r15
+
+    mov %rsp, %rdi
+
+    call isr
+
+    pop %r15
+    pop %r14
+    pop %r13
+    pop %r12
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rsi
+    pop %rdi
+    pop %rbp
+    pop %rdx
+    pop %rcx
+    pop %rbx
+    pop %rax
+    add $16, %rsp
+    iretq
+
+
+#undef exception
+#define exception(n) \
+	.globl	exception_##n ;\
+	\
+exception_##n: \
+	pushq	$0x##n ;\
+	jmp		isr_asm ;\
+	.align	8
+
+#undef irq
+#define irq(n) \
+	.globl	irq_##n ;\
+	\
+irq_##n: \
+	pushq	$-1 ;\
+	pushq	$0x##n; \
+	jmp		isr_asm ;\
+	.align	8
+	
+#undef interrupt	
+#define interrupt(n) \
+	.globl	interrupt_##n ;\
+	\
+interrupt_##n: \
+	pushq	$0 ;\
+	pushq	$0x##n; \
+	jmp		isr_asm ;\
+	.align	8
+
+#include "interrupts.h"
 
 /* === Page-aligned data === */
 .section .padata
@@ -206,3 +298,46 @@ GDT:
 		.long 0x00000000, 0x0040FA00    /* 0x28: 32-bit User Code */
 		.long 0x00000000, 0x0040F200    /* 0x30: User Data        */
 GDTEnd:
+
+/* Interrupt Descriptor Table */
+IDTPtr:
+    .word IDT - IDTEnd
+    .quad IDT
+.globl IDT
+IDT:
+/*
+ * Offset   Size    Description
+ * 0    2   Offset low bits (0..15)
+ * 2    2   Selector (Code segment selector)
+ * 4    1   Zero
+ * 5    1   Type and Attributes (same as before)
+ * 6    2   Offset middle bits (16..31)
+ * 8    4   Offset high bits (32..63)
+ * 12   4   Zero
+ */
+
+/* 32-bit Interrupt gate: 0x8E ( P=1, DPL=00b, S=0, type=1110b => type_attr=1000_1110b=0x8E) */
+
+#define IDT_ENTRY(which) \
+IDT_low_##which: \
+    .word 0; ;\
+    .word 0x08 ;\
+    .byte 0 ;\
+    .byte 0x8e ;\
+IDT_mid_##which: \
+    .word 0 ;\
+    .long KERNEL_BASE >> 32 ;\
+    .long 0
+	
+#undef exception
+#define exception(n) IDT_ENTRY(exception_##n)
+
+#undef irq
+#define irq(n) IDT_ENTRY(irq_##n)
+
+#undef interrupt	
+#define interrupt(n) IDT_ENTRY(interrupt_##n)
+
+#include "interrupts.h"
+
+IDTEnd:
