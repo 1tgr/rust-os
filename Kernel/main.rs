@@ -15,17 +15,12 @@
 #![feature(lang_items)]	//< unwind needs to define lang items
 
 /// Macros, need to be loaded before everything else due to how rust parses
-#[macro_use]
-extern crate core;
+#[macro_use] extern crate bitflags;
+#[macro_use] extern crate core;
+#[macro_use] extern crate lazy_static;
 
-#[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
-mod macros;
-
-#[macro_use]
-mod test;
+#[macro_use] mod macros;
+#[macro_use] mod test;
 
 extern crate alloc;
 extern crate libc;

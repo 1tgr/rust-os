@@ -1,3 +1,5 @@
+#![crate_name = "std"]
+
 #![feature(alloc)]
 #![feature(collections)]
 #![feature(core)]
