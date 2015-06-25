@@ -151,6 +151,7 @@ start64_high:
 #include "interrupts.h"
 
     lidtq IDTPtr
+    sti
 
 	/* call the rust code */
 	call kmain

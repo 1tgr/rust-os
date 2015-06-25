@@ -20,7 +20,7 @@ RUSTFLAGS += --extern lazy_static=../modules/liblazy-static.rlib
 RUSTFLAGS += --extern spin=../modules/libspin.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 
-: arch/@(ARCH)/start.S |> !AS |> start.o {objs}
+: foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
 : main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}
 #: main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 

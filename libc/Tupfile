@@ -1,7 +1,6 @@
 include_rules
 
 CCFLAGS += -DHAVE_MMAP=0 -DLACKS_UNISTD_H -DLACKS_SYS_PARAM_H -DDL_DEBUG -nostdinc -I../include
-ASFLAGS += -D__USER_LABEL_PREFIX__= -D_I386MACH_ALLOW_HW_INTERRUPTS
 
 : foreach *.c |> !CC |> %B.o {objs}
 

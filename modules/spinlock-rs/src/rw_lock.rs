@@ -124,6 +124,8 @@ impl<T> RwLock<T>
     #[inline]
     pub fn read<'a>(&'a self) -> RwLockReadGuard<'a, T>
     {
+        unsafe { asm!("cli") };
+
         // (funny do-while loop)
         while {
             // Old value, with write bit unset
@@ -175,6 +177,8 @@ impl<T> RwLock<T>
     #[inline]
     pub fn try_read(&self) -> Option<RwLockReadGuard<T>>
     {
+        unsafe { asm!("cli") };
+
         // Old value, with write bit unset
         let old = (!USIZE_MSB) & self.lock.load(Ordering::Relaxed);
 
@@ -189,6 +193,7 @@ impl<T> RwLock<T>
                 data: unsafe { & *self.data.get() },
             })
         } else {
+            unsafe { asm!("sti") };
             None
         }
     }
@@ -214,6 +219,8 @@ impl<T> RwLock<T>
     #[inline]
     pub fn write<'a>(&'a self) -> RwLockWriteGuard<'a, T>
     {
+        unsafe { asm!("cli") };
+
         loop
         {
             // Old value, with write bit unset.
@@ -257,6 +264,7 @@ impl<T> RwLock<T>
     #[inline]
     pub fn try_write(&self) -> Option<RwLockWriteGuard<T>>
     {
+        unsafe { asm!("cli") };
         if self.lock.compare_and_swap(0,
                                       USIZE_MSB,
                                       Ordering::SeqCst) == 0
@@ -266,6 +274,7 @@ impl<T> RwLock<T>
                 data: unsafe { &mut *self.data.get() },
             })
         } else {
+            unsafe { asm!("sti") };
             None
         }
     }
@@ -291,6 +300,7 @@ impl<'rwlock, T> Drop for RwLockReadGuard<'rwlock, T> {
     fn drop(&mut self) {
         debug_assert!(self.lock.load(Ordering::Relaxed) & (!USIZE_MSB) > 0);
         self.lock.fetch_sub(1, Ordering::SeqCst);
+        unsafe { asm!("sti") };
     }
 }
 
@@ -298,5 +308,6 @@ impl<'rwlock, T> Drop for RwLockWriteGuard<'rwlock, T> {
     fn drop(&mut self) {
         debug_assert_eq!(self.lock.load(Ordering::Relaxed), USIZE_MSB);
         self.lock.store(0, Ordering::Relaxed);
+        unsafe { asm!("sti") };
     }
 }

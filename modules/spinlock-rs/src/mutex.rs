@@ -139,6 +139,7 @@ impl<T> Mutex<T>
 
     fn obtain_lock(&self)
     {
+        unsafe { asm!("cli") };
         while self.lock.compare_and_swap(false, true, Ordering::SeqCst) != false
         {
             // Do nothing
@@ -202,5 +203,6 @@ impl<'a, T> Drop for MutexGuard<'a, T>
     fn drop(&mut self)
     {
         self.lock.store(false, Ordering::SeqCst);
+        unsafe { asm!("sti") };
     }
 }

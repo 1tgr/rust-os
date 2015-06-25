@@ -2,6 +2,7 @@ use ::arch::cpu;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::ptr::Align;
 use ::thread;
+use spin::Mutex;
 use std::fmt::{Debug,Error,Formatter};
 use std::intrinsics;
 use std::marker::PhantomData;
@@ -171,6 +172,7 @@ extern {
 }
 
 pub struct AddressSpace {
+    mutex: Mutex<()>,
     bitmap: Arc<PhysicalBitmap>,
     cr3: usize
 }
@@ -195,17 +197,20 @@ impl AddressSpace {
         }
 
         Ok(AddressSpace {
+            mutex: Mutex::new(()),
             bitmap: bitmap,
             cr3: pml4_addr
         })
     }
 
     pub fn switch(&self) {
+        let _ = self.mutex.lock();
         log!("switch: {:x} -> {:x}", recursive_pml4_addr(), self.cr3);
         unsafe { cpu::write_cr3(self.cr3) };
     }
 
     pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<(), &'static str> {
+        let _ = self.mutex.lock();
         assert_eq!(self.cr3, recursive_pml4_addr());
 
         try!(pml4_entry(ptr).ensure_present(&self.bitmap));

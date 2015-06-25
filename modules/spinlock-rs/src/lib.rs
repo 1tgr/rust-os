@@ -1,6 +1,7 @@
 #![crate_name = "spin"]
 #![crate_type = "lib"]
 #![warn(missing_docs)]
+#![feature(asm)]
 
 //! Synchronization primitives based on spinning
 
