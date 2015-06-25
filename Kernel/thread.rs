@@ -3,18 +3,13 @@ use ::phys_mem::PhysicalBitmap;
 use ::process::Process;
 use ::virt_mem::VirtualTree;
 use alloc::heap;
-use core::ops::{Drop,FnOnce};
 use libc::{self,jmp_buf};
 use spin::{RwLock,RwLockWriteGuard};
-use std::boxed::{Box,FnBox};
-use std::clone::Clone;
+use std::boxed::FnBox;
 use std::collections::VecDeque;
 use std::mem;
-use std::option::Option::{self,Some,None};
-use std::string::String;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use std::vec::Vec;
 
 pub fn setjmp() -> Option<jmp_buf> {
     unsafe {

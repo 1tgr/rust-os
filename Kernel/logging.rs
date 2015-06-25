@@ -1,7 +1,6 @@
 use ::arch::debug;
 use core::fmt::{Error,Write};
 use spin::{MutexGuard,StaticMutex,STATIC_MUTEX_INIT};
-use std::result::Result::{self,Ok};
 
 pub struct Writer<'a> {
     state: MutexGuard<'a, ()>

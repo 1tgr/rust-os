@@ -2,10 +2,8 @@ use ::arch::mmu;
 use ::arch::process::ArchProcess;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::virt_mem::VirtualTree;
-use std::clone::Clone;
 use std::intrinsics;
 use std::ptr;
-use std::result::Result::{self,Ok};
 use std::sync::Arc;
 
 pub struct Process {

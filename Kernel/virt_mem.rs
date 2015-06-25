@@ -1,12 +1,8 @@
-use core::usize;
-use spin::RwLock;
-use std::iter::Iterator;
-use std::mem;
-use std::option::Option::{Some,None};
-use std::result::Result::{self,Ok,Err};
-use std::vec::Vec;
 use ::phys_mem;
 use ::ptr::{self,Align};
+use core::usize;
+use spin::RwLock;
+use std::mem;
 
 extern {
     static kernel_start: u8;

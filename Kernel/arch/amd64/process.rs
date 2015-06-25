@@ -1,6 +1,5 @@
 use ::arch::mmu::AddressSpace;
 use ::phys_mem::PhysicalBitmap;
-use std::result::Result::{self,Ok};
 use std::sync::Arc;
 
 pub struct ArchProcess {

@@ -5,9 +5,6 @@ use spin::RwLock;
 use std::cmp;
 use std::collections::bit_vec::BitVec;
 use std::intrinsics;
-use std::iter::Iterator;
-use std::option::Option::{Some,None};
-use std::result::Result::{self,Ok,Err};
 
 extern {
     static mut KERNEL_BASE: u8;

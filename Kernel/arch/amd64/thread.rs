@@ -1,5 +1,5 @@
 use libc::{c_void,jmp_buf};
-use std::boxed::{Box,FnBox};
+use std::boxed::FnBox;
 use std::mem;
 
 extern {

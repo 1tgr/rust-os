@@ -4,11 +4,7 @@ use ::ptr::Align;
 use ::thread;
 use std::fmt::{Debug,Error,Formatter};
 use std::intrinsics;
-use std::iter::Iterator;
 use std::marker::PhantomData;
-use std::ops::Drop;
-use std::option::Option::*;
-use std::result::Result::{self,Ok};
 use std::sync::Arc;
 
 bitflags! {
