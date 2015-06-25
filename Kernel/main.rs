@@ -27,14 +27,11 @@ extern crate libc;
 extern crate spin;
 
 // Achitecture-specific modules
-#[cfg(all(not(test), target_arch="x86_64"))]
+#[cfg(target_arch="x86_64")]
 #[path="arch/amd64/mod.rs"]
 pub mod arch;
-#[cfg(all(not(test), target_arch="x86"))]
+#[cfg(target_arch="x86")]
 #[path="arch/x86/mod.rs"]
-pub mod arch;
-#[cfg(test)]
-#[path="arch/test/mod.rs"]
 pub mod arch;
 
 mod logging;
@@ -82,7 +79,6 @@ const TEST_FIXTURES: &'static [Fixture] = &[
 ];
 
 // Kernel entrypoint
-#[cfg(not(test))]
 #[lang="start"]
 #[no_mangle]
 pub fn kmain() -> ! {

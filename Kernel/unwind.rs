@@ -12,7 +12,6 @@
 use prelude::*;
 use core::fmt::Arguments;
 
-#[cfg(not(test))]
 #[lang="panic_fmt"]
 #[no_mangle]
 pub extern fn rust_begin_unwind(msg: Arguments, file: &'static str, line: u32) -> ! {
@@ -21,7 +20,6 @@ pub extern fn rust_begin_unwind(msg: Arguments, file: &'static str, line: u32) -
 	loop {}
 }
 
-#[cfg(not(test))]
 #[lang="stack_exhausted"]
 #[no_mangle]
 pub fn __morestack() -> !
@@ -65,7 +63,6 @@ pub struct _Unwind_Exception
 	private: [u64; 2],
 }
 
-#[cfg(not(test))]
 #[lang="eh_personality"]
 #[no_mangle]
 pub fn rust_eh_personality(
