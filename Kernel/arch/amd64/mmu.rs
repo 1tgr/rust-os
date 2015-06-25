@@ -1,7 +1,6 @@
 use ::arch::cpu;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::ptr::Align;
-use ::thread;
 use spin::Mutex;
 use std::fmt::{Debug,Error,Formatter};
 use std::intrinsics;
@@ -204,13 +203,13 @@ impl AddressSpace {
     }
 
     pub fn switch(&self) {
-        let _ = self.mutex.lock();
+        let _x = self.mutex.lock();
         log!("switch: {:x} -> {:x}", recursive_pml4_addr(), self.cr3);
         unsafe { cpu::write_cr3(self.cr3) };
     }
 
     pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<(), &'static str> {
-        let _ = self.mutex.lock();
+        let _x = self.mutex.lock();
         assert_eq!(self.cr3, recursive_pml4_addr());
 
         try!(pml4_entry(ptr).ensure_present(&self.bitmap));
@@ -237,24 +236,6 @@ impl Drop for AddressSpace {
         }
 
         // TODO free memory
-    }
-}
-
-pub unsafe fn call_user_mode<T, U>(rip: *const T, rsp: *const U) {
-    static mut KERNEL_RSP: i64 = 0;
-    cpu::wrmsr(cpu::IA32_STAR, 0x00100008_00000000);
-
-    match thread::setjmp() {
-        Some(jmp_buf) => {
-            cpu::wrmsr(cpu::IA32_LSTAR, jmp_buf.rip as u64);
-            KERNEL_RSP = jmp_buf.rsp;
-            log!("sysret...");
-            cpu::sysret(rip, rsp);
-        }
-        None => {
-            asm!("mov $0, %rsp" :: "r"(KERNEL_RSP) : "memory" : "volatile");
-            log!("...syscall");
-        }
     }
 }
 
@@ -296,25 +277,6 @@ test! {
         unsafe {
             intrinsics::volatile_store(ptr1, sentinel);
             assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
-        }
-    }
-
-    fn can_run_code_in_user_mode() {
-        let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
-        assert_eq!(4096, phys_mem::PAGE_SIZE);
-
-        let code_ptr = 0x1000 as *mut u8;
-        let code_addr = bitmap.alloc_page().unwrap();
-        let stack_ptr = 0x2000 as *mut u8;
-        let stack_addr = bitmap.alloc_page().unwrap();
-        let address_space = AddressSpace::new(bitmap).unwrap();
-        address_space.switch();
-        address_space.map(code_ptr, code_addr, true, true).unwrap();
-        address_space.map(stack_ptr, stack_addr, true, true).unwrap();
-        unsafe {
-            *code_ptr.offset(0) = 0x0f;
-            *code_ptr.offset(1) = 0x05;
-            call_user_mode(code_ptr, stack_ptr.offset(4096))
         }
     }
 }

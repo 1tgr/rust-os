@@ -11,8 +11,10 @@ LIBS += ../libstd/libstd.rlib
 
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 
-ifeq ($(ARCH),amd64)
-NDISASMFLAGS += -b64
+NDISASMFLAGS += -o 0x1000
+
+ifeq (@(ARCH),amd64)
+NDISASMFLAGS += -b64 -pamd
 else
 NDISASMFLAGS += -b32
 endif

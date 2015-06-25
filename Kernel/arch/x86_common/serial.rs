@@ -31,14 +31,14 @@ unsafe fn putb(b: u8) {
 }
 
 pub fn puts(s: &str) {
-    let _ = MUTEX.lock();
+    let _x = MUTEX.lock();
 	for b in s.bytes() {
 		unsafe { putb(b) };
 	}
 }
 
 pub unsafe fn put_cstr(s: *const c_char) {
-    let _ = MUTEX.lock();
+    let _x = MUTEX.lock();
     let mut s = s;
     while *s != 0 {
         putb(*s as u8);

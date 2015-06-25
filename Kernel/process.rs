@@ -1,9 +1,7 @@
-use ::arch::mmu;
 use ::arch::process::ArchProcess;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::virt_mem::VirtualTree;
 use std::intrinsics;
-use std::ptr;
 use std::sync::Arc;
 
 pub struct Process {
@@ -66,25 +64,6 @@ test!{
             }
 
             i += phys_mem::PAGE_SIZE;
-        }
-    }
-
-    fn can_run_hello_world() {
-        static HELLO: &'static [u8] = include_bytes!("../hello/hello.bin");
-        log!("HELLO = {} bytes @ {:p}", HELLO.len(), HELLO.as_ptr());
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::for_kernel());
-        let p = Process::new(phys, kernel_virt).unwrap();
-        p.switch();
-
-        let stack_len = phys_mem::PAGE_SIZE;
-        let code_ptr = p.alloc(HELLO.len(), true, true).unwrap();
-        let stack_ptr = p.alloc(stack_len, true, true).unwrap();
-        log!("code_ptr = {:p}, stack_ptr = {:p}", code_ptr, stack_ptr);
-        unsafe {
-            ptr::copy(HELLO.as_ptr(), code_ptr, HELLO.len());
-            log!("code_ptr[0] = 0x{:x}", *code_ptr);
-            mmu::call_user_mode(code_ptr, stack_ptr.offset(stack_len as isize));
         }
     }
 }

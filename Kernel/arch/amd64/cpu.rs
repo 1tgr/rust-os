@@ -1,3 +1,30 @@
+#[repr(C)]
+#[derive(Debug)]
+pub struct Regs {
+    pub r15: u64,
+    pub r14: u64,
+    pub r13: u64,
+    pub r12: u64,
+    pub r11: u64,
+    pub r10: u64,
+    pub r9: u64,
+    pub r8: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rbx: u64,
+    pub rax: u64,
+    pub num: u64,
+    pub error: i64,
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,
+    pub ss: u64
+}
+
 pub const IA32_STAR: u32 = 0xC0000081;
 pub const IA32_LSTAR: u32 = 0xC0000082;
 

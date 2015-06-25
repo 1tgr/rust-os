@@ -3,14 +3,14 @@ use core::fmt::{Error,Write};
 use spin::{MutexGuard,StaticMutex,STATIC_MUTEX_INIT};
 
 pub struct Writer<'a> {
-    state: MutexGuard<'a, ()>
+    _state: MutexGuard<'a, ()>
 }
 
 static LOGGING_LOCK: StaticMutex = STATIC_MUTEX_INIT;
 
 impl<'a> Writer<'a> {
 	pub fn get(module: &str) -> Writer {
-		let mut ret = Writer { state: LOGGING_LOCK.lock() };
+		let mut ret = Writer { _state: LOGGING_LOCK.lock() };
 		
 		{
 			use core::fmt::Write;

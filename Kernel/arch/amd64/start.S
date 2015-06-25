@@ -168,41 +168,63 @@ thread_entry_asm:
     jmp thread_entry
 
 
-isr_asm:
-    push %rax
-    push %rbx
-    push %rcx
-    push %rdx
-    push %rbp
-    push %rdi
-    push %rsi
-    push %r8
-    push %r9
-    push %r10
-    push %r11
-    push %r12
-    push %r13
-    push %r14
+#define PUSH_REGS \
+    push %rbx ;\
+    push %rcx ;\
+    push %rdx ;\
+    push %rbp ;\
+    push %rdi ;\
+    push %rsi ;\
+    push %r8 ;\
+    push %r9 ;\
+    push %r10 ;\
+    push %r11 ;\
+    push %r12 ;\
+    push %r13 ;\
+    push %r14 ;\
     push %r15
 
-    mov %rsp, %rdi
-
-    call isr
-
-    pop %r15
-    pop %r14
-    pop %r13
-    pop %r12
-    pop %r11
-    pop %r10
-    pop %r9
-    pop %r8
-    pop %rsi
-    pop %rdi
-    pop %rbp
-    pop %rdx
-    pop %rcx
+#define POP_REGS \
+    pop %r15 ;\
+    pop %r14 ;\
+    pop %r13 ;\
+    pop %r12 ;\
+    pop %r11 ;\
+    pop %r10 ;\
+    pop %r9 ;\
+    pop %r8 ;\
+    pop %rsi ;\
+    pop %rdi ;\
+    pop %rbp ;\
+    pop %rdx ;\
+    pop %rcx ;\
     pop %rbx
+
+
+.globl syscall_entry_asm
+syscall_entry_asm:
+    mov %rsp, %r11
+    lea syscall_stack(%rip), %rsp
+    push %r11
+    push %rax
+    PUSH_REGS
+    mov %rsp, %rdi
+    call syscall_entry
+    POP_REGS
+    add $8, %rsp    // skip rax
+    pop %r11        // preserved rsp
+    cli             // about to switch stacks
+    mov %r11, %rsp
+    xor %r11, %r11  // r11=user rflags
+    sysretq         // rcx=user rip (preserved above)
+
+
+isr_asm:
+    push %rax
+    PUSH_REGS
+    mov %rsp, %rdi
+    call isr
+    POP_REGS
     pop %rax
     add $16, %rsp
     iretq
@@ -274,6 +296,11 @@ init_stack_base:
 		.byte 0
 	.endr
 init_stack:
+syscall_stack_base:
+	.rept 0x1000 * 2
+		.byte 0
+	.endr
+syscall_stack:
 
 /* === General Data === */
 .section .data
