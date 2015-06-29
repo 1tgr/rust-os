@@ -40,7 +40,10 @@ SYM (longjmp):
 
   movq     8 (rdi), rbp
 
-  __CLI
+  pushfq
+  pop     r11
+  cli
+
   movq    48 (rdi), rsp
   pushq   56 (rdi)
   movq     0 (rdi), rbx
@@ -48,6 +51,8 @@ SYM (longjmp):
   movq    24 (rdi), r13
   movq    32 (rdi), r14
   movq    40 (rdi), r15
-  __STI
+
+  push    r11
+  popfq
 
   ret

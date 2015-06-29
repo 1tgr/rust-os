@@ -97,6 +97,7 @@ pub struct Mutex<T>
 pub struct MutexGuard<'a, T:'a>
 {
     lock: &'a AtomicBool,
+    token: usize,
     data: &'a mut T,
 }
 
@@ -137,13 +138,14 @@ impl<T> Mutex<T>
         }
     }
 
-    fn obtain_lock(&self)
+    fn obtain_lock(&self) -> usize
     {
-        unsafe { asm!("cli") };
+        let token = super::interrupts::disable();
         while self.lock.compare_and_swap(false, true, Ordering::SeqCst) != false
         {
             // Do nothing
         }
+        token
     }
 
     /// Locks the spinlock and returns a guard.
@@ -163,10 +165,11 @@ impl<T> Mutex<T>
     /// ```
     pub fn lock(&self) -> MutexGuard<T>
     {
-        self.obtain_lock();
+        let token = self.obtain_lock();
         MutexGuard
         {
             lock: &self.lock,
+            token: token,
             data: unsafe { &mut *self.data.get() },
         }
     }
@@ -203,6 +206,6 @@ impl<'a, T> Drop for MutexGuard<'a, T>
     fn drop(&mut self)
     {
         self.lock.store(false, Ordering::SeqCst);
-        unsafe { asm!("sti") };
+        super::interrupts::restore(self.token);
     }
 }

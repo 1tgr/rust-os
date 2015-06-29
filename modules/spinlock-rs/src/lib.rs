@@ -20,3 +20,17 @@ pub use rw_lock::*;
 
 mod mutex;
 mod rw_lock;
+
+mod interrupts {
+    #[inline]
+    pub fn disable() -> usize {
+        let token;
+        unsafe { asm!("pushfq ; cli ; pop $0" : "=r"(token)) };
+        token
+    }
+
+    #[inline]
+    pub fn restore(token: usize) {
+        unsafe { asm!("pushq $0 ; popfq" :: "r"(token) : "cc" : "volatile") };
+    }
+}

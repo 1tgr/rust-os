@@ -44,6 +44,7 @@ pub struct RwLock<T>
 pub struct RwLockReadGuard<'a, T:'a>
 {
     lock: &'a AtomicUsize,
+    token: usize,
     data: &'a T,
 }
 
@@ -53,6 +54,7 @@ pub struct RwLockReadGuard<'a, T:'a>
 pub struct RwLockWriteGuard<'a, T:'a>
 {
     lock: &'a AtomicUsize,
+    token: usize,
     data: &'a mut T,
 }
 
@@ -124,7 +126,7 @@ impl<T> RwLock<T>
     #[inline]
     pub fn read<'a>(&'a self) -> RwLockReadGuard<'a, T>
     {
-        unsafe { asm!("cli") };
+        let token = super::interrupts::disable();
 
         // (funny do-while loop)
         while {
@@ -148,6 +150,7 @@ impl<T> RwLock<T>
         } {}
         RwLockReadGuard {
             lock: &self.lock,
+            token: token,
             data: unsafe { & *self.data.get() },
         }
     }
@@ -177,7 +180,7 @@ impl<T> RwLock<T>
     #[inline]
     pub fn try_read(&self) -> Option<RwLockReadGuard<T>>
     {
-        unsafe { asm!("cli") };
+        let token = super::interrupts::disable();
 
         // Old value, with write bit unset
         let old = (!USIZE_MSB) & self.lock.load(Ordering::Relaxed);
@@ -190,10 +193,11 @@ impl<T> RwLock<T>
         {
             Some(RwLockReadGuard {
                 lock: &self.lock,
+                token: token,
                 data: unsafe { & *self.data.get() },
             })
         } else {
-            unsafe { asm!("sti") };
+            super::interrupts::restore(token);
             None
         }
     }
@@ -219,7 +223,7 @@ impl<T> RwLock<T>
     #[inline]
     pub fn write<'a>(&'a self) -> RwLockWriteGuard<'a, T>
     {
-        unsafe { asm!("cli") };
+        let token = super::interrupts::disable();
 
         loop
         {
@@ -238,6 +242,7 @@ impl<T> RwLock<T>
         }
         RwLockWriteGuard {
             lock: &self.lock,
+            token: token,
             data: unsafe { &mut *self.data.get() },
         }
     }
@@ -264,17 +269,19 @@ impl<T> RwLock<T>
     #[inline]
     pub fn try_write(&self) -> Option<RwLockWriteGuard<T>>
     {
-        unsafe { asm!("cli") };
+        let token = super::interrupts::disable();
+
         if self.lock.compare_and_swap(0,
                                       USIZE_MSB,
                                       Ordering::SeqCst) == 0
         {
             Some(RwLockWriteGuard {
                 lock: &self.lock,
+                token: token,
                 data: unsafe { &mut *self.data.get() },
             })
         } else {
-            unsafe { asm!("sti") };
+            super::interrupts::restore(token);
             None
         }
     }
@@ -300,7 +307,7 @@ impl<'rwlock, T> Drop for RwLockReadGuard<'rwlock, T> {
     fn drop(&mut self) {
         debug_assert!(self.lock.load(Ordering::Relaxed) & (!USIZE_MSB) > 0);
         self.lock.fetch_sub(1, Ordering::SeqCst);
-        unsafe { asm!("sti") };
+        super::interrupts::restore(self.token);
     }
 }
 
@@ -308,6 +315,6 @@ impl<'rwlock, T> Drop for RwLockWriteGuard<'rwlock, T> {
     fn drop(&mut self) {
         debug_assert_eq!(self.lock.load(Ordering::Relaxed), USIZE_MSB);
         self.lock.store(0, Ordering::Relaxed);
-        unsafe { asm!("sti") };
+        super::interrupts::restore(self.token);
     }
 }
