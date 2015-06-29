@@ -333,7 +333,6 @@ test! {
             let dstate = dstate.clone();
             let scheduler = scheduler.clone();
             move |regs: &Regs| -> usize {
-                log!("syscall: {} {:p} {}", regs.rax, regs.rdi as *const u8, regs.rsi);
                 match regs.rax {
                     0 => {
                         let bytes = unsafe { slice::from_raw_parts(regs.rdi as *const u8, regs.rsi as usize) };

@@ -16,6 +16,8 @@ static mut SYSCALL_HANDLER: *mut Box<RegsHandler> = 0 as *mut _;
 
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> usize {
+    log!("syscall: {} {:p} {}", regs.rax, regs.rdi as *const u8, regs.rsi);
+
     let p = SYSCALL_HANDLER;
     if p == (0 as *mut _) {
         0
@@ -86,8 +88,12 @@ pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack: &'static mut [u8]) -> jmp_bu
 pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *const u8) -> ! {
     static INIT: Once = once::ONCE_INIT;
     INIT.call_once(|| {
-        cpu::wrmsr(cpu::IA32_STAR, 0x00100008_00000000);
+        const KERNEL_CS: u16 = 0x08;  // KERNEL_SS = 0x10 (+8)
+        const USER_CS_32: u16 = 0x23; // USER_SS = 0x2B (+8); USER_CS_64 = 0x33 (+16)
+        const RFLAGS_IF: u64 = 1 << 9;
+        cpu::wrmsr(cpu::IA32_STAR, (USER_CS_32 as u64) << 48 | (KERNEL_CS as u64) << 32);
         cpu::wrmsr(cpu::IA32_LSTAR, &syscall_entry_asm as *const u8 as u64);
+        cpu::wrmsr(cpu::IA32_SFMASK, RFLAGS_IF);
     });
 
     log!("jmp_user_mode({:p}, {:p})", rip, rsp);

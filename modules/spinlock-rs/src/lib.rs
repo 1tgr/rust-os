@@ -24,13 +24,15 @@ mod rw_lock;
 mod interrupts {
     #[inline]
     pub fn disable() -> usize {
-        let token;
-        unsafe { asm!("pushfq ; cli ; pop $0" : "=r"(token)) };
-        token
+        let rflags: usize;
+        unsafe { asm!("pushfq ; cli ; pop $0" : "=r"(rflags)) };
+        rflags & (1 << 9)
     }
 
     #[inline]
     pub fn restore(token: usize) {
-        unsafe { asm!("pushq $0 ; popfq" :: "r"(token) : "cc" : "volatile") };
+        if token != 0 {
+            unsafe { asm!("sti" :::: "volatile") };
+        }
     }
 }

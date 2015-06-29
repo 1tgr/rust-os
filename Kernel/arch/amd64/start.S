@@ -131,27 +131,6 @@ start64_high:
 	
 	/* Set up stack pointer */
 	mov $init_stack, %rsp
-	
-    /* Load IDTR */
-#define IDT_FIXUP(which) \
-    movq $which, %rax ;\
-    movw %ax, IDT_low_##which(%rip) ;\
-    shrl $16, %eax ;\
-    movw %ax, IDT_mid_##which(%rip)
-
-#undef exception
-#define exception(n) IDT_FIXUP(exception_##n)
-
-#undef irq
-#define irq(n) IDT_FIXUP(irq_##n)
-	
-#undef interrupt	
-#define interrupt(n) IDT_FIXUP(interrupt_##n)
-
-#include "interrupts.h"
-
-    lidtq IDTPtr
-    sti
 
 	/* call the rust code */
 	call kmain
@@ -204,7 +183,7 @@ thread_entry_asm:
 .globl syscall_entry_asm
 syscall_entry_asm:
     mov %rsp, %r11
-    lea syscall_stack(%rip), %rsp
+    movq TSS+4, %rsp
     push %r11
     push %rax
     PUSH_REGS
@@ -219,15 +198,14 @@ syscall_entry_asm:
     sysretq         	// rcx=user rip (preserved above)
 
 
-isr_asm:
-    push %rax
-    PUSH_REGS
-    mov %rsp, %rdi
-    call isr
-    POP_REGS
-    pop %rax
+#define ISR_ASM \
+    push %rax ;\
+    PUSH_REGS ;\
+    mov %rsp, %rdi ;\
+    call isr ;\
+    POP_REGS ;\
+    pop %rax ;\
     add $16, %rsp
-    iretq
 
 
 #undef exception
@@ -236,8 +214,9 @@ isr_asm:
 	\
 exception_##n: \
 	pushq	$0x##n ;\
-	jmp		isr_asm ;\
-	.align	8
+	ISR_ASM
+    iretq ;\
+	.align 16
 
 #undef irq
 #define irq(n) \
@@ -246,8 +225,9 @@ exception_##n: \
 irq_##n: \
 	pushq	$-1 ;\
 	pushq	$0x##n; \
-	jmp		isr_asm ;\
-	.align	8
+	ISR_ASM ;\
+    iretq ;\
+	.align 16
 	
 #undef interrupt	
 #define interrupt(n) \
@@ -256,10 +236,16 @@ irq_##n: \
 interrupt_##n: \
 	pushq	$-2 ;\
 	pushq	$0x##n; \
-	jmp		isr_asm ;\
-	.align	8
+	ISR_ASM ;\
+    iretq ;\
+	.align 16
 
 #include "interrupts.h"
+
+.globl lidt
+lidt:
+	lidtq (%rdi)
+	ret
 
 /* === Page-aligned data === */
 .section .padata
@@ -296,11 +282,6 @@ init_stack_base:
 		.byte 0
 	.endr
 init_stack:
-syscall_stack_base:
-	.rept 0x1000 * 2
-		.byte 0
-	.endr
-syscall_stack:
 
 /* === General Data === */
 .section .data
@@ -318,54 +299,92 @@ GDTPtr:
 	.quad GDT
 .globl GDT
 GDT:
-	.long 0, 0
-		.long 0x00000000, 0x00209A00    /* 0x08: 64-bit Code */
-		.long 0x00000000, 0x00009200    /* 0x10: 64-bit Data */
-		.long 0x00000000, 0x0000F200    /* 0x18: User Data (64 version) */
-		.long 0x00000000, 0x0020FA00    /* 0x20: 64-bit User Code       */
-		.long 0x00000000, 0x0040FA00    /* 0x28: 32-bit User Code */
-		.long 0x00000000, 0x0040F200    /* 0x30: User Data        */
-GDTEnd:
-
-/* Interrupt Descriptor Table */
-IDTPtr:
-    .word IDT - IDTEnd
-    .quad IDT
-.globl IDT
-IDT:
 /*
  * Offset   Size    Description
- * 0    2   Offset low bits (0..15)
- * 2    2   Selector (Code segment selector)
- * 4    1   Zero
- * 5    1   Type and Attributes (same as before)
- * 6    2   Offset middle bits (16..31)
- * 8    4   Offset high bits (32..63)
- * 12   4   Zero
+ * 0        2       Limit low bits (0..15)
+ * 2        2       Base low bits (0..15)
+ * 4        1       Base middle bits (16..23)
+ * 5        1       Access
+ * 6        1       Limit high bits (16..19), flags
+ * 7        1       Base high bits (24..31)
+ * 8        4       Base extra-high bits (32..63)
+ *
+ * Access when S=0:
+ * 	0x09: (x64) Available 64-bit TSS
+ * 	0x80: Present
+ * -
+ * 	0x89: Available 64-bit TSS, present
+ *
+ * Access when S=1:
+ *  0x01: Accessed
+ *  0x02: Readable code/writable data
+ *  0x04: Direction/conforming
+ *  0x08: Executable
+ *  0x10: (S bit - always 1)
+ *  0x60: Ring 3
+ *  0x80: Present
+ *  -
+ *  0x9A = Readable code, executable, present
+ *  0x92 = Writable data, present
+ *  0xF2 = Ring 3, writable data, present
+ *  0xFA = Ring 3, readable code, executable, present
+ *  0x82 = Writable data, present, descriptor is 16 bytes
+ *
+ * Flags:
+ *  0x2x = (x64) 64-bit
+ *  0x4x = 32-bit
+ *  0x8x = Page granularity
+ *  -
  */
+	.long 0, 0
+	.long 0x00000000, 0x00209A00    // 0x08: 64-bit Code
+	.long 0x00000000, 0x00009200    // 0x10: 64-bit Data
+	.long 0x00000000, 0x00000000	// 0x18: (not used)
+	.long 0x00000000, 0x0040FA00    // 0x20: 32-bit User Code
+	.long 0x00000000, 0x0040F200    // 0x28: User Data
+	.long 0x00000000, 0x0020FA00    // 0x30: 64-bit User Code
 
-/* 32-bit Interrupt gate: 0x8E ( P=1, DPL=00b, S=0, type=1110b => type_attr=1000_1110b=0x8E) */
+.globl GDT_TSS
+GDT_TSS:
+	.long 0x00000000, 0x00000000	// 0x38: TSS (adjusted in Rust code before ltr instruction)
+	.long 0x00000000, 0x00000000
+GDTEnd:
 
-#define IDT_ENTRY(which) \
-IDT_low_##which: \
-    .word 0; ;\
-    .word 0x08 ;\
-    .byte 0 ;\
-    .byte 0x8e ;\
-IDT_mid_##which: \
-    .word 0 ;\
-    .long KERNEL_BASE >> 32 ;\
-    .long 0
-	
+.globl TSS
+TSS:
+	.rept 104
+		.byte 0
+	.endr
+.globl TSSEnd
+TSSEnd:
+
+.globl IDT
+IDT:
 #undef exception
-#define exception(n) IDT_ENTRY(exception_##n)
+#define exception(n) .long 0, 0, 0, 0
 
 #undef irq
-#define irq(n) IDT_ENTRY(irq_##n)
+#define irq(n) .long 0, 0, 0, 0
 
-#undef interrupt	
-#define interrupt(n) IDT_ENTRY(interrupt_##n)
+#undef interrupt
+#define interrupt(n) .long 0, 0, 0, 0
 
 #include "interrupts.h"
-
+.globl IDTEnd
 IDTEnd:
+
+/* Interrupt handlers */
+.globl interrupt_handlers
+interrupt_handlers:
+#undef exception
+#define exception(n) .quad exception_##n
+
+#undef irq
+#define irq(n) .quad irq_##n
+
+#undef interrupt
+#define interrupt(n) .quad interrupt_##n
+
+#include "interrupts.h"
+.globl interrupt_handlers_end
+interrupt_handlers_end:
