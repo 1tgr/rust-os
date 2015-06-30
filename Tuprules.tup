@@ -21,8 +21,16 @@ endif
 
 TARGETSPEC := $(TUP_CWD)/Kernel/arch/@(ARCH)/target.json
 
-RUSTFLAGS := -O -g --cfg arch__@(ARCH) --target=$(TARGETSPEC)
-CCFLAGS := -O -g
+ifeq (1,0)
+RUSTFLAGS += -C opt-level=0
+CCFLAGS += -O0
+else
+RUSTFLAGS += -O
+CCFLAGS += -O
+endif
+
+RUSTFLAGS += -g --cfg arch__@(ARCH) --target=$(TARGETSPEC)
+CCFLAGS += -g
 
 ifeq (@(ARCH),amd64)
 RUSTFLAGS += -C soft-float -C no-redzone
@@ -30,7 +38,7 @@ CCFLAGS += -fPIC -mno-red-zone
 endif
 
 ARFLAGS += crus
-ASFLAGS += -I $(TUP_CWD)/include
+ASFLAGS += -g -I $(TUP_CWD)/include
 LINKFLAGS += --gc-sections -z max-page-size=0x1000
 
 !AR = |> $(AR) $(ARFLAGS) -o %o %f |>
