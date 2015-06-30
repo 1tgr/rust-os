@@ -24,10 +24,9 @@ TARGETSPEC := $(TUP_CWD)/Kernel/arch/@(ARCH)/target.json
 RUSTFLAGS := -O -g --cfg arch__@(ARCH) --target=$(TARGETSPEC)
 CCFLAGS := -O -g
 
-# - amd64 needs to be set to use soft floating point
 ifeq (@(ARCH),amd64)
-RUSTFLAGS += -C soft-float
-CCFLAGS += -fPIC
+RUSTFLAGS += -C soft-float -C no-redzone
+CCFLAGS += -fPIC -mno-red-zone
 endif
 
 ARFLAGS += crus
