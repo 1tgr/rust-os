@@ -1,28 +1,18 @@
 use ::arch::debug;
 use core::fmt::{Error,Write};
-use spin::{MutexGuard,StaticMutex,STATIC_MUTEX_INIT};
 
-pub struct Writer<'a> {
-    _state: MutexGuard<'a, ()>
-}
+pub struct Writer;
 
-static LOGGING_LOCK: StaticMutex = STATIC_MUTEX_INIT;
-
-impl<'a> Writer<'a> {
+impl Writer {
 	pub fn get(module: &str) -> Writer {
-		let mut ret = Writer { _state: LOGGING_LOCK.lock() };
-		
-		{
-			use core::fmt::Write;
-			let _ = write!(&mut ret, "[{}] ", module);
-		}
-		
-		ret
+        use core::fmt::Write;
+        let mut writer = Writer;
+        let _ = write!(&mut writer, "[{}] ", module);
+        writer
 	}
 }
 
-impl<'a> Write for Writer<'a>
-{
+impl Write for Writer {
 	fn write_str(&mut self, s: &str) -> Result<(), Error> {
         debug::puts(s);
 		Ok(())
