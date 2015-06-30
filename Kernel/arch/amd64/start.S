@@ -211,12 +211,12 @@ syscall_entry_asm:
     mov %rsp, %rdi
     call syscall_entry
     POP_REGS
-    add $8, %rsp    // skip rax
-    pop %r11        // preserved rsp
-    cli             // about to switch stacks
+    add $8, %rsp    	// skip rax
+    pop %r11        	// preserved rsp
+    cli             	// about to switch stacks
     mov %r11, %rsp
-    xor %r11, %r11  // r11=user rflags
-    sysretq         // rcx=user rip (preserved above)
+	movq $(1<<9), %r11  // r11=user flags: IF=1
+    sysretq         	// rcx=user rip (preserved above)
 
 
 isr_asm:

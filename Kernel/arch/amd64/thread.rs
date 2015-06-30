@@ -91,5 +91,5 @@ pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *const u8) -> ! {
     });
 
     log!("jmp_user_mode({:p}, {:p})", rip, rsp);
-    cpu::sysret(rip, rsp)
+    cpu::sysret(rip, rsp, 1 << 9)
 }

@@ -32,8 +32,8 @@ pub fn invlpg<T>(ptr: *const T) {
     unsafe { asm!("invlpg ($0)" :: "r"(ptr) : "memory" : "volatile") }
 }
 
-pub unsafe fn sysret<T, U>(rip: *const T, rsp: *const U) -> ! {
-    asm!("cli ; mov $0, %rsp ; sysretq" :: "r"(rsp), "{rcx}" (rip), "{r11}" (0) :: "volatile");
+pub unsafe fn sysret<T, U>(rip: *const T, rsp: *const U, rflags: u64) -> ! {
+    asm!("cli ; mov $0, %rsp ; sysretq" :: "r"(rsp), "{rcx}" (rip), "{r11}" (rflags) :: "volatile");
     unreachable!()
 }
 
