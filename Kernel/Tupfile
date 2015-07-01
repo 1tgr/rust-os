@@ -24,6 +24,8 @@ RUSTFLAGS += --extern std=../libstd/libstd.rlib
 : main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}
 #: main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 
+: main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> rustdoc $(RUSTFLAGS) %f && tar -zcf doc.tar.gz doc && rm -r doc |> doc.tar.gz
+
 ifeq (@(ARCH),amd64)
 : {objs} $(KERNEL_LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
 : kernel.amd64.bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin

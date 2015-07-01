@@ -20,20 +20,21 @@ else
 endif
 
 TARGETSPEC := $(TUP_CWD)/Kernel/arch/@(ARCH)/target.json
+RUSTFLAGS += --cfg arch__@(ARCH) --target=$(TARGETSPEC)
 
 ifeq (1,0)
-RUSTFLAGS += -C opt-level=0
+RUSTCFLAGS += -C opt-level=0
 CCFLAGS += -O0
 else
-RUSTFLAGS += -O
+RUSTCFLAGS += -O
 CCFLAGS += -O
 endif
 
-RUSTFLAGS += -g --cfg arch__@(ARCH) --target=$(TARGETSPEC)
+RUSTCFLAGS += -g
 CCFLAGS += -g
 
 ifeq (@(ARCH),amd64)
-RUSTFLAGS += -C soft-float -C no-redzone
+RUSTCFLAGS += -C soft-float -C no-redzone
 CCFLAGS += -fPIC -mno-red-zone
 endif
 
@@ -45,7 +46,7 @@ LINKFLAGS += --gc-sections -z max-page-size=0x1000
 !AS = |> $(CC) $(ASFLAGS) -c -o %o %f |>
 !CC = |> $(CC) $(CCFLAGS) -c -o %o %f |>
 !LD = |> $(LD) $(LINKFLAGS) -o %o %f |>
-!RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type bin %f |>
-!RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) -o %o --crate-type=lib --emit=link %f |>
-!RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) -o %o --emit=obj %f |>
+!RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type bin %f |>
+!RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type=lib --emit=link %f |>
+!RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --emit=obj %f |>
 

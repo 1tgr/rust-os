@@ -7,6 +7,7 @@ macro_rules! test {
             fn $name() $block
         )*
 
+        #[doc(hidden)]
         pub const TESTS: ::test::Fixture = (module_path!(), &[
             $(
                 (stringify!($name), $name),

@@ -34,13 +34,12 @@ pub mod arch;
 #[path="arch/x86/mod.rs"]
 pub mod arch;
 
-mod logging;
-mod multiboot;
-mod prelude;
-mod process;
-mod ptr;
-mod thread;
-mod virt_mem;
+pub mod logging;
+pub mod multiboot;
+pub mod process;
+pub mod ptr;
+pub mod thread;
+pub mod virt_mem;
 pub mod phys_mem;
 pub mod unwind;
 
