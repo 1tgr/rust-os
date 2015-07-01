@@ -74,7 +74,7 @@ define uninitialized `static mut` values.
 #![no_std]
 
 extern crate core;
-extern crate spin;
+#[macro_use] extern crate spin;
 
 pub mod once;
 

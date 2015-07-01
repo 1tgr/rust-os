@@ -24,7 +24,7 @@
 
 extern crate alloc;
 extern crate libc;
-extern crate spin;
+#[macro_use] extern crate spin;
 
 // Achitecture-specific modules
 #[cfg(target_arch="x86_64")]

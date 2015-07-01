@@ -203,13 +203,13 @@ impl AddressSpace {
     }
 
     pub fn switch(&self) {
-        let _x = self.mutex.lock();
+        let _x = lock!(self.mutex);
         log!("switch: {:x} -> {:x}", recursive_pml4_addr(), self.cr3);
         unsafe { cpu::write_cr3(self.cr3) };
     }
 
     pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<(), &'static str> {
-        let _x = self.mutex.lock();
+        let _x = lock!(self.mutex);
         assert_eq!(self.cr3, recursive_pml4_addr());
 
         try!(pml4_entry(ptr).ensure_present(&self.bitmap));

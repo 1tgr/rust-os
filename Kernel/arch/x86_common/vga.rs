@@ -92,7 +92,7 @@ lazy_static! {
 }
 
 pub fn puts(s: &str) {
-    let mut state = STATE.lock();
+    let mut state = lock!(STATE);
     for b in s.bytes() {
         state.putb(b);
     }
@@ -101,7 +101,7 @@ pub fn puts(s: &str) {
 }
 
 pub unsafe fn put_cstr(s: *const c_char) {
-    let mut state = STATE.lock();
+    let mut state = lock!(STATE);
     let mut s = s;
     while *s != 0 {
         state.putb(*s as u8);

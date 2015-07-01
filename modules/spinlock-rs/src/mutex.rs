@@ -1,5 +1,5 @@
 #[cfg(not(feature = "no_std"))]
-use std::sync::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 #[cfg(not(feature = "no_std"))]
 use std::cell::UnsafeCell;
 #[cfg(not(feature = "no_std"))]
@@ -8,7 +8,7 @@ use std::marker::Sync;
 use std::ops::{Drop, Deref, DerefMut};
 
 #[cfg(feature = "no_std")]
-use core::atomic::{AtomicBool, Ordering, ATOMIC_BOOL_INIT};
+use core::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 #[cfg(feature = "no_std")]
 use core::cell::UnsafeCell;
 #[cfg(feature = "no_std")]
@@ -87,7 +87,7 @@ use core::ops::{Drop, Deref, DerefMut};
 /// ```
 pub struct Mutex<T>
 {
-    lock: AtomicBool,
+    lock: AtomicUsize,
     data: UnsafeCell<T>,
 }
 
@@ -96,7 +96,7 @@ pub struct Mutex<T>
 /// When the guard falls out of scope it will release the lock.
 pub struct MutexGuard<'a, T:'a>
 {
-    lock: &'a AtomicBool,
+    lock: &'a AtomicUsize,
     token: usize,
     data: &'a mut T,
 }
@@ -122,7 +122,7 @@ pub type StaticMutex = Mutex<()>;
 /// A initializer for StaticMutex, containing no data.
 #[cfg(feature = "no_std")]
 pub const STATIC_MUTEX_INIT: StaticMutex = Mutex {
-    lock: ATOMIC_BOOL_INIT,
+    lock: ATOMIC_USIZE_INIT,
     data: UnsafeCell { value: () },
 };
 
@@ -133,15 +133,16 @@ impl<T> Mutex<T>
     {
         Mutex
         {
-            lock: ATOMIC_BOOL_INIT,
+            lock: ATOMIC_USIZE_INIT,
             data: UnsafeCell::new(user_data),
         }
     }
 
-    fn obtain_lock(&self) -> usize
+    fn obtain_lock(&self, file_line: *const (&'static str, u32)) -> usize
     {
         let token = super::interrupts::disable();
-        while self.lock.compare_and_swap(false, true, Ordering::SeqCst) != false
+        let null = 0;
+        while self.lock.compare_and_swap(null, file_line as usize, Ordering::SeqCst) != null
         {
             // Do nothing
         }
@@ -163,9 +164,9 @@ impl<T> Mutex<T>
     /// }
     ///
     /// ```
-    pub fn lock(&self) -> MutexGuard<T>
+    pub fn lock(&self, file_line: &'static (&'static str, u32)) -> MutexGuard<T>
     {
-        let token = self.obtain_lock();
+        let token = self.obtain_lock(file_line);
         MutexGuard
         {
             lock: &self.lock,
@@ -205,7 +206,15 @@ impl<'a, T> Drop for MutexGuard<'a, T>
     /// The dropping of the MutexGuard will release the lock it was created from.
     fn drop(&mut self)
     {
-        self.lock.store(false, Ordering::SeqCst);
+        self.lock.store(0, Ordering::SeqCst);
         super::interrupts::restore(self.token);
     }
+}
+
+#[macro_export]
+macro_rules! lock {
+    ($mutex:expr) => ({
+        static FILE_LINE: (&'static str, u32) = (file!(), line!());
+        $mutex.lock(&FILE_LINE)
+    })
 }

@@ -106,7 +106,7 @@ impl Once {
         // If the count is negative, then someone else finished the job,
         // otherwise we run the job and record how many people will try to grab
         // this lock
-        let guard = self.mutex.lock();
+        let guard = lock!(self.mutex);
         if self.cnt.load(Ordering::SeqCst) > 0 {
             f();
             let prev = self.cnt.swap(isize::MIN, Ordering::SeqCst);
