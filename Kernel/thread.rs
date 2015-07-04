@@ -137,7 +137,7 @@ impl Scheduler {
             let (new_jmp_buf, new_current) =
                 match state.threads.pop_front() {
                     Some(front) => front,
-                    None => panic!("block({}: no more threads", state.current.id)
+                    None => panic!("block({}): no more threads", state.current.id)
                 };
 
             let old_current = mem::replace(&mut state.current, new_current);
@@ -158,6 +158,14 @@ impl Scheduler {
                     forget_write_guard(dstate);
                 }
             }
+        }
+    }
+
+    fn try_get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> Option<A> where A : Clone {
+        let dstate = lock!(dstate);
+        match dstate.result {
+            Some(ref result) => Some(result.clone()),
+            None => None
         }
     }
 
@@ -215,10 +223,20 @@ impl Drop for Scheduler {
 
 pub trait Promise<A> {
     fn get(&self) -> A;
+    fn try_get(&self) -> Option<A>;
     // fn then<B>(f: FnOnce(A) -> B) -> Promise<B>;
 }
 
 impl<A> Deferred<A> {
+    pub fn new(scheduler: Arc<Scheduler>) -> Deferred<A> {
+        let dstate = Arc::new(Mutex::new(DeferredState {
+            result: None,
+            waiters: VecDeque::new()
+        }));
+
+        Deferred { scheduler: scheduler, state: dstate }
+    }
+
     pub fn resolve(&self, result: A) {
         self.scheduler.resolve_deferred(&self.state, result)
     }
@@ -227,6 +245,10 @@ impl<A> Deferred<A> {
 impl<A> Promise<A> for Deferred<A> where A : Clone {
     fn get(&self) -> A {
         self.scheduler.get_deferred(&self.state)
+    }
+
+    fn try_get(&self) -> Option<A> {
+        self.scheduler.try_get_deferred(&self.state)
     }
 }
 
@@ -349,7 +371,7 @@ test! {
         };
 
         let d = Deferred { scheduler: scheduler.clone(), state: dstate };
-        let _x = thread::set_syscall_handler(Box::new(syscall_handler));
+        let _x = thread::register_syscall_handler(syscall_handler);
         scheduler.spawn_user_mode(code_ptr, stack_ptr, stack_len);
 
         assert_eq!(0x1234, d.get());

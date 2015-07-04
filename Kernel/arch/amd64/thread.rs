@@ -1,8 +1,8 @@
 use ::arch::cpu::{self,Regs};
+use ::singleton::{DropSingleton,Singleton};
 use lazy_static::once::{self,Once};
 use libc::jmp_buf;
-use std::boxed::{self,FnBox};
-use std::intrinsics;
+use std::boxed::FnBox;
 use std::mem;
 
 extern {
@@ -10,53 +10,27 @@ extern {
     static syscall_entry_asm: u8;
 }
 
-type RegsHandler = Fn(&Regs) -> usize;
+pub type RegsHandler = Fn(&Regs) -> usize;
 
-static mut SYSCALL_HANDLER: *mut Box<RegsHandler> = 0 as *mut _;
+lazy_static! {
+    static ref SYSCALL_HANDLER: Singleton<Box<RegsHandler>> = Singleton::<Box<RegsHandler>>::new();
+}
 
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> usize {
     log!("syscall: {} {:p} {}", regs.rax, regs.rdi as *const u8, regs.rsi);
 
-    let p = SYSCALL_HANDLER;
-    if p == (0 as *mut _) {
-        0
+    if let Some(handler) = SYSCALL_HANDLER.get() {
+        handler(regs)
     } else {
-        let b: &Box<RegsHandler> = &*p;
-        b(regs)
+        0
     }
 }
 
-fn atomic_replace<T>(dest: &mut *mut T, src: *mut T) -> *mut T {
-    let dest_ptr = dest as *mut *mut T as *mut usize;
-    let src = src as usize;
-    let old_dest: usize = unsafe { intrinsics::atomic_xchg(dest_ptr, src) };
-    old_dest as *mut T
-}
+pub type DropSyscallHandler = DropSingleton<'static, Box<RegsHandler>>;
 
-pub struct DropSyscall {
-    old: *mut Box<RegsHandler>
-}
-
-impl Drop for DropSyscall {
-    fn drop(&mut self) {
-        let b: Box<Box<RegsHandler>> = unsafe {
-            let p: *mut Box<RegsHandler> = atomic_replace(&mut SYSCALL_HANDLER, self.old);
-            Box::from_raw(p)
-        };
-
-        mem::drop(b);
-    }
-}
-
-pub fn set_syscall_handler(handler: Box<Fn(&Regs) -> usize + 'static>) -> DropSyscall {
-    unsafe {
-        let b1: Box<Box<RegsHandler>> = Box::new(handler);
-        let p1: *mut Box<RegsHandler> = boxed::into_raw(b1);
-        DropSyscall {
-            old: atomic_replace(&mut SYSCALL_HANDLER, p1)
-        }
-    }
+pub fn register_syscall_handler<T>(handler: T) -> DropSyscallHandler where T : Fn(&Regs) -> usize + 'static {
+    SYSCALL_HANDLER.register(Box::new(handler))
 }
 
 #[no_mangle]

@@ -36,12 +36,13 @@ pub mod arch;
 
 pub mod logging;
 pub mod multiboot;
+pub mod phys_mem;
 pub mod process;
 pub mod ptr;
+pub mod singleton;
 pub mod thread;
-pub mod virt_mem;
-pub mod phys_mem;
 pub mod unwind;
+pub mod virt_mem;
 
 use core::fmt::Write;
 use libc::{c_char,c_int};
@@ -70,6 +71,7 @@ const TEST_FIXTURES: &'static [Fixture] = &[
     ptr::TESTS,
 
     arch::isr::TESTS,
+    arch::keyboard::TESTS,
     arch::mmu::TESTS,
     phys_mem::TESTS,
     process::TESTS,

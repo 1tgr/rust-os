@@ -3,9 +3,10 @@ use ::arch::debug;
 use ::arch::mmu;
 use ::arch::x86_common::io;
 use ::ptr;
+use ::singleton::{DropSingleton,Singleton};
+use lazy_static::once::{self,Once};
 use std::default::Default;
 use std::mem;
-use lazy_static::once::{self,Once};
 
 extern {
     static GDT: u8;
@@ -20,12 +21,33 @@ extern {
 
 static mut syscall_stack: [u8; 4096] = [0; 4096];
 
+lazy_static! {
+    static ref IRQ_HANDLERS: Vec<Singleton<Box<Fn() + 'static>>> = {
+        let mut v: Vec<Singleton<Box<Fn() + 'static>>> = Vec::new();
+        for _ in 0..16 {
+            v.push(Singleton::new());
+        }
+
+        v
+    };
+}
+
 const PIC1: u16 = 0x20; // IO base address for master PIC
 const PIC2: u16 = 0xA0; // IO base address for slave PIC
 const PIC1_COMMAND: u16 = PIC1;
 const PIC1_DATA: u16 = PIC1 + 1;
 const PIC2_COMMAND: u16 = PIC2;
 const PIC2_DATA: u16 = PIC2 + 1;
+
+pub type DropIrqHandler = DropSingleton<'static, Box<Fn()>>;
+
+pub fn register_irq_handler<T>(irq: usize, handler: T) -> DropIrqHandler where T : Fn() + 'static {
+    if let Some(singleton) = IRQ_HANDLERS.get(irq) {
+        singleton.register(Box::new(handler))
+    } else {
+        panic!("irq must be between 0 and {}", IRQ_HANDLERS.len())
+    }
+}
 
 macro_rules! assert_size {
 	($value:expr, $expected_end:expr) => ({
@@ -123,12 +145,17 @@ pub extern fn interrupt(num: u8, _: &Regs) {
 }
 
 #[no_mangle]
-pub extern fn irq(num: u8, _: &Regs) {
+pub extern fn irq(num: usize, _: &Regs) {
     unsafe {
         const PIC_EOI: u8 = 0x20; // End-of-interrupt command code
 
         if num != 0 {
             log!("irq {}", num);
+            if let Some(singleton) = IRQ_HANDLERS.get(num) {
+                if let Some(handler) = singleton.get() {
+                    handler();
+                }
+            }
         }
 
         if num >= 8 {
