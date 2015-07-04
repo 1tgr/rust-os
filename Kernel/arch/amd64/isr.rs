@@ -119,19 +119,21 @@ pub fn init_once() {
     });
 }
 
-fn interrupt(regs: &Regs) {
-    log!("interrupt {}", regs.num);
+#[no_mangle]
+pub extern fn interrupt(num: u8, _: &Regs) {
+    log!("interrupt {}", num);
 }
 
-fn irq(regs: &Regs) {
+#[no_mangle]
+pub extern fn irq(num: u8, _: &Regs) {
     unsafe {
         const PIC_EOI: u8 = 0x20; // End-of-interrupt command code
 
-        if regs.num != 0 {
-            log!("irq {}", regs.num);
+        if num != 0 {
+            log!("irq {}", num);
         }
 
-        if regs.num >= 8 {
+        if num >= 8 {
             io::outb(PIC2_COMMAND, PIC_EOI);
         }
 
@@ -139,9 +141,10 @@ fn irq(regs: &Regs) {
     }
 }
 
-fn exception(regs: &Regs) {
+#[no_mangle]
+pub extern fn exception(num: u8, regs: &Regs) {
     let cr2: *const u8 = cpu::read_cr2();
-    log!("exception {}: error=0x{:x}  cr2={:p}", regs.num, regs.error, cr2);
+    log!("exception {}: error=0x{:x}  cr2={:p}", num, regs.error, cr2);
     log!("ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}", regs.ss, regs.rsp, regs.cs, regs.rip, regs.rflags);
     log!("rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}", regs.rax, regs.rbx, regs.rcx, regs.rdx);
     log!("rbp={:-16x} rdi={:-16x} rsi={:-16x}", regs.rbp, regs.rdi, regs.rsi);
@@ -149,7 +152,7 @@ fn exception(regs: &Regs) {
     log!("r12={:-16x} r12={:-16x} r14={:-16x} r15={:-16x}", regs.r12, regs.r13, regs.r14, regs.r15);
     log!("");
 
-    if regs.num == 14 {
+    if num == 14 {
         log!("page fault: {} {} in {} mode",
              if (regs.error & 1) != 0 { "protection violation" } else { "page not present" },
              if (regs.error & 2) != 0 { "writing" } else { "reading" },
@@ -185,15 +188,6 @@ fn exception(regs: &Regs) {
     }
 
     loop { }
-}
-
-#[no_mangle]
-pub extern fn isr(regs: &Regs) {
-    match regs.error {
-        -1 => irq(regs),
-        -2 => interrupt(regs),
-        _ => exception(regs)
-    };
 }
 
 test! {

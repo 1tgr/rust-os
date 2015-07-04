@@ -139,12 +139,14 @@ start64_high:
 start64.loop:
 	hlt
 	jmp start64.loop
+	.align 16
 
 
 .globl thread_entry_asm
 thread_entry_asm:
     mov %rbx, %rdi
     jmp thread_entry
+	.align 16
 
 
 #define PUSH_REGS \
@@ -184,6 +186,7 @@ thread_entry_asm:
 syscall_entry_asm:
     mov %rsp, %r11
     movq TSS+4, %rsp
+	sti
     push %r11
     push %rax
     PUSH_REGS
@@ -198,14 +201,17 @@ syscall_entry_asm:
     sysretq         	// rcx=user rip (preserved above)
 
 
-#define ISR_ASM \
+#define ISR_ASM(num, rust_handler) \
+	sti ;\
     push %rax ;\
     PUSH_REGS ;\
-    mov %rsp, %rdi ;\
-    call isr ;\
+	mov $num, %rdi ;\
+    mov %rsp, %rsi ;\
+    call rust_handler ;\
     POP_REGS ;\
     pop %rax ;\
-    add $16, %rsp
+	cli ;\
+    add $8, %rsp
 
 
 #undef exception
@@ -213,8 +219,7 @@ syscall_entry_asm:
 	.globl	exception_##n ;\
 	\
 exception_##n: \
-	pushq	$0x##n ;\
-	ISR_ASM
+	ISR_ASM(0x##n, exception)
     iretq ;\
 	.align 16
 
@@ -224,8 +229,7 @@ exception_##n: \
 	\
 irq_##n: \
 	pushq	$-1 ;\
-	pushq	$0x##n; \
-	ISR_ASM ;\
+	ISR_ASM(0x##n, irq) ;\
     iretq ;\
 	.align 16
 	
@@ -235,8 +239,7 @@ irq_##n: \
 	\
 interrupt_##n: \
 	pushq	$-2 ;\
-	pushq	$0x##n; \
-	ISR_ASM ;\
+	ISR_ASM(0x##n, interrupt) ;\
     iretq ;\
 	.align 16
 
