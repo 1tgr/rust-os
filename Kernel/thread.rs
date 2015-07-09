@@ -5,7 +5,7 @@ use ::process::Process;
 use ::virt_mem::VirtualTree;
 use alloc::heap;
 use libc::{self,jmp_buf};
-use spin::{RwLock,RwLockWriteGuard};
+use spin::{Mutex,MutexGuard};
 use std::boxed::FnBox;
 use std::collections::VecDeque;
 use std::mem;
@@ -26,11 +26,11 @@ pub fn setjmp() -> Option<jmp_buf> {
     }
 }
 
-fn drop_write_guard<'a, T>(guard: RwLockWriteGuard<'a, T>) {
+fn drop_write_guard<'a, T>(guard: MutexGuard<'a, T>) {
     mem::drop(guard);
 }
 
-fn forget_write_guard<'a, T>(guard: RwLockWriteGuard<'a, T>) {
+fn forget_write_guard<'a, T>(guard: MutexGuard<'a, T>) {
     mem::forget(guard);
 }
 
@@ -64,11 +64,11 @@ struct SchedulerState {
 
 pub struct Deferred<A> {
     scheduler: Arc<Scheduler>,
-    state: Arc<RwLock<DeferredState<A>>>
+    state: Arc<Mutex<DeferredState<A>>>
 }
 
 pub struct Scheduler {
-    state: RwLock<SchedulerState>
+    state: Mutex<SchedulerState>
 }
 
 impl Scheduler {
@@ -79,11 +79,11 @@ impl Scheduler {
             garbage_stacks: Vec::new()
         };
 
-        Scheduler { state: RwLock::new(state) }
+        Scheduler { state: Mutex::new(state) }
     }
 
     pub fn schedule(&self) {
-        let mut state = self.state.write();
+        let mut state = lock!(self.state);
         match state.threads.pop_front() {
             Some((new_jmp_buf, new_current)) => {
                 let old_current = mem::replace(&mut state.current, new_current);
@@ -109,7 +109,7 @@ impl Scheduler {
     }
 
     pub fn exit_current(&self) -> ! {
-        let mut state = self.state.write();
+        let mut state = lock!(self.state);
         let (new_jmp_buf, new_current) =
             match state.threads.pop_front() {
                 Some(front) => front,
@@ -125,15 +125,15 @@ impl Scheduler {
         }
     }
 
-    fn get_deferred<A>(&self, dstate: &RwLock<DeferredState<A>>) -> A where A : Clone {
+    fn get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> A where A : Clone {
         loop {
-            let mut dstate = dstate.write();
+            let mut dstate = lock!(dstate);
             match dstate.result {
                 Some(ref result) => { return result.clone(); },
                 None => { }
             }
 
-            let mut state = self.state.write();
+            let mut state = lock!(self.state);
             let (new_jmp_buf, new_current) =
                 match state.threads.pop_front() {
                     Some(front) => front,
@@ -161,14 +161,14 @@ impl Scheduler {
         }
     }
 
-    fn resolve_deferred<A>(&self, dstate: &RwLock<DeferredState<A>>, result: A) {
-        let mut dstate = dstate.write();
+    fn resolve_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>, result: A) {
+        let mut dstate = lock!(dstate);
         match dstate.result {
             Some(_) => panic!("promise is already resolved"),
             None => { }
         }
 
-        let mut state = self.state.write();
+        let mut state = lock!(self.state);
         dstate.result = Some(result);
 
         let mut waiters = mem::replace(&mut dstate.waiters, VecDeque::new());
@@ -182,7 +182,7 @@ impl Scheduler {
         let thread = Thread::new(process, stack);
 
         {
-            let mut state = self.state.write();
+            let mut state = lock!(self.state);
             state.threads.push_back((jmp_buf, thread));
         }
     }
@@ -195,7 +195,7 @@ impl Scheduler {
             // TODO: free stack
         };
 
-        let process = self.state.read().current.process.clone();
+        let process = lock!(self.state).current.process.clone();
         self.spawn_inner(process, Box::new(start))
     }
 }
@@ -203,7 +203,7 @@ impl Scheduler {
 impl Drop for Scheduler {
     fn drop(&mut self) {
         let garbage_stacks = {
-            let mut state = self.state.write();
+            let mut state = lock!(self.state);
             mem::replace(&mut state.garbage_stacks, Vec::new())
         };
 
@@ -231,7 +231,7 @@ impl<A> Promise<A> for Deferred<A> where A : Clone {
 }
 
 pub fn spawn_remote<T, A>(scheduler: Arc<Scheduler>, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : Clone + 'static {
-    let dstate = Arc::new(RwLock::new(DeferredState {
+    let dstate = Arc::new(Mutex::new(DeferredState {
         result: None,
         waiters: VecDeque::new()
     }));
@@ -252,7 +252,7 @@ pub fn spawn_remote<T, A>(scheduler: Arc<Scheduler>, process: Arc<Process>, star
 }
 
 pub fn spawn<T, A>(scheduler: Arc<Scheduler>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : Clone + 'static {
-    let process = scheduler.state.read().current.process.clone();
+    let process = lock!(scheduler.state).current.process.clone();
     spawn_remote(scheduler, process, start)
 }
 
@@ -324,7 +324,7 @@ test! {
             log!("code_ptr[0] = 0x{:x}", *code_ptr);
         }
 
-        let dstate = Arc::new(RwLock::new(DeferredState {
+        let dstate = Arc::new(Mutex::new(DeferredState {
             result: None,
             waiters: VecDeque::new()
         }));

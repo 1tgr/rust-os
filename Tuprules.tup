@@ -26,7 +26,7 @@ ifeq (1,0)
 RUSTCFLAGS += -C opt-level=0
 CCFLAGS += -O0
 else
-RUSTCFLAGS += -O
+RUSTCFLAGS += -O -C debug-assertions
 CCFLAGS += -O
 endif
 

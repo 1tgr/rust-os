@@ -1,7 +1,7 @@
 use ::phys_mem;
 use ::ptr::{self,Align};
 use core::usize;
-use spin::RwLock;
+use spin::Mutex;
 use std::mem;
 
 extern {
@@ -98,13 +98,13 @@ impl VirtualState {
 }
 
 pub struct VirtualTree {
-    state: RwLock<VirtualState>
+    state: Mutex<VirtualState>
 }
 
 impl VirtualTree {
     pub fn new() -> VirtualTree {
         VirtualTree {
-            state: RwLock::new(VirtualState {
+            state: Mutex::new(VirtualState {
                 blocks: vec![Block {
                     ptr: 0 as *mut u8,
                     len: usize::MAX,
@@ -126,19 +126,19 @@ impl VirtualTree {
     }
 
     pub fn block_count(&self) -> usize {
-        self.state.read().blocks.len()
+        lock!(self.state).blocks.len()
     }
 
     pub fn alloc(&self, len: usize) -> Result<*mut u8, &'static str> {
-        self.state.write().alloc(len)
+        lock!(self.state).alloc(len)
     }
 
     pub fn reserve(&self, ptr: *mut u8, len: usize) -> bool {
-        self.state.write().reserve(ptr, len)
+        lock!(self.state).reserve(ptr, len)
     }
 
     pub fn free(&self, ptr: *mut u8) -> bool {
-        self.state.write().free(ptr)
+        lock!(self.state).free(ptr)
     }
 }
 

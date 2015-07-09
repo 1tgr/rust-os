@@ -1,7 +1,7 @@
 use ::multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
 use ::ptr;
 use libc::{c_int,c_void};
-use spin::RwLock;
+use spin::Mutex;
 use std::cmp;
 use std::collections::bit_vec::BitVec;
 use std::intrinsics;
@@ -26,13 +26,13 @@ pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
 pub const PAGE_SIZE: usize = 4096;
 
 pub struct PhysicalBitmap {
-    free: RwLock<BitVec>
+    free: Mutex<BitVec>
 }
 
 impl PhysicalBitmap {
     pub fn new(total_bytes: usize) -> PhysicalBitmap {
         let free = BitVec::from_elem(total_bytes / PAGE_SIZE, true);
-        PhysicalBitmap { free: RwLock::new(free) }
+        PhysicalBitmap { free: Mutex::new(free) }
     }
 
     pub fn parse_multiboot() -> PhysicalBitmap {
@@ -58,7 +58,7 @@ impl PhysicalBitmap {
     }
 
     pub fn reserve_pages(&self, start_page: usize, page_count: usize) {
-        let mut free = self.free.write();
+        let mut free = lock!(self.free);
         if start_page <= free.len() {
             let page_count = cmp::min(page_count, free.len() - start_page);
             for i in start_page..start_page + page_count {
@@ -77,19 +77,19 @@ impl PhysicalBitmap {
     }
 
     pub fn total_bytes(&self) -> usize {
-        let total_count = self.free.read().len();
+        let total_count = lock!(self.free).len();
         total_count * PAGE_SIZE
     }
 
     pub fn free_bytes(&self) -> usize {
-        let free = self.free.read();
+        let free = lock!(self.free);
         let free_count = free.iter().filter(|x| *x).count();
         free_count * PAGE_SIZE
     }
 
     pub fn alloc_page(&self) -> Result<usize, &'static str> {
         let addr = {
-            let mut free = self.free.write();
+            let mut free = lock!(self.free);
             match free.iter().position(|x| x) {
                 Some(i) => {
                     free.set(i, false);
@@ -109,7 +109,7 @@ impl PhysicalBitmap {
     }
 
     pub fn free_page(&self, addr: usize) {
-        let mut free = self.free.write();
+        let mut free = lock!(self.free);
         let i = addr / PAGE_SIZE;
         free.set(i, true)
     }
