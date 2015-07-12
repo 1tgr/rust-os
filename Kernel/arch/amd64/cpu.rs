@@ -125,3 +125,10 @@ pub unsafe fn ltr(selector: u16) {
 pub unsafe fn sti() {
     asm!("sti" :::: "volatile");
 }
+
+pub fn current_frame() -> *const usize {
+    let rbp;
+    unsafe { asm!("mov %rbp, $0" : "=r"(rbp)) };
+    rbp
+}
+

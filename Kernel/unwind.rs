@@ -9,6 +9,8 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
+use ::arch::cpu;
+use ::arch::debug;
 use core::fmt::Arguments;
 
 #[lang="panic_fmt"]
@@ -16,6 +18,9 @@ use core::fmt::Arguments;
 pub extern fn rust_begin_unwind(msg: Arguments, file: &'static str, line: u32) -> ! {
 	// 'args' will print to the formatted string passed to panic!
 	log!("file='{}', line={} :: {}", file, line, msg);
+
+    let frame = cpu::current_frame();
+    unsafe { debug::print_stack_trace(frame) };
 	loop {}
 }
 

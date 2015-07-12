@@ -2,6 +2,11 @@ use libc::c_char;
 use super::serial;
 use super::vga;
 
+extern {
+    static kernel_start: u8;
+    static kernel_end: u8;
+}
+
 pub fn puts(s: &str) {
     serial::puts(s);
     vga::puts(s);
@@ -10,4 +15,14 @@ pub fn puts(s: &str) {
 pub unsafe fn put_cstr(s: *const c_char) {
     serial::put_cstr(s);
     vga::put_cstr(s);
+}
+
+pub unsafe fn print_stack_trace(mut frame: *const usize) {
+    let kernel_start_ptr = &kernel_start as *const u8 as *const usize;
+    let kernel_end_ptr = &kernel_end as *const u8 as *const usize;
+    while frame >= kernel_start_ptr && frame < kernel_end_ptr {
+        let pc = *frame.offset(1) as *const u8;
+        log!("frame = {:p}: return to pc = {:p}", frame, pc);
+        frame = *frame as *const usize;
+    }
 }
