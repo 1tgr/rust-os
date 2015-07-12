@@ -1,7 +1,6 @@
 use ::arch::cpu::{self,DescriptorExtra,Dtr,InterruptDescriptor,Regs,Tss};
 use ::arch::mmu;
 use ::arch::x86_common::io;
-use ::phys_mem;
 use ::ptr;
 use std::default::Default;
 use std::mem;
@@ -180,7 +179,7 @@ pub extern fn exception(num: u8, regs: &Regs) {
 
     let mut rbp = regs.rbp as *const usize;
     let kernel_start_ptr = &kernel_start as *const u8 as *const usize;
-    let kernel_end_ptr = unsafe { (&kernel_end as *const u8).offset(phys_mem::brk as isize) } as *const usize;
+    let kernel_end_ptr = &kernel_end as *const u8 as *const usize;
     while rbp >= kernel_start_ptr && rbp < kernel_end_ptr {
         let rip = unsafe { *rbp.offset(1) as *const u8 };
         log!("rbp = {:p}: return to rip = {:p}", rbp, rip);

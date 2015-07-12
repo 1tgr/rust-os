@@ -118,7 +118,7 @@ impl VirtualTree {
         let tree = VirtualTree::new();
         let kernel_start_ptr = &kernel_start as *const u8;
         let kernel_end_ptr = &kernel_end as *const u8;
-        let kernel_len = ptr::bytes_between(kernel_start_ptr, kernel_end_ptr) + unsafe { phys_mem::brk };
+        let kernel_len = ptr::bytes_between(kernel_start_ptr, kernel_end_ptr);
         let four_meg = 4 * 1024 * 1024;
         let (kernel_start_ptr, kernel_len) = Align::range(kernel_start_ptr, kernel_len, four_meg);
         tree.reserve(0 as *mut u8, kernel_start_ptr as usize + kernel_len);

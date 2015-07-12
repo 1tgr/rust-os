@@ -9,16 +9,18 @@ use std::intrinsics;
 extern {
     static mut KERNEL_BASE: u8;
     static kernel_start: u8;
-    static mut kernel_end: u8;
+    static kernel_end: u8;
+    static mut heap_start: u8;
+    static heap_end: u8;
     static mboot_ptr: multiboot_uint32_t;
 }
 
-pub static mut brk: usize = 0;
-
 #[no_mangle]
 pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
-    let begin = (&mut kernel_end as *mut u8).offset(brk as isize);
-    brk += incr as usize;
+    static mut BRK: usize = 0;
+    let begin = (&mut heap_start as *mut u8).offset(BRK as isize);
+    assert!((begin as *const u8) < (&heap_end as *const u8), "out of heap space");
+    BRK += incr as usize;
     log!("sbrk({}) = {:p}", incr, begin);
     begin as *mut c_void
 }
@@ -37,7 +39,7 @@ impl PhysicalBitmap {
 
     pub fn parse_multiboot() -> PhysicalBitmap {
         let info: &multiboot_info_t = unsafe { phys2virt(mboot_ptr as usize) };
-        let kernel_len = unsafe { ptr::bytes_between(&kernel_start, &kernel_end) + brk };
+        let kernel_len = ptr::bytes_between(&kernel_start, &kernel_end);
         let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
         let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
         bitmap.reserve_ptr(&kernel_start, kernel_len as usize);
