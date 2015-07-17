@@ -1,7 +1,6 @@
 use ::arch::cpu::{self,DescriptorExtra,Dtr,InterruptDescriptor,Regs,Tss};
 use ::arch::debug;
 use ::arch::mmu;
-use ::arch::x86_common::io;
 use ::ptr;
 use ::singleton::{DropSingleton,Singleton};
 use lazy_static::once::{self,Once};
@@ -119,21 +118,21 @@ pub fn init_once() {
         const OFFSET1: u8 = 32;
         const OFFSET2: u8 = 40;
 
-        let a1 = io::inb(PIC1_DATA);                        // save masks
-        let a2 = io::inb(PIC2_DATA);
+        let a1 = cpu::inb(PIC1_DATA);                        // save masks
+        let a2 = cpu::inb(PIC2_DATA);
 
-        io::outb(PIC1_COMMAND, ICW1_INIT+ICW1_ICW4);  // starts the initialization sequence (in cascade mode)
-        io::outb(PIC2_COMMAND, ICW1_INIT+ICW1_ICW4);
-        io::outb(PIC1_DATA, OFFSET1);                 // ICW2: Master PIC vector offset
-        io::outb(PIC2_DATA, OFFSET2);                 // ICW2: Slave PIC vector offset
-        io::outb(PIC1_DATA, 4);                       // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
-        io::outb(PIC2_DATA, 2);                       // ICW3: tell Slave PIC its cascade identity (0000 0010)
+        cpu::outb(PIC1_COMMAND, ICW1_INIT+ICW1_ICW4);  // starts the initialization sequence (in cascade mode)
+        cpu::outb(PIC2_COMMAND, ICW1_INIT+ICW1_ICW4);
+        cpu::outb(PIC1_DATA, OFFSET1);                 // ICW2: Master PIC vector offset
+        cpu::outb(PIC2_DATA, OFFSET2);                 // ICW2: Slave PIC vector offset
+        cpu::outb(PIC1_DATA, 4);                       // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+        cpu::outb(PIC2_DATA, 2);                       // ICW3: tell Slave PIC its cascade identity (0000 0010)
 
-        io::outb(PIC1_DATA, ICW4_8086);
-        io::outb(PIC2_DATA, ICW4_8086);
+        cpu::outb(PIC1_DATA, ICW4_8086);
+        cpu::outb(PIC2_DATA, ICW4_8086);
 
-        io::outb(PIC1_DATA, a1);   // restore saved masks.
-        io::outb(PIC2_DATA, a2);
+        cpu::outb(PIC1_DATA, a1);   // restore saved masks.
+        cpu::outb(PIC2_DATA, a2);
 
         cpu::sti();
     });
@@ -159,10 +158,10 @@ pub extern fn irq(num: usize, _: &Regs) {
         }
 
         if num >= 8 {
-            io::outb(PIC2_COMMAND, PIC_EOI);
+            cpu::outb(PIC2_COMMAND, PIC_EOI);
         }
 
-        io::outb(PIC1_COMMAND, PIC_EOI);
+        cpu::outb(PIC1_COMMAND, PIC_EOI);
     }
 }
 

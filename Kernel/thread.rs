@@ -62,6 +62,7 @@ struct SchedulerState {
     garbage_stacks: Vec<&'static mut [u8]>
 }
 
+#[derive(Clone)]
 pub struct Deferred<A> {
     scheduler: Arc<Scheduler>,
     state: Arc<Mutex<DeferredState<A>>>
@@ -125,11 +126,11 @@ impl Scheduler {
         }
     }
 
-    fn get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> A where A : Clone {
+    fn get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> A {
         loop {
             let mut dstate = lock!(dstate);
-            match dstate.result {
-                Some(ref result) => { return result.clone(); },
+            match mem::replace(&mut dstate.result, None) {
+                Some(result) => { return result; },
                 None => { }
             }
 
@@ -161,12 +162,8 @@ impl Scheduler {
         }
     }
 
-    fn try_get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> Option<A> where A : Clone {
-        let dstate = lock!(dstate);
-        match dstate.result {
-            Some(ref result) => Some(result.clone()),
-            None => None
-        }
+    fn try_get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> Option<A> {
+        mem::replace(&mut lock!(dstate).result, None)
     }
 
     fn resolve_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>, result: A) {
@@ -242,7 +239,7 @@ impl<A> Deferred<A> {
     }
 }
 
-impl<A> Promise<A> for Deferred<A> where A : Clone {
+impl<A> Promise<A> for Deferred<A> {
     fn get(&self) -> A {
         self.scheduler.get_deferred(&self.state)
     }
@@ -252,7 +249,7 @@ impl<A> Promise<A> for Deferred<A> where A : Clone {
     }
 }
 
-pub fn spawn_remote<T, A>(scheduler: Arc<Scheduler>, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : Clone + 'static {
+pub fn spawn_remote<T, A>(scheduler: Arc<Scheduler>, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
     let dstate = Arc::new(Mutex::new(DeferredState {
         result: None,
         waiters: VecDeque::new()
@@ -273,7 +270,7 @@ pub fn spawn_remote<T, A>(scheduler: Arc<Scheduler>, process: Arc<Process>, star
     Deferred { scheduler: scheduler, state: dstate }
 }
 
-pub fn spawn<T, A>(scheduler: Arc<Scheduler>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : Clone + 'static {
+pub fn spawn<T, A>(scheduler: Arc<Scheduler>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
     let process = lock!(scheduler.state).current.process.clone();
     spawn_remote(scheduler, process, start)
 }
