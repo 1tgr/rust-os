@@ -338,10 +338,10 @@ test! {
                 }
             }
 
-            if let Some(c) = char::from_u32(c) {
+            if let Some(c) = char::from_u32(c & !keys::BUCKY_SHIFT.bits()) {
                 if c == '\n' {
                     break;
-                } else {
+                } else if c != '\0' {
                     let mut s = String::new();
                     s.push(c);
                     debug::puts(&s);
