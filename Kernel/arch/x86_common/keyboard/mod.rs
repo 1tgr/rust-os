@@ -286,14 +286,15 @@ impl Keyboard {
                         break;
                     }
 
+                    let mut requests = lock!(requests);
                     let request: IoRequest =
-                        match lock!(requests).pop_front() {
+                        match requests.pop_front() {
                             Some(request) => request,
                             None => { break; }
                         };
 
                     if let Some(request) = request.fulfil(&mut slice) {
-                        lock!(requests).push_front(request);
+                        requests.push_front(request);
                     }
                 }
             }

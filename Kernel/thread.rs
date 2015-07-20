@@ -1,4 +1,4 @@
-use ::arch::cpu::Regs;
+use ::arch::cpu::{self,Regs};
 use ::arch::thread;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::process::Process;
@@ -32,6 +32,10 @@ fn drop_write_guard<'a, T>(guard: MutexGuard<'a, T>) {
 
 fn forget_write_guard<'a, T>(guard: MutexGuard<'a, T>) {
     mem::forget(guard);
+}
+
+fn assert_no_lock() {
+    assert!(cpu::interrupts_enabled());
 }
 
 struct Thread {
@@ -84,6 +88,8 @@ impl Scheduler {
     }
 
     pub fn schedule(&self) {
+        assert_no_lock();
+
         let mut state = lock!(self.state);
         match state.threads.pop_front() {
             Some((new_jmp_buf, new_current)) => {
@@ -110,6 +116,8 @@ impl Scheduler {
     }
 
     pub fn exit_current(&self) -> ! {
+        assert_no_lock();
+
         let mut state = lock!(self.state);
         let (new_jmp_buf, new_current) =
             match state.threads.pop_front() {
@@ -128,6 +136,8 @@ impl Scheduler {
 
     fn get_deferred<A>(&self, dstate: &Mutex<DeferredState<A>>) -> A {
         loop {
+            assert_no_lock();
+
             let mut dstate = lock!(dstate);
             match mem::replace(&mut dstate.result, None) {
                 Some(result) => { return result; },

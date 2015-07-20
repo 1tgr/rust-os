@@ -126,6 +126,12 @@ pub unsafe fn sti() {
     asm!("sti" :::: "volatile");
 }
 
+pub fn interrupts_enabled() -> bool {
+    let rflags : usize;
+    unsafe { asm!("pushfq ; pop $0" : "=r"(rflags)) };
+    (rflags & (1 << 9)) != 0
+}
+
 pub fn current_frame() -> *const usize {
     let rbp;
     unsafe { asm!("mov %rbp, $0" : "=r"(rbp)) };
