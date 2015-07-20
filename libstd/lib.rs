@@ -49,6 +49,7 @@ pub use core::option;
 pub use core::marker;
 
 pub use alloc::*;
+pub use core::char;
 pub use core::clone;
 pub use core::default;
 pub use core::hash;

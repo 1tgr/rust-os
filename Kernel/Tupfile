@@ -7,6 +7,7 @@ KERNEL_LIBS += ../libc/libc.a
 KERNEL_LIBS += ../libcollections/libcollections.rlib
 KERNEL_LIBS += ../libcore/libcore.rlib
 KERNEL_LIBS += ../liblibc/liblibc.rlib
+KERNEL_LIBS += ../librustc_unicode/librustc_unicode.rlib
 KERNEL_LIBS += ../libstd/libstd.rlib
 KERNEL_LIBS += ../modules/libbitflags.rlib
 KERNEL_LIBS += ../modules/liblazy-static.rlib
@@ -17,6 +18,7 @@ RUSTFLAGS += --extern bitflags=../modules/libbitflags.rlib
 RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
 RUSTFLAGS += --extern lazy_static=../modules/liblazy-static.rlib
+RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
 RUSTFLAGS += --extern spin=../modules/libspin.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 

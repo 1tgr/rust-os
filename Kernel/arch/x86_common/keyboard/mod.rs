@@ -1,12 +1,16 @@
+use ::arch::cpu;
+use ::arch::debug;
 use ::arch::isr::{self,DropIrqHandler};
 use ::phys_mem::PhysicalBitmap;
-use ::arch::cpu;
 use ::process::Process;
 use ::thread::{Deferred,Promise,Scheduler};
 use ::virt_mem::VirtualTree;
 use spin::Mutex;
+use std::char;
+use std::cmp;
 use std::collections::VecDeque;
 use std::mem;
+use std::slice::bytes;
 use std::sync::Arc;
 
 //                  S    C    C+S  AGr  AGr+S
@@ -236,9 +240,17 @@ impl IoRequest {
         }
     }
 
-    pub fn fulfil(mut self, b: u8) -> Option<IoRequest> {
-        self.buf[self.current] = b;
-        self.current += 1;
+    pub fn fulfil(mut self, data: &mut &[u8]) -> Option<IoRequest> {
+        {
+            let len = cmp::min(self.buf.len(), data.len());
+            let (data1, data2) = data.split_at(len);
+            *data = data2;
+
+            let buf1 = &mut self.buf[self.current .. self.current + len];
+            bytes::copy_memory(data1, buf1);
+            self.current += len;
+        }
+
         if self.current >= self.buf.len() {
             self.d.resolve(Ok((self.buf, self.current)));
             None
@@ -262,12 +274,25 @@ impl Keyboard {
         let handler = {
             let requests = requests.clone();
             move || {
-                let key = lock!(state).decode(unsafe { cpu::inb(0x60) });
-                let request_opt: Option<IoRequest> = lock!(requests).pop_front();
+                let data: [u8; 4] = {
+                    let scancode = unsafe { cpu::inb(0x60) };
+                    let key = lock!(state).decode(scancode);
+                    unsafe { mem::transmute(key) }
+                };
 
-                if let Some(request) = request_opt {
-                    let a: [u8; 4] = unsafe { mem::transmute(key) };
-                    if let Some(request) = request.fulfil(a[0]) {
+                let mut slice: &[u8] = &data;
+                loop {
+                    if slice.len() == 0 {
+                        break;
+                    }
+
+                    let request: IoRequest =
+                        match lock!(requests).pop_front() {
+                            Some(request) => request,
+                            None => { break; }
+                        };
+
+                    if let Some(request) = request.fulfil(&mut slice) {
                         lock!(requests).push_front(request);
                     }
                 }
@@ -300,22 +325,27 @@ test! {
         log!("Type something and press Enter");
 
         loop {
-            let d = keyboard.read_async(vec![0; 1]);
-            let c: char;
+            let d = keyboard.read_async(vec![0; 4]);
+            let c: u32;
             loop {
                 if let Some(result) = d.try_get() {
                     let (keys, _) = result.unwrap(); 
-                    c = *keys.get(0).expect("") as char;
+                    let p = keys[0..4].as_ptr() as *const u32;
+                    c = unsafe { *p };
                     break;
                 } else {
                     unsafe { asm!("hlt") };
                 }
             }
 
-            if c == '\n' {
-                break;
-            } else {
-                log!("{}", c);
+            if let Some(c) = char::from_u32(c) {
+                if c == '\n' {
+                    break;
+                } else {
+                    let mut s = String::new();
+                    s.push(c);
+                    debug::puts(&s);
+                }
             }
         }
     }
