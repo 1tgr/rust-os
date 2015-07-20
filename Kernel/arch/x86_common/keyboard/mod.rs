@@ -297,17 +297,25 @@ test! {
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p));
         let keyboard = Keyboard::new(scheduler);
-        let d = keyboard.read_async(vec![0; 1]);
-        log!("Press any key to continue");
+        log!("Type something and press Enter");
 
         loop {
-            if let Some(result) = d.try_get() {
-                let (keys, _) = result.unwrap(); 
-                let k = keys.get(0).expect("");
-                log!("You pressed: {}", *k as char);
+            let d = keyboard.read_async(vec![0; 1]);
+            let c: char;
+            loop {
+                if let Some(result) = d.try_get() {
+                    let (keys, _) = result.unwrap(); 
+                    c = *keys.get(0).expect("") as char;
+                    break;
+                } else {
+                    unsafe { asm!("hlt") };
+                }
+            }
+
+            if c == '\n' {
                 break;
             } else {
-                unsafe { asm!("hlt") };
+                log!("{}", c);
             }
         }
     }

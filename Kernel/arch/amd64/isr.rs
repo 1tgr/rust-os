@@ -149,7 +149,6 @@ pub extern fn irq(num: usize, _: &Regs) {
         const PIC_EOI: u8 = 0x20; // End-of-interrupt command code
 
         if num != 0 {
-            log!("irq {}", num);
             if let Some(singleton) = IRQ_HANDLERS.get(num) {
                 if let Some(handler) = singleton.get() {
                     handler();
