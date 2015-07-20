@@ -95,18 +95,6 @@ impl Key {
     }
 }
 
-const RAW_LEFT_CTRL: u16 =   0x1D;
-const RAW_LEFT_SHIFT: u16 =  0x2A;
-const RAW_CAPS_LOCK: u16 =   0x3A;
-const RAW_LEFT_ALT: u16 =    0x38;
-const RAW_RIGHT_ALT: u16 =   0x6038;
-const RAW_RIGHT_CTRL: u16 =  0x601D;
-const RAW_RIGHT_SHIFT: u16 = 0x36;
-const RAW_SCROLL_LOCK: u16 = 0x46;
-const RAW_NUM_LOCK: u16 =    0x45;
-const RAW_NUM7: u16 =        0x47;
-const RAW_NUM0: u16 =        0x52;
-
 struct KeyboardState {
     extended: bool,
     keys: keys::Bucky,
@@ -128,51 +116,56 @@ impl KeyboardState {
         }
     }
 
-    pub fn decode(&mut self, scancode: u8) -> Option<Keypress> {
-        static KEYPAD: &'static [Option<u8>; (RAW_NUM0 - RAW_NUM7 + 1) as usize] = &[
-            Some(7), Some(8), Some(9), None,
-            Some(4), Some(5), Some(6), None,
-            Some(1), Some(2), Some(3),
-            Some(0)
-        ];
+    pub fn decode(&mut self, code: u8) -> Option<Keypress> {
+        const RAW_CTRL: u8 =        0x1D;
+        const RAW_LEFT_SHIFT: u8 =  0x2A;
+        const RAW_CAPS_LOCK: u8 =   0x3A;
+        const RAW_ALT: u8 =         0x38;
+        const RAW_RIGHT_SHIFT: u8 = 0x36;
+        const RAW_SCROLL_LOCK: u8 = 0x46;
+        const RAW_NUM_LOCK: u8 =    0x45;
+        const RAW_NUM7: u8 =        0x47;
+        const RAW_NUM0: u8 =        0x52;
 
-        let down = (scancode & 0x80) == 0;
-        let mut code = (scancode & !0x80) as u16;
+        let down = (code & 0x80) == 0;
+        let code = code & !0x80;
 
         if code == 0x60 {
             self.extended = true;
             return None;
-        } else if self.extended {
-            code |= 0x6000;
+        }
+
+        let extended = self.extended;
+        if extended {
             self.extended = false;
         }
 
         match code {
-            RAW_LEFT_CTRL | RAW_RIGHT_CTRL => {
+            RAW_CTRL => {
                 self.keys.set(keys::BUCKY_CTRL, down);
                 None
             },
 
-            RAW_LEFT_ALT => {
-                self.keys.set(keys::BUCKY_ALT, down);
-
-                if down && self.keys.contains(keys::BUCKY_ALT) {
-                    self.compose = 0;
+            RAW_ALT => {
+                if extended {
+                    self.keys.set(keys::BUCKY_ALTGR, down);
                     None
-                } else if !down && self.keys.contains(keys::BUCKY_ALT) {
-                    if self.compose != 0 {
-                        Some(Keypress::Char(self.compose))
+                } else {
+                    self.keys.set(keys::BUCKY_ALT, down);
+
+                    if down && self.keys.contains(keys::BUCKY_ALT) {
+                        self.compose = 0;
+                        None
+                    } else if !down && self.keys.contains(keys::BUCKY_ALT) {
+                        if self.compose != 0 {
+                            Some(Keypress::Char(self.compose))
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
-                } else {
-                    None
                 }
-            },
-
-            RAW_RIGHT_ALT => {
-                self.keys.set(keys::BUCKY_ALTGR, down);
-                None
             },
 
             RAW_LEFT_SHIFT | RAW_RIGHT_SHIFT => {
@@ -211,26 +204,36 @@ impl KeyboardState {
             },
 
             _ => {
-                if code >= RAW_NUM7 && code <= RAW_NUM0 && code != 0x4a && code != 0x4e {
-                    match KEYPAD[(code - RAW_NUM7) as usize] {
-                        Some(n) => {
-                            if self.keys.contains(keys::BUCKY_ALT) {
-                                if down {
-                                    self.compose *= 10;
-                                    self.compose += n as u32;
-                                }
-                                None
-                            } else if self.keys.contains(keys::BUCKY_NUM) {
-                                Some(Keypress::Scancode(self.keys, '0' as u8 + n, down))
-                            } else {
-                                Some(Keypress::Scancode(self.keys, code as u8, down))
-                            }
-                        },
+                let num =
+                    if code >= RAW_NUM7 {
+                        static KEYPAD: &'static [Option<u8>; (RAW_NUM0 - RAW_NUM7 + 1) as usize] = &[
+                            Some(7), Some(8), Some(9), None,
+                            Some(4), Some(5), Some(6), None,
+                            Some(1), Some(2), Some(3),
+                            Some(0)
+                        ];
 
-                        None => Some(Keypress::Scancode(self.keys, code as u8, down))
-                    }
-                } else {
-                    Some(Keypress::Scancode(self.keys, code as u8, down))
+                        match KEYPAD.get((code - RAW_NUM7) as usize) {
+                            Some(&Some(num)) => Some(num),
+                            _ => None
+                        }
+                    } else {
+                        None
+                    };
+
+                match num {
+                    Some(num) if self.keys.contains(keys::BUCKY_ALT) => {
+                        if down {
+                            self.compose = self.compose * 10 + num as u32;
+                        }
+                        None
+                    },
+
+                    Some(num) if self.keys.contains(keys::BUCKY_NUM) =>
+                        Some(Keypress::Scancode(self.keys, '0' as u8 + num, down)),
+
+                    _ =>
+                        Some(Keypress::Scancode(self.keys, code, down))
                 }
             }
         }
@@ -293,8 +296,8 @@ impl Keyboard {
             let requests = requests.clone();
             move || {
                 let key = {
-                    let scancode = unsafe { cpu::inb(0x60) };
-                    lock!(state).decode(scancode)
+                    let code = unsafe { cpu::inb(0x60) };
+                    lock!(state).decode(code)
                 };
 
                 let c =
@@ -303,6 +306,7 @@ impl Keyboard {
 
                         Some(Keypress::Scancode(mut keys, scan, down)) => {
                             keys.set(keys::BUCKY_RELEASE, !down);
+
                             if let Some(key) = british::KEYS.get(scan as usize) {
                                 let c = key.pick(keys);
 
