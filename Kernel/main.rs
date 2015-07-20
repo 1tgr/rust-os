@@ -34,6 +34,7 @@ pub mod arch;
 #[path="arch/x86/mod.rs"]
 pub mod arch;
 
+pub mod device;
 pub mod logging;
 pub mod multiboot;
 pub mod phys_mem;

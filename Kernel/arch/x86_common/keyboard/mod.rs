@@ -1,16 +1,15 @@
 use ::arch::cpu;
 use ::arch::debug;
 use ::arch::isr::{self,DropIrqHandler};
+use ::device::{ByteDevice,Device};
 use ::phys_mem::PhysicalBitmap;
 use ::process::Process;
-use ::thread::{Deferred,Promise,Scheduler};
+use ::thread::{Promise,Scheduler};
 use ::virt_mem::VirtualTree;
 use spin::Mutex;
 use std::char;
-use std::cmp;
-use std::collections::VecDeque;
 use std::mem;
-use std::slice::bytes;
+use std::ops::Deref;
 use std::sync::Arc;
 
 //                  S    C    C+S  AGr  AGr+S
@@ -240,60 +239,20 @@ impl KeyboardState {
     }
 }
 
-pub trait Device {
-    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>>;
-}
-
-pub struct IoRequest {
-    buf: Vec<u8>,
-    d: Deferred<Result<(Vec<u8>, usize), &'static str>>,
-    current: usize
-}
-
-impl IoRequest {
-    pub fn new(buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize), &'static str>>) -> IoRequest {
-        IoRequest {
-            buf: buf,
-            d: d,
-            current: 0
-        }
-    }
-
-    pub fn fulfil(mut self, data: &mut &[u8]) -> Option<IoRequest> {
-        {
-            let len = cmp::min(self.buf.len(), data.len());
-            let (data1, data2) = data.split_at(len);
-            *data = data2;
-
-            let buf1 = &mut self.buf[self.current .. self.current + len];
-            bytes::copy_memory(data1, buf1);
-            self.current += len;
-        }
-
-        if self.current >= self.buf.len() {
-            self.d.resolve(Ok((self.buf, self.current)));
-            None
-        } else {
-            Some(self)
-        }
-    }
-}
-
 mod british;
 
 pub struct Keyboard {
     _drop_irq_handler: DropIrqHandler,
-    scheduler: Arc<Scheduler>,
-    requests: Arc<Mutex<VecDeque<IoRequest>>>
+    device: Arc<ByteDevice>
 }
 
 impl Keyboard {
     pub fn new(scheduler: Arc<Scheduler>) -> Keyboard {
-        let requests = Arc::new(Mutex::new(VecDeque::new()));
-        let state = Mutex::new(KeyboardState::new());
+        let device = Arc::new(ByteDevice::new(scheduler));
 
         let handler = {
-            let requests = requests.clone();
+            let device = device.clone();
+            let state = Mutex::new(KeyboardState::new());
             move || {
                 let key = {
                     let code = unsafe { cpu::inb(0x60) };
@@ -334,39 +293,23 @@ impl Keyboard {
                     };
 
                 let data: [u8; 4] = unsafe { mem::transmute(c) };
-                let mut slice: &[u8] = &data;
-                loop {
-                    if slice.len() == 0 {
-                        break;
-                    }
-
-                    let mut requests = lock!(requests);
-                    let request: IoRequest =
-                        match requests.pop_front() {
-                            Some(request) => request,
-                            None => { break; }
-                        };
-
-                    if let Some(request) = request.fulfil(&mut slice) {
-                        requests.push_front(request);
-                    }
-                }
+                let mut data: &[u8] = &data;
+                device.fulfil(&mut data);
             }
         };
 
         Keyboard {
             _drop_irq_handler: isr::register_irq_handler(1, handler),
-            scheduler: scheduler,
-            requests: requests
+            device: device
         }
     }
 }
 
-impl<'a> Device for Keyboard {
-    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>> {
-        let d = Deferred::new(self.scheduler.clone());
-        lock!(self.requests).push_back(IoRequest::new(buf, d.clone()));
-        d
+impl Deref for Keyboard {
+    type Target = ByteDevice;
+
+    fn deref(&self) -> &ByteDevice {
+        &*self.device
     }
 }
 
