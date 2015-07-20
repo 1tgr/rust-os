@@ -97,28 +97,26 @@ impl Key {
 
 const RAW_LEFT_CTRL: u16 =   0x1D;
 const RAW_LEFT_SHIFT: u16 =  0x2A;
-//const RAW_CAPS_LOCK: u16 =   0x3A;
+const RAW_CAPS_LOCK: u16 =   0x3A;
 const RAW_LEFT_ALT: u16 =    0x38;
 const RAW_RIGHT_ALT: u16 =   0x6038;
 const RAW_RIGHT_CTRL: u16 =  0x601D;
 const RAW_RIGHT_SHIFT: u16 = 0x36;
-//const RAW_SCROLL_LOCK: u16 = 0x46;
-//const RAW_NUM_LOCK: u16 =    0x45;
+const RAW_SCROLL_LOCK: u16 = 0x46;
+const RAW_NUM_LOCK: u16 =    0x45;
 const RAW_NUM7: u16 =        0x47;
-//const RAW_NUM8: u16 =        0x48;
-//const RAW_NUM9: u16 =        0x49;
-//const RAW_NUM4: u16 =        0x4b;
-//const RAW_NUM5: u16 =        0x4c;
-//const RAW_NUM6: u16 =        0x4d;
-//const RAW_NUM1: u16 =        0x4f;
-//const RAW_NUM2: u16 =        0x50;
-//const RAW_NUM3: u16 =        0x51;
 const RAW_NUM0: u16 =        0x52;
 
 struct KeyboardState {
     extended: bool,
     keys: keys::Bucky,
     compose: u32,
+}
+
+enum Keypress {
+    Char(u32),
+    Scancode(keys::Bucky, u8, bool),
+    Leds(u8)
 }
 
 impl KeyboardState {
@@ -130,7 +128,7 @@ impl KeyboardState {
         }
     }
 
-    pub fn decode(&mut self, scancode: u8) -> u32 {
+    pub fn decode(&mut self, scancode: u8) -> Option<Keypress> {
         static KEYPAD: &'static [Option<u8>; (RAW_NUM0 - RAW_NUM7 + 1) as usize] = &[
             Some(7), Some(8), Some(9), None,
             Some(4), Some(5), Some(6), None,
@@ -140,11 +138,10 @@ impl KeyboardState {
 
         let down = (scancode & 0x80) == 0;
         let mut code = (scancode & !0x80) as u16;
-        let mut key: u32 = 0;
 
         if code == 0x60 {
             self.extended = true;
-            return 0;
+            return None;
         } else if self.extended {
             code |= 0x6000;
             self.extended = false;
@@ -153,33 +150,67 @@ impl KeyboardState {
         match code {
             RAW_LEFT_CTRL | RAW_RIGHT_CTRL => {
                 self.keys.set(keys::BUCKY_CTRL, down);
+                None
             },
 
             RAW_LEFT_ALT => {
+                self.keys.set(keys::BUCKY_ALT, down);
+
                 if down && self.keys.contains(keys::BUCKY_ALT) {
                     self.compose = 0;
+                    None
                 } else if !down && self.keys.contains(keys::BUCKY_ALT) {
-                    key =
-                        if self.compose != 0 {
-                            self.compose
-                        } else {
-                            (keys::BUCKY_ALT | keys::BUCKY_RELEASE).bits()
-                        };
+                    if self.compose != 0 {
+                        Some(Keypress::Char(self.compose))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
                 }
-
-                self.keys.set(keys::BUCKY_ALT, down);
             },
 
             RAW_RIGHT_ALT => {
                 self.keys.set(keys::BUCKY_ALTGR, down);
+                None
             },
 
             RAW_LEFT_SHIFT | RAW_RIGHT_SHIFT => {
                 self.keys.set(keys::BUCKY_SHIFT, down);
+                None
+            },
+
+            RAW_NUM_LOCK | RAW_CAPS_LOCK | RAW_SCROLL_LOCK => {
+                if down {
+                    let k =
+                        match code {
+                            RAW_NUM_LOCK => keys::BUCKY_NUM,
+                            RAW_CAPS_LOCK => keys::BUCKY_CAPS,
+                            _ => keys::BUCKY_SCRL
+                        };
+
+                    self.keys.toggle(k);
+
+                    let mut flags = 0;
+                    if self.keys.contains(keys::BUCKY_SCRL) {
+                        flags |= 1;
+                    }
+
+                    if self.keys.contains(keys::BUCKY_NUM) {
+                        flags |= 2;
+                    }
+
+                    if self.keys.contains(keys::BUCKY_CAPS) {
+                        flags |= 4;
+                    }
+
+                    Some(Keypress::Leds(flags))
+                } else {
+                    None
+                }
             },
 
             _ => {
-                code &= !0x6000;
                 if code >= RAW_NUM7 && code <= RAW_NUM0 && code != 0x4a && code != 0x4e {
                     match KEYPAD[(code - RAW_NUM7) as usize] {
                         Some(n) => {
@@ -188,38 +219,23 @@ impl KeyboardState {
                                     self.compose *= 10;
                                     self.compose += n as u32;
                                 }
+                                None
                             } else if self.keys.contains(keys::BUCKY_NUM) {
-                                key = '0' as u32 + n as u32;
+                                Some(Keypress::Scancode(self.keys, '0' as u8 + n, down))
+                            } else {
+                                Some(Keypress::Scancode(self.keys, code as u8, down))
                             }
                         },
 
-                        None => {
-                            key = british::KEYS[code as usize].pick(keys::Bucky::empty());
-                        }
+                        None => Some(Keypress::Scancode(self.keys, code as u8, down))
                     }
                 } else {
-                    key = british::KEYS[code as usize].pick(self.keys);
-                }
-
-                /* if self.keys.contains(keys::BUCKY_CAPS) {
-                    if (iswupper(key)) {
-                        key = towlower(key);
-                    } else if (iswlower(key)) {
-                        key = towupper(key);
-                    }
-                } */
-                
-                if !down {
-                    key |= keys::BUCKY_RELEASE.bits();
+                    Some(Keypress::Scancode(self.keys, code as u8, down))
                 }
             }
         }
-        
-        key | self.keys.bits()
     }
 }
-
-mod british;
 
 pub trait Device {
     fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>>;
@@ -260,6 +276,8 @@ impl IoRequest {
     }
 }
 
+mod british;
+
 pub struct Keyboard {
     _drop_irq_handler: DropIrqHandler,
     scheduler: Arc<Scheduler>,
@@ -274,12 +292,44 @@ impl Keyboard {
         let handler = {
             let requests = requests.clone();
             move || {
-                let data: [u8; 4] = {
+                let key = {
                     let scancode = unsafe { cpu::inb(0x60) };
-                    let key = lock!(state).decode(scancode);
-                    unsafe { mem::transmute(key) }
+                    lock!(state).decode(scancode)
                 };
 
+                let c =
+                    match key {
+                        Some(Keypress::Char(c)) => c,
+
+                        Some(Keypress::Scancode(mut keys, scan, down)) => {
+                            keys.set(keys::BUCKY_RELEASE, !down);
+                            if let Some(key) = british::KEYS.get(scan as usize) {
+                                let c = key.pick(keys);
+
+                                let c =
+                                    match char::from_u32(c) {
+                                        Some(c) if keys.contains(keys::BUCKY_CAPS) => c.to_uppercase().next().unwrap_or(c) as u32,
+                                        _ => c
+                                    };
+
+                                keys.bits() | c
+                            } else {
+                                return;
+                            }
+                        },
+
+                        Some(Keypress::Leds(flags)) => {
+                            unsafe {
+                                cpu::outb(0x60, 0xed);
+                                cpu::outb(0x60, flags);
+                            }
+                            return;
+                        },
+
+                        None => { return; }
+                    };
+
+                let data: [u8; 4] = unsafe { mem::transmute(c) };
                 let mut slice: &[u8] = &data;
                 loop {
                     if slice.len() == 0 {
@@ -339,13 +389,17 @@ test! {
                 }
             }
 
-            if let Some(c) = char::from_u32(c & !keys::BUCKY_SHIFT.bits()) {
-                if c == '\n' {
-                    break;
-                } else if c != '\0' {
-                    let mut s = String::new();
-                    s.push(c);
-                    debug::puts(&s);
+            let keys = keys::Bucky::from_bits_truncate(c);
+            if !keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
+                let c = c & !keys.bits();
+                if let Some(c) = char::from_u32(c) {
+                    if c == '\n' {
+                        break;
+                    } else if c != '\0' {
+                        let mut s = String::new();
+                        s.push(c);
+                        debug::puts(&s);
+                    }
                 }
             }
         }
