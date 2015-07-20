@@ -1,4 +1,6 @@
 use ::arch::cpu::{self,Regs};
+use ::arch::debug;
+use ::arch::keyboard::Keyboard;
 use ::arch::thread;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::process::Process;
@@ -342,6 +344,7 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::for_kernel());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p.clone()));
+        let keyboard = Keyboard::new(scheduler.clone());
         p.switch();
 
         let stack_len = phys_mem::PAGE_SIZE;
@@ -350,7 +353,10 @@ test! {
         log!("code_ptr = {:p}, stack_ptr = {:p}", code_ptr, stack_ptr);
         unsafe {
             ptr::copy(HELLO.as_ptr(), code_ptr, HELLO.len());
-            log!("code_ptr[0] = 0x{:x}", *code_ptr);
+
+            let code_slice = slice::from_raw_parts(code_ptr, HELLO.len());
+            let code_slice = &code_slice[0 .. 16];
+            log!("code_slice = {:?}", code_slice);
         }
 
         let dstate = Arc::new(Mutex::new(DeferredState {
@@ -365,12 +371,16 @@ test! {
                 match regs.rax {
                     0 => {
                         let bytes = unsafe { slice::from_raw_parts(regs.rdi as *const u8, regs.rsi as usize) };
-                        log!("{}", str::from_utf8(bytes).unwrap());
+                        debug::puts(str::from_utf8(bytes).unwrap());
                         0
                     },
                     1 => {
                         scheduler.resolve_deferred(&dstate, regs.rdi);
                         scheduler.exit_current();
+                    },
+                    2 => {
+                        let bytes = unsafe { slice::from_raw_parts_mut(regs.rdi as *mut u8, regs.rsi as usize) };
+                        keyboard.read_line(bytes)
                     },
                     _ => regs.rax as usize
                 }

@@ -8,8 +8,10 @@ use ::thread::{Promise,Scheduler};
 use ::virt_mem::VirtualTree;
 use spin::Mutex;
 use std::char;
+use std::cmp;
 use std::mem;
 use std::ops::Deref;
+use std::slice::bytes;
 use std::sync::Arc;
 
 //                  S    C    C+S  AGr  AGr+S
@@ -303,6 +305,56 @@ impl Keyboard {
             device: device
         }
     }
+
+    pub fn read_key(&self) -> (keys::Bucky, u32) {
+        let d = self.read_async(vec![0; 4]);
+        let c: u32;
+        loop {
+            if let Some(result) = d.try_get() {
+                let (keys, _) = result.unwrap(); 
+                let p = keys[0..4].as_ptr() as *const u32;
+                c = unsafe { *p };
+                break;
+            } else {
+                unsafe { asm!("hlt") };
+            }
+        }
+
+        let keys = keys::Bucky::from_bits_truncate(c);
+        (keys, c & !keys.bits())
+    }
+
+    pub fn read_char(&self) -> char {
+        loop {
+            let (keys, c) = self.read_key();
+            if !keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
+                if let Some(c) = char::from_u32(c) {
+                    return c;
+                }
+            }
+        }
+    }
+
+    pub fn read_line(&self, bytes: &mut [u8]) -> usize {
+        let mut buf = String::new();
+
+        loop {
+            match self.read_char() {
+                '\n' => { break; },
+                c => {
+                    let mut s = String::new();
+                    s.push(c);
+                    debug::puts(&s);
+                    buf.push(c);
+                }
+            }
+        }
+
+        let buf = buf.as_bytes();
+        let buf = &buf[0 .. cmp::min(buf.len(), bytes.len())];
+        bytes::copy_memory(buf, bytes);
+        buf.len()
+    }
 }
 
 impl Deref for Keyboard {
@@ -319,36 +371,8 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p));
-        let keyboard = Keyboard::new(scheduler);
-        log!("Type something and press Enter");
-
-        loop {
-            let d = keyboard.read_async(vec![0; 4]);
-            let c: u32;
-            loop {
-                if let Some(result) = d.try_get() {
-                    let (keys, _) = result.unwrap(); 
-                    let p = keys[0..4].as_ptr() as *const u32;
-                    c = unsafe { *p };
-                    break;
-                } else {
-                    unsafe { asm!("hlt") };
-                }
-            }
-
-            let keys = keys::Bucky::from_bits_truncate(c);
-            if !keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
-                let c = c & !keys.bits();
-                if let Some(c) = char::from_u32(c) {
-                    if c == '\n' {
-                        break;
-                    } else if c != '\0' {
-                        let mut s = String::new();
-                        s.push(c);
-                        debug::puts(&s);
-                    }
-                }
-            }
-        }
+        let _keyboard = Keyboard::new(scheduler);
+        //log!("Press any key to continue");
+        //keyboard.read_key();
     }
 }

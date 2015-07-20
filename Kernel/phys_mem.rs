@@ -21,7 +21,6 @@ pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
     let begin = (&mut heap_start as *mut u8).offset(BRK as isize);
     assert!((begin as *const u8) < (&heap_end as *const u8), "out of heap space");
     BRK += incr as usize;
-    log!("sbrk({}) = {:p}", incr, begin);
     begin as *mut c_void
 }
 

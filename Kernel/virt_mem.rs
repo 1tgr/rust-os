@@ -21,6 +21,8 @@ struct VirtualState {
 
 impl VirtualState {
     pub fn alloc(&mut self, len: usize) -> Result<*mut u8, &'static str> {
+        let len = Align::up(len, phys_mem::PAGE_SIZE);
+
         let pos =
             match self.blocks.iter().position(|block| block.free && block.len >= len) {
                 Some(pos) => pos,

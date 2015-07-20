@@ -18,13 +18,17 @@ lazy_static! {
 
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> usize {
-    log!("syscall: {} {:p} {}", regs.rax, regs.rdi as *const u8, regs.rsi);
+    //log!("syscall: {} {:p} {}", regs.rax, regs.rdi as *const u8, regs.rsi);
 
-    if let Some(handler) = SYSCALL_HANDLER.get() {
-        handler(regs)
-    } else {
-        0
-    }
+    let result =
+        if let Some(handler) = SYSCALL_HANDLER.get() {
+            handler(regs)
+        } else {
+            0
+        };
+
+    //log!("syscall: {} {:p} {} => {}", regs.rax, regs.rdi as *const u8, regs.rsi, result);
+    result
 }
 
 pub type DropSyscallHandler = DropSingleton<'static, Box<RegsHandler>>;

@@ -1,26 +1,23 @@
-OUTPUT_FORMAT("binary")
+OUTPUT_FORMAT(elf64-x86-64)
 ENTRY(start)
-phys = 0x00010000;
+phys = 0x00001000;
 SECTIONS
 {
   .text phys : AT(phys) {
     code = .;
     *(.init)
-    *(.text)
-    *(.rodata)
-    . = ALIGN(4096);
+    *(.text .text.*)
+    *(.rodata .rodata.*)
   }
   .data : AT(phys + (data - code))
   {
     data = .;
-    *(.data)
-    . = ALIGN(4096);
+    *(.data .data.*)
   }
   .bss : AT(phys + (bss - code))
   {
     bss = .;
-    *(.bss)
-    . = ALIGN(4096);
+    *(.bss .bss.*)
   }
   end = .;
 }
