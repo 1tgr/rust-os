@@ -11,8 +11,8 @@ use spin::{Mutex,MutexGuard};
 use std::boxed::FnBox;
 use std::collections::VecDeque;
 use std::mem;
-use std::ptr;
 use std::slice;
+use std::slice::bytes;
 use std::str;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -204,10 +204,13 @@ impl Scheduler {
         }
     }
 
-    pub fn spawn_user_mode(&self, pc: *const u8, stack: *const u8, stack_len: usize) {
+    pub fn spawn_user_mode(&self, pc: *const u8, stack: &mut [u8]) {
+        let stack_ptr = stack.as_mut_ptr();
+        let stack_len = stack.len();
+
         let start = move || {
             unsafe {
-                thread::jmp_user_mode(pc, stack.offset(stack_len as isize))
+                thread::jmp_user_mode(pc, stack_ptr.offset(stack_len as isize))
             }
             // TODO: free stack
         };
@@ -347,17 +350,11 @@ test! {
         let keyboard = Keyboard::new(scheduler.clone());
         p.switch();
 
-        let stack_len = phys_mem::PAGE_SIZE;
-        let code_ptr = p.alloc(HELLO.len(), true, true).unwrap();
-        let stack_ptr = p.alloc(stack_len, true, true).unwrap();
-        log!("code_ptr = {:p}, stack_ptr = {:p}", code_ptr, stack_ptr);
-        unsafe {
-            ptr::copy(HELLO.as_ptr(), code_ptr, HELLO.len());
-
-            let code_slice = slice::from_raw_parts(code_ptr, HELLO.len());
-            let code_slice = &code_slice[0 .. 16];
-            log!("code_slice = {:?}", code_slice);
-        }
+        let mut code_slice = p.alloc(HELLO.len(), true, true).unwrap();
+        let stack_slice = p.alloc(phys_mem::PAGE_SIZE, true, true).unwrap();
+        log!("code_slice = {:p}, stack_slice = {:p}", code_slice.as_ptr(), stack_slice.as_ptr());
+        bytes::copy_memory(HELLO, code_slice);
+        log!("code_slice = {:?}", &code_slice[0..16]);
 
         let dstate = Arc::new(Mutex::new(DeferredState {
             result: None,
@@ -389,7 +386,7 @@ test! {
 
         let d = Deferred { scheduler: scheduler.clone(), state: dstate };
         let _x = thread::register_syscall_handler(syscall_handler);
-        scheduler.spawn_user_mode(code_ptr, stack_ptr, stack_len);
+        scheduler.spawn_user_mode(code_slice.as_ptr(), stack_slice);
 
         assert_eq!(0x1234, d.get());
     }

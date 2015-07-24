@@ -3,9 +3,9 @@ use ::ptr::{self,Align};
 use core::usize;
 use spin::Mutex;
 use std::mem;
+use std::slice;
 
 extern {
-    static kernel_start: u8;
     static kernel_end: u8;
 }
 
@@ -20,7 +20,8 @@ struct VirtualState {
 }
 
 impl VirtualState {
-    pub fn alloc(&mut self, len: usize) -> Result<*mut u8, &'static str> {
+    pub fn alloc(&mut self, len: usize) -> Result<&'static mut [u8], &'static str> {
+        let unaligned_len = len;
         let len = Align::up(len, phys_mem::PAGE_SIZE);
 
         let pos =
@@ -43,10 +44,11 @@ impl VirtualState {
         };
 
         self.blocks.insert(pos + 1, block2);
-        Ok(orig_ptr)
+        Ok(unsafe { slice::from_raw_parts_mut(orig_ptr, unaligned_len) })
     }
 
-    pub fn reserve(&mut self, ptr: *mut u8, len: usize) -> bool {
+    pub fn reserve(&mut self, slice: &mut [u8]) -> bool {
+        let (ptr, len) = (slice.as_mut_ptr(), slice.len());
         let (ptr, len) = Align::range(ptr, len, phys_mem::PAGE_SIZE);
         log!("reserve({:p} -> {:p})", ptr, unsafe { ptr.offset(len as isize) });
 
@@ -80,7 +82,9 @@ impl VirtualState {
         true
     }
 
-    pub fn free(&mut self, ptr: *mut u8) -> bool {
+    pub fn free(&mut self, slice: &mut [u8]) -> bool {
+        let ptr = slice.as_mut_ptr();
+
         let pos =
             match self.blocks.iter().position(|block| block.ptr == ptr) {
                 Some(pos) => pos,
@@ -118,12 +122,10 @@ impl VirtualTree {
 
     pub fn for_kernel() -> VirtualTree {
         let tree = VirtualTree::new();
-        let kernel_start_ptr = &kernel_start as *const u8;
-        let kernel_end_ptr = &kernel_end as *const u8;
-        let kernel_len = ptr::bytes_between(kernel_start_ptr, kernel_end_ptr);
         let four_meg = 4 * 1024 * 1024;
-        let (kernel_start_ptr, kernel_len) = Align::range(kernel_start_ptr, kernel_len, four_meg);
-        tree.reserve(0 as *mut u8, kernel_start_ptr as usize + kernel_len);
+        let kernel_end_ptr = Align::up(&kernel_end as *const u8, four_meg);
+        let identity = unsafe { slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize) };
+        tree.reserve(identity);
         tree
     }
 
@@ -131,16 +133,18 @@ impl VirtualTree {
         lock!(self.state).blocks.len()
     }
 
-    pub fn alloc(&self, len: usize) -> Result<*mut u8, &'static str> {
-        lock!(self.state).alloc(len)
+    pub fn alloc(&self, len: usize) -> Result<&mut [u8], &'static str> {
+        let slice: &'static mut [u8] = try!(lock!(self.state).alloc(len));
+        let slice: &mut [u8] = unsafe { mem::transmute(slice) };
+        Ok(slice)
     }
 
-    pub fn reserve(&self, ptr: *mut u8, len: usize) -> bool {
-        lock!(self.state).reserve(ptr, len)
+    pub fn reserve(&self, slice: &mut [u8]) -> bool {
+        lock!(self.state).reserve(slice)
     }
 
-    pub fn free(&self, ptr: *mut u8) -> bool {
-        lock!(self.state).free(ptr)
+    pub fn free(&self, slice: &mut [u8]) -> bool {
+        lock!(self.state).free(slice)
     }
 }
 
@@ -149,11 +153,11 @@ test! {
        let tree = VirtualTree::new();
        assert_eq!(1, tree.block_count());
 
-       let ptr = tree.alloc(4096).unwrap();
-       assert_eq!(0 as *mut u8, ptr);
+       let slice = tree.alloc(4096).unwrap();
+       assert_eq!(0 as *const u8, slice.as_ptr());
        assert_eq!(2, tree.block_count());
 
-       assert!(tree.free(ptr));
+       assert!(tree.free(slice));
        assert_eq!(1, tree.block_count());
    } 
 
@@ -161,14 +165,14 @@ test! {
        let tree = VirtualTree::new();
        assert_eq!(1, tree.block_count());
 
-       assert!(tree.reserve(0 as *mut u8, 4096));
+       assert!(tree.reserve(unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) }));
        assert_eq!(3, tree.block_count());
 
-       let ptr = tree.alloc(4096).unwrap();
+       let slice = tree.alloc(4096).unwrap();
        assert_eq!(4, tree.block_count());
-       assert_eq!(4096 as *mut u8, ptr);
+       assert_eq!(4096 as *const u8, slice.as_ptr());
 
-       assert!(tree.free(ptr));
+       assert!(tree.free(slice));
        assert_eq!(3, tree.block_count());
    } 
 }
