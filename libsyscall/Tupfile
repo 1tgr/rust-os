@@ -1,0 +1,9 @@
+include_rules
+
+LIBS += ../libcore/libcore.rlib
+
+RUSTFLAGS += --extern core=../libcore/libcore.rlib
+
+: lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> libsyscall.rlib
+: lib.rs | $(LIBS) *.rs |> !RUSTC_LIB --cfg feature=\"kernel\" |> libsyscall_kernel.rlib
+

@@ -5,9 +5,11 @@ RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L 
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
 LIBS += ../libstd/libstd.rlib
+LIBS += ../libsyscall/libsyscall.rlib
 
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
+RUSTFLAGS += --extern syscall=../libsyscall/libsyscall.rlib
 
 NDISASMFLAGS += -o 0x1000
 

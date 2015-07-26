@@ -4,6 +4,7 @@ use lazy_static::once::{self,Once};
 use libc::jmp_buf;
 use std::boxed::FnBox;
 use std::mem;
+use syscall::kernel::Dispatch;
 
 extern {
     static thread_entry_asm: u8;
@@ -13,28 +14,24 @@ extern {
 pub type RegsHandler = Fn(&Regs) -> usize;
 
 lazy_static! {
-    static ref SYSCALL_HANDLER: Singleton<Box<RegsHandler>> = Singleton::<Box<RegsHandler>>::new();
+    static ref SYSCALL_DISPATCH: Singleton<Box<Dispatch+'static>> = Singleton::<Box<Dispatch+'static>>::new();
 }
 
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> usize {
-    //log!("syscall: {} {:p} {}", regs.rax, regs.rdi as *const u8, regs.rsi);
-
-    let result =
-        if let Some(handler) = SYSCALL_HANDLER.get() {
-            handler(regs)
-        } else {
-            0
-        };
-
-    //log!("syscall: {} {:p} {} => {}", regs.rax, regs.rdi as *const u8, regs.rsi, result);
-    result
+    if let Some(ref d) = SYSCALL_DISPATCH.get() {
+        let d: &Box<Dispatch> = d;
+        let d: &Dispatch = &**d;
+        d.dispatch(regs.rax as usize, regs.rdi as usize, regs.rsi as usize)
+    } else {
+        0
+    }
 }
 
-pub type DropSyscallHandler = DropSingleton<'static, Box<RegsHandler>>;
+pub type DropSyscallHandler = DropSingleton<'static, Box<Dispatch>>;
 
-pub fn register_syscall_handler<T>(handler: T) -> DropSyscallHandler where T : Fn(&Regs) -> usize + 'static {
-    SYSCALL_HANDLER.register(Box::new(handler))
+pub fn register_syscall_handler<T>(handler: T) -> DropSyscallHandler where T : ::syscall::kernel::Handler + 'static {
+    SYSCALL_DISPATCH.register(Box::new(::syscall::kernel::Dispatcher::new(handler)))
 }
 
 #[no_mangle]

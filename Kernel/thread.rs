@@ -1,4 +1,4 @@
-use ::arch::cpu::{self,Regs};
+use ::arch::cpu;
 use ::arch::debug;
 use ::arch::keyboard::Keyboard;
 use ::arch::thread;
@@ -11,8 +11,8 @@ use spin::{Mutex,MutexGuard};
 use std::boxed::FnBox;
 use std::collections::VecDeque;
 use std::mem;
-use std::slice;
 use std::slice::bytes;
+use std::slice;
 use std::str;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
@@ -290,6 +290,27 @@ pub fn spawn<T, A>(scheduler: Arc<Scheduler>, start: T) -> Deferred<A> where T :
     spawn_remote(scheduler, process, start)
 }
 
+struct TestSyscallHandler {
+    scheduler: Arc<Scheduler>,
+    dstate: Arc<Mutex<DeferredState<u32>>>,
+    keyboard: Keyboard
+}
+
+impl ::syscall::kernel::Handler for TestSyscallHandler {
+    fn write(&self, s: &[u8]) {
+        debug::puts(str::from_utf8(s).unwrap())
+    }
+
+    fn exit_thread(&self, code: u32) -> ! {
+        self.scheduler.resolve_deferred(&self.dstate, code);
+        self.scheduler.exit_current()
+    }
+
+    fn read_line(&self, buf: &mut [u8]) -> usize {
+        self.keyboard.read_line(buf)
+    }
+}
+
 test! {
     fn can_spawn_exit_thread() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
@@ -361,31 +382,14 @@ test! {
             waiters: VecDeque::new()
         }));
 
-        let syscall_handler = {
-            let dstate = dstate.clone();
-            let scheduler = scheduler.clone();
-            move |regs: &Regs| -> usize {
-                match regs.rax {
-                    0 => {
-                        let bytes = unsafe { slice::from_raw_parts(regs.rdi as *const u8, regs.rsi as usize) };
-                        debug::puts(str::from_utf8(bytes).unwrap());
-                        0
-                    },
-                    1 => {
-                        scheduler.resolve_deferred(&dstate, regs.rdi);
-                        scheduler.exit_current();
-                    },
-                    2 => {
-                        let bytes = unsafe { slice::from_raw_parts_mut(regs.rdi as *mut u8, regs.rsi as usize) };
-                        keyboard.read_line(bytes)
-                    },
-                    _ => regs.rax as usize
-                }
-            }
+        let handler = TestSyscallHandler {
+            scheduler: scheduler.clone(),
+            dstate: dstate.clone(),
+            keyboard: keyboard
         };
 
         let d = Deferred { scheduler: scheduler.clone(), state: dstate };
-        let _x = thread::register_syscall_handler(syscall_handler);
+        let _x = thread::register_syscall_handler(handler);
         scheduler.spawn_user_mode(code_slice.as_ptr(), stack_slice);
 
         assert_eq!(0x1234, d.get());

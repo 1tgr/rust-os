@@ -9,6 +9,7 @@ KERNEL_LIBS += ../libcore/libcore.rlib
 KERNEL_LIBS += ../liblibc/liblibc.rlib
 KERNEL_LIBS += ../librustc_unicode/librustc_unicode.rlib
 KERNEL_LIBS += ../libstd/libstd.rlib
+KERNEL_LIBS += ../libsyscall/libsyscall_kernel.rlib
 KERNEL_LIBS += ../modules/libbitflags.rlib
 KERNEL_LIBS += ../modules/liblazy-static.rlib
 KERNEL_LIBS += ../modules/libspin.rlib
@@ -21,6 +22,7 @@ RUSTFLAGS += --extern lazy_static=../modules/liblazy-static.rlib
 RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
 RUSTFLAGS += --extern spin=../modules/libspin.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
+RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
 : main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}

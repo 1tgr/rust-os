@@ -18,13 +18,14 @@
 #[macro_use] extern crate bitflags;
 #[macro_use] extern crate core;
 #[macro_use] extern crate lazy_static;
+#[macro_use] extern crate spin;
 
 #[macro_use] mod macros;
 #[macro_use] mod test;
 
 extern crate alloc;
 extern crate libc;
-#[macro_use] extern crate spin;
+extern crate syscall;
 
 // Achitecture-specific modules
 #[cfg(target_arch="x86_64")]
