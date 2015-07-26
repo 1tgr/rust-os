@@ -13,7 +13,6 @@ use std::collections::VecDeque;
 use std::mem;
 use std::slice::bytes;
 use std::slice;
-use std::str;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
@@ -297,8 +296,8 @@ struct TestSyscallHandler {
 }
 
 impl ::syscall::kernel::Handler for TestSyscallHandler {
-    fn write(&self, s: &[u8]) {
-        debug::puts(str::from_utf8(s).unwrap())
+    fn write(&self, s: &str) {
+        debug::puts(s)
     }
 
     fn exit_thread(&self, code: u32) -> ! {

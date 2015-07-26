@@ -10,6 +10,7 @@
 #[cfg(not(feature = "kernel"))]
 mod user {
     use core::slice::SliceExt;
+    use core::str::StrExt;
 
     unsafe fn syscall(num: u32, arg1: usize, arg2: usize) -> usize {
         let result;
@@ -22,7 +23,7 @@ mod user {
         result
     }
 
-    pub fn write(s: &[u8]) {
+    pub fn write(s: &str) {
         unsafe { syscall(0, s.as_ptr() as usize, s.len()) };
     }
 
@@ -39,9 +40,10 @@ mod user {
 #[cfg(feature = "kernel")]
 pub mod kernel {
     use core::slice;
+    use core::str;
 
     pub trait Handler {
-        fn write(&self, s: &[u8]);
+        fn write(&self, s: &str);
         fn exit_thread(&self, code: u32) -> !;
         fn read_line(&self, buf: &mut [u8]) -> usize;
     }
@@ -65,7 +67,7 @@ pub mod kernel {
     impl<T> Dispatch for Dispatcher<T> where T : Handler {
         fn dispatch(&self, rax: usize, rdi: usize, rsi: usize) -> usize {
             match rax {
-                0 => { self.handler.write(unsafe { slice::from_raw_parts(rdi as *const _, rsi) }); 0 },
+                0 => { self.handler.write(str::from_utf8(unsafe { slice::from_raw_parts(rdi as *const _, rsi) }).unwrap()); 0 },
                 1 => self.handler.exit_thread(rdi as u32),
                 2 => self.handler.read_line(unsafe { slice::from_raw_parts_mut(rdi as *mut _, rsi) } ),
                 _ => 0

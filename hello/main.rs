@@ -14,7 +14,7 @@ struct Writer;
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> Result {
-        syscall::write(s.as_bytes());
+        syscall::write(s);
         Ok(())
     }
 } 
