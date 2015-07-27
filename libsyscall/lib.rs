@@ -7,7 +7,7 @@
 
 #[macro_use] extern crate core;
 
-pub mod marshal;
+mod marshal;
 
 #[cfg(not(feature = "kernel"))]
 mod user;
@@ -22,6 +22,9 @@ macro_rules! syscalls {
             $num:expr => $name:ident($arg:ty) -> $result:ty
         ),+
     ) => {
+        use core::result::Result;
+        use $crate::marshal::ErrNum;
+
         #[allow(non_camel_case_types)]
         enum Num {
             $(
@@ -30,7 +33,7 @@ macro_rules! syscalls {
         }
 
         $(
-            pub fn $name<'a>(arg: $arg) -> $result {
+            pub fn $name<'a>(arg: $arg) -> Result<$result, ErrNum> {
                 unsafe { $crate::user::syscall(Num::$name as u32, arg) }
             }
         )+
@@ -44,12 +47,13 @@ macro_rules! syscalls {
             $num:expr => $name:ident($arg:ty) -> $result:ty
         ),+
     ) => {
-        use $crate::marshal::{SyscallArgs,SyscallResult};
+        use core::result::Result::{self,Ok,Err};
+        use $crate::marshal::{ErrNum,SyscallArgs,SyscallResult};
         use $crate::kernel::Dispatch;
 
         pub trait Handler {
             $(
-                fn $name<'a>(&self, arg: $arg) -> $result;
+                fn $name<'a>(&self, arg: $arg) -> Result<$result, ErrNum>;
             )+
         }
 
@@ -66,10 +70,14 @@ macro_rules! syscalls {
         }
 
         impl<T> Dispatch for Dispatcher<T> where T : Handler {
-            fn dispatch(&self, num: usize, arg1: usize, arg2: usize) -> usize {
+            fn dispatch(&self, num: usize, arg1: usize, arg2: usize) -> isize {
                 match num {
                     $(
-                        $num => self.handler.$name(SyscallArgs::from_args(arg1, arg2)).as_result(),
+                        $num =>
+                            (match SyscallArgs::from_args(arg1, arg2) {
+                                Ok(args) => self.handler.$name(args),
+                                Err(num) => Err(num) 
+                            }).as_result(),
                     )+
                     _ => 0
                 }
@@ -80,4 +88,5 @@ macro_rules! syscalls {
 
 mod table;
 
+pub use marshal::ErrNum;
 pub use table::*;

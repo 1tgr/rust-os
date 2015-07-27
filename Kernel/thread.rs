@@ -296,17 +296,17 @@ struct TestSyscallHandler {
 }
 
 impl ::syscall::Handler for TestSyscallHandler {
-    fn write(&self, s: &str) {
-        debug::puts(s)
+    fn write(&self, s: &str) -> Result<(), ::syscall::ErrNum> {
+        Ok(debug::puts(s))
     }
 
-    fn exit_thread(&self, code: u32) {
+    fn exit_thread(&self, code: u32) -> Result<(), ::syscall::ErrNum> {
         self.scheduler.resolve_deferred(&self.dstate, code);
         self.scheduler.exit_current()
     }
 
-    fn read_line(&self, buf: &mut [u8]) -> usize {
-        self.keyboard.read_line(buf)
+    fn read_line(&self, buf: &mut [u8]) -> Result<usize, ::syscall::ErrNum> {
+        Ok(self.keyboard.read_line(buf))
     }
 }
 

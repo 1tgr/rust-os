@@ -18,7 +18,7 @@ lazy_static! {
 }
 
 #[no_mangle]
-pub unsafe fn syscall_entry(regs: &Regs) -> usize {
+pub unsafe fn syscall_entry(regs: &Regs) -> isize {
     if let Some(ref d) = SYSCALL_DISPATCH.get() {
         let d: &Box<Dispatch> = d;
         let d: &Dispatch = &**d;

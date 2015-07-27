@@ -11,16 +11,8 @@ RUSTFLAGS += --extern core=../libcore/libcore.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall.rlib
 
-NDISASMFLAGS += -o 0x1000
-
-ifeq (@(ARCH),amd64)
-NDISASMFLAGS += -b64 -pamd
-else
-NDISASMFLAGS += -b32
-endif
-
 : main.rs | $(LIBS) |> !RUSTC_OBJ |> hello.o {objs}
 : {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> hello.elf
 : hello.elf |> $(OBJCOPY) -O binary %f %o |> hello.bin
-: hello.bin |> ndisasm $(NDISASMFLAGS) %f > %o |> hello.txt
+: hello.elf |> $(OBJDUMP) -d %f > %o |> hello.txt
 
