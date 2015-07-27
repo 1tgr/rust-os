@@ -295,12 +295,12 @@ struct TestSyscallHandler {
     keyboard: Keyboard
 }
 
-impl ::syscall::kernel::Handler for TestSyscallHandler {
+impl ::syscall::Handler for TestSyscallHandler {
     fn write(&self, s: &str) {
         debug::puts(s)
     }
 
-    fn exit_thread(&self, code: u32) -> ! {
+    fn exit_thread(&self, code: u32) {
         self.scheduler.resolve_deferred(&self.dstate, code);
         self.scheduler.exit_current()
     }

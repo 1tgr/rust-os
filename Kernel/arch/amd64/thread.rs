@@ -30,8 +30,8 @@ pub unsafe fn syscall_entry(regs: &Regs) -> usize {
 
 pub type DropSyscallHandler = DropSingleton<'static, Box<Dispatch>>;
 
-pub fn register_syscall_handler<T>(handler: T) -> DropSyscallHandler where T : ::syscall::kernel::Handler + 'static {
-    SYSCALL_DISPATCH.register(Box::new(::syscall::kernel::Dispatcher::new(handler)))
+pub fn register_syscall_handler<T>(handler: T) -> DropSyscallHandler where T : ::syscall::Handler + 'static {
+    SYSCALL_DISPATCH.register(Box::new(::syscall::Dispatcher::new(handler)))
 }
 
 #[no_mangle]
