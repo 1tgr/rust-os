@@ -132,6 +132,15 @@ start64_high:
 	/* Set up stack pointer */
 	mov $init_stack, %rsp
 
+    /* Enable SSE */
+    mov %cr0, %rax
+    and $0xFFFB, %ax    // clear coprocessor emulation CR0.EM
+    or $2, %ax          // set coprocessor monitoring  CR0.MP
+    mov %rax, %cr0
+    mov %cr4, %rax
+    or $(3 << 9), %rax  // set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
+    mov %rax, %cr4
+
 	/* call the rust code */
 	call kmain
 
@@ -149,6 +158,7 @@ thread_entry_asm:
 	.align 16
 
 
+// TODO save XMM regs
 #define PUSH_REGS \
     push %rbx ;\
     push %rcx ;\
@@ -165,6 +175,7 @@ thread_entry_asm:
     push %r14 ;\
     push %r15
 
+// TODO restore XMM regs
 #define POP_REGS \
     pop %r15 ;\
     pop %r14 ;\

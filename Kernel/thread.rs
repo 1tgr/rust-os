@@ -15,6 +15,7 @@ use std::slice::bytes;
 use std::slice;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use syscall::ErrNum;
 
 pub fn setjmp() -> Option<jmp_buf> {
     unsafe {
@@ -291,22 +292,34 @@ pub fn spawn<T, A>(scheduler: Arc<Scheduler>, start: T) -> Deferred<A> where T :
 
 struct TestSyscallHandler {
     scheduler: Arc<Scheduler>,
-    dstate: Arc<Mutex<DeferredState<u32>>>,
-    keyboard: Keyboard
+    dstate: Arc<Mutex<DeferredState<i32>>>,
+    keyboard: Keyboard,
+    process: Arc<Process>
 }
 
 impl ::syscall::Handler for TestSyscallHandler {
-    fn write(&self, s: &str) -> Result<(), ::syscall::ErrNum> {
+    fn write(&self, s: &str) -> Result<(), ErrNum> {
         Ok(debug::puts(s))
     }
 
-    fn exit_thread(&self, code: u32) -> Result<(), ::syscall::ErrNum> {
+    fn exit_thread(&self, code: i32) -> Result<(), ErrNum> {
         self.scheduler.resolve_deferred(&self.dstate, code);
         self.scheduler.exit_current()
     }
 
-    fn read_line(&self, buf: &mut [u8]) -> Result<usize, ::syscall::ErrNum> {
+    fn read_line(&self, buf: &mut [u8]) -> Result<usize, ErrNum> {
         Ok(self.keyboard.read_line(buf))
+    }
+
+    fn alloc_pages(&self, len: usize) -> Result<*mut u8, ErrNum> {
+        match self.process.alloc(len, true, true) {
+            Ok(slice) => Ok(slice.as_mut_ptr()),
+            Err(_) => Err(ErrNum::OutOfMemory)
+        }
+    }
+
+    fn free_pages(&self, p: *mut u8) -> Result<bool, ErrNum> {
+        Ok(self.process.free(p))
     }
 }
 
@@ -384,7 +397,8 @@ test! {
         let handler = TestSyscallHandler {
             scheduler: scheduler.clone(),
             dstate: dstate.clone(),
-            keyboard: keyboard
+            keyboard: keyboard,
+            process: p.clone()
         };
 
         let d = Deferred { scheduler: scheduler.clone(), state: dstate };

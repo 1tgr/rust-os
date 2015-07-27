@@ -44,6 +44,10 @@ impl Process {
 
         Ok(slice)
     }
+
+    pub fn free(&self, p: *mut u8) -> bool {
+        self.user_virt.free(p)
+    }
 }
 
 test!{

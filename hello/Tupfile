@@ -2,6 +2,8 @@ include_rules
 
 RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
 
+LIBS += ../liballoc/liballoc.rlib
+LIBS += ../libc/libc.a
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
 LIBS += ../libstd/libstd.rlib

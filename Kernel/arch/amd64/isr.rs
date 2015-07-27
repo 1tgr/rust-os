@@ -139,11 +139,6 @@ pub fn init_once() {
 }
 
 #[no_mangle]
-pub extern fn interrupt(num: u8, _: &Regs) {
-    log!("interrupt {}", num);
-}
-
-#[no_mangle]
 pub extern fn irq(num: usize, _: &Regs) {
     unsafe {
         const PIC_EOI: u8 = 0x20; // End-of-interrupt command code
@@ -203,6 +198,15 @@ pub extern fn exception(num: u8, regs: &Regs) {
 
     unsafe { debug::print_stack_trace(regs.rbp as *const usize) };
     loop { }
+}
+
+#[no_mangle]
+pub extern fn interrupt(num: u8, regs: &Regs) {
+    if num < 32 {
+        exception(num, regs)
+    } else {
+        log!("interrupt {}", num)
+    }
 }
 
 test! {

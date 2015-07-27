@@ -6,7 +6,7 @@ use core::str::{self,StrExt};
 #[repr(usize)]
 pub enum ErrNum {
     Utf8Error = 1,
-    _NotUnivariantEnum = 0,
+    OutOfMemory = 2
 }
 
 pub trait SyscallArgs {
@@ -24,18 +24,48 @@ impl SyscallArgs for () {
         (0, 0)
     }
 
-    fn from_args(_arg1: usize, _arg2: usize) -> Result<(), ErrNum >{
+    fn from_args(_arg1: usize, _arg2: usize) -> Result<Self, ErrNum >{
         Ok(())
     }
 }
 
-impl SyscallArgs for u32 {
+impl SyscallArgs for i32 {
     fn as_args(self) -> (usize, usize) {
         (self as usize, 0)
     }
 
-    fn from_args(arg1: usize, _arg2: usize) -> Result<u32, ErrNum> {
-        Ok(arg1 as u32)
+    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
+        Ok(arg1 as Self)
+    }
+}
+
+impl SyscallArgs for usize {
+    fn as_args(self) -> (usize, usize) {
+        (self, 0)
+    }
+
+    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
+        Ok(arg1)
+    }
+}
+
+impl<T> SyscallArgs for *const T {
+    fn as_args(self) -> (usize, usize) {
+        (self as usize, 0)
+    }
+
+    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
+        Ok(arg1 as Self)
+    }
+}
+
+impl<T> SyscallArgs for *mut T {
+    fn as_args(self) -> (usize, usize) {
+        (self as usize, 0)
+    }
+
+    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
+        Ok(arg1 as Self)
     }
 }
 
@@ -44,7 +74,7 @@ impl<'a, T> SyscallArgs for &'a [T] {
         (self.as_ptr() as usize, self.len())
     }
 
-    fn from_args(arg1: usize, arg2: usize) -> Result<&'a [T], ErrNum> {
+    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum> {
         Ok(unsafe { slice::from_raw_parts(arg1 as *mut T, arg2) })
     }
 }
@@ -54,7 +84,7 @@ impl<'a, T> SyscallArgs for &'a mut [T] {
         (self.as_mut_ptr() as usize, self.len())
     }
 
-    fn from_args(arg1: usize, arg2: usize) -> Result<&'a mut [T], ErrNum> {
+    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum> {
         Ok(unsafe { slice::from_raw_parts_mut(arg1 as *mut T, arg2) })
     }
 }
@@ -64,7 +94,7 @@ impl<'a> SyscallArgs for &'a str {
         self.as_bytes().as_args()
     }
 
-    fn from_args(arg1: usize, arg2: usize) -> Result<&'a str, ErrNum> {
+    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum> {
         match str::from_utf8(try!(SyscallArgs::from_args(arg1, arg2))) {
             Ok(s) => Ok(s),
             Err(_) => Err(ErrNum::Utf8Error)
@@ -98,12 +128,42 @@ impl SyscallResult for () {
     }
 }
 
+impl SyscallResult for bool {
+    fn as_result(self) -> isize {
+        if self { 1 } else { 0 }
+    }
+
+    fn from_result(value: isize) -> Self {
+        value != 0
+    }
+}
+
 impl SyscallResult for usize {
     fn as_result(self) -> isize {
         self as isize
     }
 
-    fn from_result(value: isize) -> usize {
+    fn from_result(value: isize) -> Self {
         value as usize
+    }
+}
+
+impl<'a, T> SyscallResult for *const T {
+    fn as_result(self) -> isize {
+        self as isize
+    }
+
+    fn from_result(value: isize) -> Self {
+        value as Self
+    }
+}
+
+impl<'a, T> SyscallResult for *mut T {
+    fn as_result(self) -> isize {
+        self as isize
+    }
+
+    fn from_result(value: isize) -> Self {
+        value as Self
     }
 }

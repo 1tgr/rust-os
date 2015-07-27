@@ -82,9 +82,7 @@ impl VirtualState {
         true
     }
 
-    pub fn free(&mut self, slice: &mut [u8]) -> bool {
-        let ptr = slice.as_mut_ptr();
-
+    pub fn free(&mut self, ptr: *mut u8) -> bool {
         let pos =
             match self.blocks.iter().position(|block| block.ptr == ptr) {
                 Some(pos) => pos,
@@ -143,8 +141,8 @@ impl VirtualTree {
         lock!(self.state).reserve(slice)
     }
 
-    pub fn free(&self, slice: &mut [u8]) -> bool {
-        lock!(self.state).free(slice)
+    pub fn free(&self, p: *mut u8) -> bool {
+        lock!(self.state).free(p)
     }
 }
 
@@ -157,7 +155,7 @@ test! {
        assert_eq!(0 as *const u8, slice.as_ptr());
        assert_eq!(2, tree.block_count());
 
-       assert!(tree.free(slice));
+       assert!(tree.free(slice.as_mut_ptr()));
        assert_eq!(1, tree.block_count());
    } 
 
@@ -172,7 +170,7 @@ test! {
        assert_eq!(4, tree.block_count());
        assert_eq!(4096 as *const u8, slice.as_ptr());
 
-       assert!(tree.free(slice));
+       assert!(tree.free(slice.as_mut_ptr()));
        assert_eq!(3, tree.block_count());
    } 
 }
