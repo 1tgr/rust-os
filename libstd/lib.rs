@@ -1,10 +1,14 @@
 #![crate_name = "std"]
 
 #![feature(alloc)]
+#![feature(bitvec)]
 #![feature(collections)]
+#![feature(collections_bound)]
 #![feature(core)]
+#![feature(core_intrinsics)]
 #![feature(macro_reexport)]
 #![feature(no_std)]
+#![feature(raw)]
 #![cfg_attr(not(test), no_std)]
 
 #[macro_use]
@@ -23,7 +27,7 @@ pub mod prelude {
         pub use boxed::Box;
         pub use clone::Clone;
         pub use cmp::{PartialEq, PartialOrd, Eq, Ord};
-        //pub use convert::{AsRef, AsMut, Into, From};
+        pub use convert::{AsRef, AsMut, Into, From};
         pub use default::Default;
         pub use iter::{DoubleEndedIterator, ExactSizeIterator};
         pub use iter::{Iterator, Extend, IntoIterator};
@@ -51,6 +55,7 @@ pub use core::marker;
 pub use alloc::*;
 pub use core::char;
 pub use core::clone;
+pub use core::convert;
 pub use core::default;
 pub use core::hash;
 pub use core::intrinsics;
@@ -66,7 +71,6 @@ pub use core_collections::vec;
 
 pub mod collections {
     pub use core_collections::BTreeMap;
-    pub use core_collections::BitSet;
     pub use core_collections::Bound;
     pub use core_collections::LinkedList;
     pub use core_collections::VecDeque;

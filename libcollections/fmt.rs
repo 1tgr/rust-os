@@ -128,15 +128,15 @@
 //! This allows multiple actual types to be formatted via `{:x}` (like `i8` as
 //! well as `isize`).  The current mapping of types to traits is:
 //!
-//! * *nothing* ⇒ `Display`
-//! * `?` ⇒ `Debug`
-//! * `o` ⇒ `Octal`
-//! * `x` ⇒ `LowerHex`
-//! * `X` ⇒ `UpperHex`
-//! * `p` ⇒ `Pointer`
-//! * `b` ⇒ `Binary`
-//! * `e` ⇒ `LowerExp`
-//! * `E` ⇒ `UpperExp`
+//! * *nothing* ⇒ [`Display`](trait.Display.html)
+//! * `?` ⇒ [`Debug`](trait.Debug.html)
+//! * `o` ⇒ [`Octal`](trait.Octal.html)
+//! * `x` ⇒ [`LowerHex`](trait.LowerHex.html)
+//! * `X` ⇒ [`UpperHex`](trait.UpperHex.html)
+//! * `p` ⇒ [`Pointer`](trait.Pointer.html)
+//! * `b` ⇒ [`Binary`](trait.Binary.html)
+//! * `e` ⇒ [`LowerExp`](trait.LowerExp.html)
+//! * `E` ⇒ [`UpperExp`](trait.UpperExp.html)
 //!
 //! What this means is that any type of argument which implements the
 //! `fmt::Binary` trait can then be formatted with `{:b}`. Implementations
@@ -164,17 +164,16 @@
 //! provides some helper methods.
 //!
 //! Additionally, the return value of this function is `fmt::Result` which is a
-//! typedef to `Result<(), IoError>` (also known as `IoResult<()>`). Formatting
-//! implementations should ensure that they return errors from `write!`
+//! typedef to `Result<(), std::io::Error>` (also known as `std::io::Result<()>`).
+//! Formatting implementations should ensure that they return errors from `write!`
 //! correctly (propagating errors upward).
 //!
 //! An example of implementing the formatting traits would look
 //! like:
 //!
 //! ```
-//! # #![feature(core, std_misc)]
+//! # #![feature(fmt_flags)]
 //! use std::fmt;
-//! use std::f64;
 //!
 //! #[derive(Debug)]
 //! struct Vector2D {
@@ -353,6 +352,10 @@
 //! * `^` - the argument is center-aligned in `width` columns
 //! * `>` - the argument is right-aligned in `width` columns
 //!
+//! Note that alignment may not be implemented by some types. A good way
+//! to ensure padding is applied is to format your input, then use this
+//! resulting string to pad your output.
+//!
 //! ## Sign/#/0
 //!
 //! These can all be interpreted as flags for a particular formatter.
@@ -364,11 +367,11 @@
 //!         should always be printed.
 //! * '-' - Currently not used
 //! * '#' - This flag is indicates that the "alternate" form of printing should
-//!         be used.  For array slices, the alternate form omits the brackets.
-//!         For the integer formatting traits, the alternate forms are:
+//!         be used. The alternate forms are:
+//!     * `#?` - pretty-print the `Debug` formatting
 //!     * `#x` - precedes the argument with a "0x"
 //!     * `#X` - precedes the argument with a "0x"
-//!     * `#t` - precedes the argument with a "0b"
+//!     * `#b` - precedes the argument with a "0b"
 //!     * `#o` - precedes the argument with a "0o"
 //! * '0' - This is used to indicate for integer formats that the padding should
 //!         both be done with a `0` character as well as be sign-aware. A format
@@ -405,19 +408,20 @@
 //!
 //! There are three possible ways to specify the desired `precision`:
 //!
-//! There are three possible ways to specify the desired `precision`:
-//! 1. An integer `.N`,
-//! 2. an integer followed by dollar sign `.N$`, or
-//! 3. an asterisk `.*`.
+//! 1. An integer `.N`:
 //!
-//! The first specification, `.N`, means the integer `N` itself is the precision.
+//!    the integer `N` itself is the precision.
 //!
-//! The second, `.N$`, means use format *argument* `N` (which must be a `usize`) as the precision.
+//! 2. An integer followed by dollar sign `.N$`:
 //!
-//! Finally,  `.*` means that this `{...}` is associated with *two* format inputs rather than one:
-//! the first input holds the `usize` precision, and the second holds the value to print.  Note
-//! that in this case, if one uses the format string `{<arg>:<spec>.*}`, then the `<arg>` part
-//! refers to the *value* to print, and the `precision` must come in the input preceding `<arg>`.
+//!    use format *argument* `N` (which must be a `usize`) as the precision.
+//!
+//! 3. An asterisk `.*`:
+//!
+//!    `.*` means that this `{...}` is associated with *two* format inputs rather than one: the
+//!    first input holds the `usize` precision, and the second holds the value to print.  Note that
+//!    in this case, if one uses the format string `{<arg>:<spec>.*}`, then the `<arg>` part refers
+//!    to the *value* to print, and the `precision` must come in the input preceding `<arg>`.
 //!
 //! For example, these:
 //!

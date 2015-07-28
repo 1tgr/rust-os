@@ -1,4 +1,3 @@
-use std::boxed;
 use std::mem;
 use std::sync::atomic::{AtomicPtr,Ordering};
 
@@ -26,12 +25,10 @@ impl<T> Singleton<T> {
 
     pub fn register(&self, value: T) -> DropSingleton<T> {
         let b: Box<T> = Box::new(value);
-        unsafe {
-            let p: *mut T = boxed::into_raw(b);
-            DropSingleton {
-                cell: &self.cell,
-                old: self.cell.swap(p, Ordering::Relaxed),
-            }
+        let p: *mut T = Box::into_raw(b);
+        DropSingleton {
+            cell: &self.cell,
+            old: self.cell.swap(p, Ordering::Relaxed),
         }
     }
 }

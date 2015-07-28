@@ -10,11 +10,12 @@
 
 //! Traits for conversions between types.
 //!
-//! The traits in this module provide a general way to talk about conversions from one type to
-//! another. They follow the standard Rust conventions of `as`/`into`/`from`.
+//! The traits in this module provide a general way to talk about conversions
+//! from one type to another. They follow the standard Rust conventions of
+//! `as`/`into`/`from`.
 //!
-//! Like many traits, these are often used as bounds for generic functions, to support arguments of
-//! multiple types.
+//! Like many traits, these are often used as bounds for generic functions, to
+//! support arguments of multiple types.
 //!
 //! See each trait for usage examples.
 
@@ -23,6 +24,11 @@
 use marker::Sized;
 
 /// A cheap, reference-to-reference conversion.
+///
+/// `AsRef` is very similar to, but different than, `Borrow`. See
+/// [the book][book] for more.
+///
+/// [book]: ../../book/borrow-and-asref.html
 ///
 /// # Examples
 ///
@@ -173,6 +179,7 @@ impl<T> AsMut<[T]> for [T] {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl AsRef<str> for str {
+    #[inline]
     fn as_ref(&self) -> &str {
         self
     }

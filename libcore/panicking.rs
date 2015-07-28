@@ -29,11 +29,14 @@
 //! library, but the location of this may change over time.
 
 #![allow(dead_code, missing_docs)]
+#![unstable(feature = "core_panic",
+            reason = "internal details of the implementation of the `panic!` \
+                      and related macros")]
 
 use fmt;
 
 #[cold] #[inline(never)] // this is the slow path, always
-#[lang="panic"]
+#[lang = "panic"]
 pub fn panic(expr_file_line: &(&'static str, &'static str, u32)) -> ! {
     // Use Arguments::new_v1 instead of format_args!("{}", expr) to potentially
     // reduce size overhead. The format_args! macro uses str's Display trait to
@@ -46,7 +49,7 @@ pub fn panic(expr_file_line: &(&'static str, &'static str, u32)) -> ! {
 }
 
 #[cold] #[inline(never)]
-#[lang="panic_bounds_check"]
+#[lang = "panic_bounds_check"]
 fn panic_bounds_check(file_line: &(&'static str, u32),
                      index: usize, len: usize) -> ! {
     panic_fmt(format_args!("index out of bounds: the len is {} but the index is {}",

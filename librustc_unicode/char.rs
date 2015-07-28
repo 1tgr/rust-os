@@ -8,15 +8,15 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Character manipulation (`char` type, Unicode Scalar Value)
+//! A Unicode scalar value
 //!
 //! This module provides the `CharExt` trait, as well as its
 //! implementation for the primitive `char` type, in order to allow
 //! basic character manipulation.
 //!
-//! A `char` actually represents a
-//! *[Unicode Scalar
-//! Value](http://www.unicode.org/glossary/#unicode_scalar_value)*, as it can
+//! A `char` represents a
+//! *[Unicode scalar
+//! value](http://www.unicode.org/glossary/#unicode_scalar_value)*, as it can
 //! contain any Unicode code point except high-surrogate and low-surrogate code
 //! points.
 //!
@@ -24,17 +24,18 @@
 //! (inclusive) are allowed. A `char` can always be safely cast to a `u32`;
 //! however the converse is not always true due to the above range limits
 //! and, as such, should be performed via the `from_u32` function.
+//!
+//! *[See also the `char` primitive type](../primitive.char.html).*
 
 #![stable(feature = "rust1", since = "1.0.0")]
-#![doc(primitive = "char")]
 
 use core::char::CharExt as C;
-use core::option::Option::{self, Some};
+use core::option::Option::{self, Some, None};
 use core::iter::Iterator;
 use tables::{derived_property, property, general_category, conversions, charwidth};
 
 // stable reexports
-pub use core::char::{MAX, from_u32, from_digit, EscapeUnicode, EscapeDefault};
+pub use core::char::{MAX, from_u32, from_u32_unchecked, from_digit, EscapeUnicode, EscapeDefault};
 
 // unstable reexports
 #[allow(deprecated)]
@@ -47,24 +48,67 @@ pub use tables::UNICODE_VERSION;
 /// the [`to_lowercase` method](../primitive.char.html#method.to_lowercase) on
 /// characters.
 #[stable(feature = "rust1", since = "1.0.0")]
-pub struct ToLowercase(Option<char>);
+pub struct ToLowercase(CaseMappingIter);
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl Iterator for ToLowercase {
     type Item = char;
-    fn next(&mut self) -> Option<char> { self.0.take() }
+    fn next(&mut self) -> Option<char> { self.0.next() }
 }
 
 /// An iterator over the uppercase mapping of a given character, returned from
 /// the [`to_uppercase` method](../primitive.char.html#method.to_uppercase) on
 /// characters.
 #[stable(feature = "rust1", since = "1.0.0")]
-pub struct ToUppercase(Option<char>);
+pub struct ToUppercase(CaseMappingIter);
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl Iterator for ToUppercase {
     type Item = char;
-    fn next(&mut self) -> Option<char> { self.0.take() }
+    fn next(&mut self) -> Option<char> { self.0.next() }
+}
+
+
+enum CaseMappingIter {
+    Three(char, char, char),
+    Two(char, char),
+    One(char),
+    Zero
+}
+
+impl CaseMappingIter {
+    fn new(chars: [char; 3]) -> CaseMappingIter {
+        if chars[2] == '\0' {
+            if chars[1] == '\0' {
+                CaseMappingIter::One(chars[0])  // Including if chars[0] == '\0'
+            } else {
+                CaseMappingIter::Two(chars[0], chars[1])
+            }
+        } else {
+            CaseMappingIter::Three(chars[0], chars[1], chars[2])
+        }
+    }
+}
+
+impl Iterator for CaseMappingIter {
+    type Item = char;
+    fn next(&mut self) -> Option<char> {
+        match *self {
+            CaseMappingIter::Three(a, b, c) => {
+                *self = CaseMappingIter::Two(b, c);
+                Some(a)
+            }
+            CaseMappingIter::Two(b, c) => {
+                *self = CaseMappingIter::One(c);
+                Some(b)
+            }
+            CaseMappingIter::One(c) => {
+                *self = CaseMappingIter::Zero;
+                Some(c)
+            }
+            CaseMappingIter::Zero => None,
+        }
+    }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -119,6 +163,7 @@ impl char {
     /// assert_eq!('f'.to_digit(16), Some(15));
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
     pub fn to_digit(self, radix: u32) -> Option<u32> { C::to_digit(self, radix) }
 
     /// Returns an iterator that yields the hexadecimal Unicode escape of a
@@ -131,22 +176,16 @@ impl char {
     /// # Examples
     ///
     /// ```
-    /// for i in '❤'.escape_unicode() {
-    ///     println!("{}", i);
+    /// for c in '❤'.escape_unicode() {
+    ///     print!("{}", c);
     /// }
+    /// println!("");
     /// ```
     ///
     /// This prints:
     ///
     /// ```text
-    /// \
-    /// u
-    /// {
-    /// 2
-    /// 7
-    /// 6
-    /// 4
-    /// }
+    /// \u{2764}
     /// ```
     ///
     /// Collecting into a `String`:
@@ -157,6 +196,7 @@ impl char {
     /// assert_eq!(heart, r"\u{2764}");
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
     pub fn escape_unicode(self) -> EscapeUnicode { C::escape_unicode(self) }
 
     /// Returns an iterator that yields the 'default' ASCII and
@@ -195,6 +235,7 @@ impl char {
     /// assert_eq!(quote, "\\\"");
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
     pub fn escape_default(self) -> EscapeDefault { C::escape_default(self) }
 
     /// Returns the number of bytes this character would need if encoded in
@@ -208,6 +249,7 @@ impl char {
     /// assert_eq!(n, 2);
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
     pub fn len_utf8(self) -> usize { C::len_utf8(self) }
 
     /// Returns the number of 16-bit code units this character would need if
@@ -221,6 +263,7 @@ impl char {
     /// assert_eq!(n, 1);
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[inline]
     pub fn len_utf16(self) -> usize { C::len_utf16(self) }
 
     /// Encodes this character as UTF-8 into the provided byte buffer, and then
@@ -255,7 +298,10 @@ impl char {
     /// ```
     #[unstable(feature = "unicode",
                reason = "pending decision about Iterator/Writer/Reader")]
-    pub fn encode_utf8(self, dst: &mut [u8]) -> Option<usize> { C::encode_utf8(self, dst) }
+    #[inline]
+    pub fn encode_utf8(self, dst: &mut [u8]) -> Option<usize> {
+        C::encode_utf8(self, dst)
+    }
 
     /// Encodes this character as UTF-16 into the provided `u16` buffer, and
     /// then returns the number of `u16`s written.
@@ -289,7 +335,10 @@ impl char {
     /// ```
     #[unstable(feature = "unicode",
                reason = "pending decision about Iterator/Writer/Reader")]
-    pub fn encode_utf16(self, dst: &mut [u16]) -> Option<usize> { C::encode_utf16(self, dst) }
+    #[inline]
+    pub fn encode_utf16(self, dst: &mut [u16]) -> Option<usize> {
+        C::encode_utf16(self, dst)
+    }
 
     /// Returns whether the specified character is considered a Unicode
     /// alphabetic code point.
@@ -397,27 +446,33 @@ impl char {
 
     /// Converts a character to its lowercase equivalent.
     ///
-    /// The case-folding performed is the common or simple mapping. See
-    /// `to_uppercase()` for references and more information.
+    /// This performs complex unconditional mappings with no tailoring.
+    /// See `to_uppercase()` for references and more information.
     ///
     /// # Return value
     ///
     /// Returns an iterator which yields the characters corresponding to the
     /// lowercase equivalent of the character. If no conversion is possible then
-    /// the input character is returned.
+    /// an iterator with just the input character is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert_eq!(Some('c'), 'C'.to_lowercase().next());
+    /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
     pub fn to_lowercase(self) -> ToLowercase {
-        ToLowercase(Some(conversions::to_lower(self)))
+        ToLowercase(CaseMappingIter::new(conversions::to_lower(self)))
     }
 
     /// Converts a character to its uppercase equivalent.
     ///
-    /// The case-folding performed is the common or simple mapping: it maps
-    /// one Unicode codepoint to its uppercase equivalent according to the
-    /// Unicode database [1]. The additional [`SpecialCasing.txt`] is not yet
-    /// considered here, but the iterator returned will soon support this form
-    /// of case folding.
+    /// This performs complex unconditional mappings with no tailoring:
+    /// it maps one Unicode character to its uppercase equivalent
+    /// according to the Unicode database [1]
+    /// and the additional complex mappings [`SpecialCasing.txt`].
+    /// Conditional mappings (based on context or language) are not considerd here.
     ///
     /// A full reference can be found here [2].
     ///
@@ -425,17 +480,23 @@ impl char {
     ///
     /// Returns an iterator which yields the characters corresponding to the
     /// uppercase equivalent of the character. If no conversion is possible then
-    /// the input character is returned.
+    /// an iterator with just the input character is returned.
     ///
     /// [1]: ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt
     ///
-    /// [`SpecialCasing`.txt`]: ftp://ftp.unicode.org/Public/UNIDATA/SpecialCasing.txt
+    /// [`SpecialCasing.txt`]: ftp://ftp.unicode.org/Public/UNIDATA/SpecialCasing.txt
     ///
-    /// [2]: http://www.unicode.org/versions/Unicode4.0.0/ch03.pdf#G33992
+    /// [2]: http://www.unicode.org/versions/Unicode7.0.0/ch03.pdf#G33992
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert_eq!(Some('C'), 'c'.to_uppercase().next());
+    /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
     pub fn to_uppercase(self) -> ToUppercase {
-        ToUppercase(Some(conversions::to_upper(self)))
+        ToUppercase(CaseMappingIter::new(conversions::to_upper(self)))
     }
 
     /// Returns this character's displayed width in columns, or `None` if it is a
@@ -451,5 +512,8 @@ impl char {
                  since = "1.0.0")]
     #[unstable(feature = "unicode",
                reason = "needs expert opinion. is_cjk flag stands out as ugly")]
-    pub fn width(self, is_cjk: bool) -> Option<usize> { charwidth::width(self, is_cjk) }
+    #[inline]
+    pub fn width(self, is_cjk: bool) -> Option<usize> {
+        charwidth::width(self, is_cjk)
+    }
 }

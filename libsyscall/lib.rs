@@ -2,6 +2,8 @@
 
 #![feature(asm)]
 #![feature(core)]
+#![feature(core_slice_ext)]
+#![feature(core_str_ext)]
 #![feature(no_std)]
 #![no_std]
 

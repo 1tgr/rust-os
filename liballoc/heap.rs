@@ -8,6 +8,21 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+#![unstable(feature = "heap_api",
+            reason = "the precise API and guarantees it provides may be tweaked \
+                      slightly, especially to possibly take into account the \
+                      types being stored to make room for a future \
+                      tracing garbage collector")]
+
+use core::{isize, usize};
+
+#[inline(always)]
+fn check_size_and_alignment(size: usize, align: usize) {
+    debug_assert!(size != 0);
+    debug_assert!(size <= isize::MAX as usize, "Tried to allocate too much: {} bytes", size);
+    debug_assert!(usize::is_power_of_two(align), "Invalid alignment of allocation: {}", align);
+}
+
 // FIXME: #13996: mark the `allocate` and `reallocate` return value as `noalias`
 
 /// Return a pointer to `size` bytes of memory aligned to `align`.
@@ -19,6 +34,7 @@
 /// size on the platform.
 #[inline]
 pub unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
+    check_size_and_alignment(size, align);
     imp::allocate(size, align)
 }
 
@@ -38,6 +54,7 @@ pub unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
 /// any value in range_inclusive(requested_size, usable_size).
 #[inline]
 pub unsafe fn reallocate(ptr: *mut u8, old_size: usize, size: usize, align: usize) -> *mut u8 {
+    check_size_and_alignment(size, align);
     imp::reallocate(ptr, old_size, size, align)
 }
 
@@ -56,6 +73,7 @@ pub unsafe fn reallocate(ptr: *mut u8, old_size: usize, size: usize, align: usiz
 #[inline]
 pub unsafe fn reallocate_inplace(ptr: *mut u8, old_size: usize, size: usize,
                                  align: usize) -> usize {
+    check_size_and_alignment(size, align);
     imp::reallocate_inplace(ptr, old_size, size, align)
 }
 
@@ -82,7 +100,6 @@ pub fn usable_size(size: usize, align: usize) -> usize {
 ///
 /// These statistics may be inconsistent if other threads use the allocator
 /// during the call.
-#[unstable(feature = "alloc")]
 pub fn stats_print() {
     imp::stats_print();
 }
@@ -95,7 +112,7 @@ pub const EMPTY: *mut () = 0x1 as *mut ();
 
 /// The allocator for unique pointers.
 #[cfg(not(test))]
-#[lang="exchange_malloc"]
+#[lang = "exchange_malloc"]
 #[inline]
 unsafe fn exchange_malloc(size: usize, align: usize) -> *mut u8 {
     if size == 0 {
@@ -108,7 +125,7 @@ unsafe fn exchange_malloc(size: usize, align: usize) -> *mut u8 {
 }
 
 #[cfg(not(test))]
-#[lang="exchange_free"]
+#[lang = "exchange_free"]
 #[inline]
 unsafe fn exchange_free(ptr: *mut u8, old_size: usize, align: usize) {
     deallocate(ptr, old_size, align);
@@ -333,47 +350,94 @@ mod imp {
           not(jemalloc),
           windows))]
 mod imp {
-    use libc::{c_void, size_t};
-    use libc;
+    use core::mem::size_of;
+    use libc::{BOOL, DWORD, HANDLE, LPVOID, SIZE_T, INVALID_HANDLE_VALUE};
+    use libc::{WriteFile};
     use super::MIN_ALIGN;
 
-    extern {
-        fn _aligned_malloc(size: size_t, align: size_t) -> *mut c_void;
-        fn _aligned_realloc(block: *mut c_void, size: size_t,
-                            align: size_t) -> *mut c_void;
-        fn _aligned_free(ptr: *mut c_void);
+    extern "system" {
+        fn GetProcessHeap() -> HANDLE;
+        fn GetStdHandle(nStdHandle: DWORD) -> HANDLE;
+        fn HeapAlloc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID;
+        fn HeapReAlloc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID;
+        fn HeapFree(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL;
+        fn HeapSummary(hHeap: HANDLE, dwFlags: DWORD, lpSummary: LPHEAP_SUMMARY) -> BOOL;
+    }
+
+    #[repr(C)] #[allow(non_snake_case)]
+    struct HEAP_SUMMARY {
+        cb: DWORD,
+        cbAllocated: SIZE_T,
+        cbCommitted: SIZE_T,
+        cbReserved: SIZE_T,
+        cbMaxReserve: SIZE_T,
+    }
+    #[allow(non_camel_case_types)]
+    type LPHEAP_SUMMARY = *mut HEAP_SUMMARY;
+
+    #[repr(C)]
+    struct Header(*mut u8);
+
+    const HEAP_REALLOC_IN_PLACE_ONLY: DWORD = 0x00000010;
+    const STD_OUTPUT_HANDLE: DWORD = -11i32 as u32;
+
+    #[inline]
+    unsafe fn get_header<'a>(ptr: *mut u8) -> &'a mut Header {
+        &mut *(ptr as *mut Header).offset(-1)
+    }
+
+    #[inline]
+    unsafe fn align_ptr(ptr: *mut u8, align: usize) -> *mut u8 {
+        let aligned = ptr.offset((align - (ptr as usize & (align - 1))) as isize);
+        *get_header(aligned) = Header(ptr);
+        aligned
     }
 
     #[inline]
     pub unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
         if align <= MIN_ALIGN {
-            libc::malloc(size as size_t) as *mut u8
+            HeapAlloc(GetProcessHeap(), 0, size as SIZE_T) as *mut u8
         } else {
-            _aligned_malloc(size as size_t, align as size_t) as *mut u8
+            let ptr = HeapAlloc(GetProcessHeap(), 0, (size + align) as SIZE_T) as *mut u8;
+            if ptr.is_null() { return ptr }
+            align_ptr(ptr, align)
         }
     }
 
     #[inline]
     pub unsafe fn reallocate(ptr: *mut u8, _old_size: usize, size: usize, align: usize) -> *mut u8 {
         if align <= MIN_ALIGN {
-            libc::realloc(ptr as *mut c_void, size as size_t) as *mut u8
+            HeapReAlloc(GetProcessHeap(), 0, ptr as LPVOID, size as SIZE_T) as *mut u8
         } else {
-            _aligned_realloc(ptr as *mut c_void, size as size_t, align as size_t) as *mut u8
+            let header = get_header(ptr);
+            let new = HeapReAlloc(GetProcessHeap(), 0, header.0 as LPVOID,
+                                  (size + align) as SIZE_T) as *mut u8;
+            if new.is_null() { return new }
+            align_ptr(new, align)
         }
     }
 
     #[inline]
-    pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: usize, _size: usize,
-                                     _align: usize) -> usize {
-        old_size
+    pub unsafe fn reallocate_inplace(ptr: *mut u8, old_size: usize, size: usize,
+                                     align: usize) -> usize {
+        if align <= MIN_ALIGN {
+            let new = HeapReAlloc(GetProcessHeap(), HEAP_REALLOC_IN_PLACE_ONLY, ptr as LPVOID,
+                                  size as SIZE_T) as *mut u8;
+            if new.is_null() { old_size } else { size }
+        } else {
+            old_size
+        }
     }
 
     #[inline]
     pub unsafe fn deallocate(ptr: *mut u8, _old_size: usize, align: usize) {
         if align <= MIN_ALIGN {
-            libc::free(ptr as *mut libc::c_void)
+            let err = HeapFree(GetProcessHeap(), 0, ptr as LPVOID);
+            debug_assert!(err != 0);
         } else {
-            _aligned_free(ptr as *mut c_void)
+            let header = get_header(ptr);
+            let err = HeapFree(GetProcessHeap(), 0, header.0 as LPVOID);
+            debug_assert!(err != 0);
         }
     }
 
@@ -382,7 +446,45 @@ mod imp {
         size
     }
 
-    pub fn stats_print() {}
+    pub fn stats_print() {
+        use core::fmt::{Error, Result, Write};
+        use core::ptr::null_mut;
+        use core::raw::Repr;
+        use core::result::Result::{Ok, Err};
+        struct Console(HANDLE);
+        impl Write for Console {
+            fn write_str(&mut self, s: &str) -> Result {
+                let repr = s.repr();
+                let mut written = 0;
+                let err = unsafe { WriteFile(self.0, repr.data as LPVOID, repr.len as DWORD,
+                                             &mut written, null_mut()) };
+                if written as usize != repr.len { return Err(Error) }
+                if err == 0 { return Err(Error) }
+                Ok(())
+            }
+        }
+        let mut hs = HEAP_SUMMARY {
+            cb: size_of::<HEAP_SUMMARY>() as DWORD,
+            cbAllocated: 0,
+            cbCommitted: 0,
+            cbReserved: 0,
+            cbMaxReserve: 0,
+        };
+        let err = unsafe { HeapSummary(GetProcessHeap(), 0, &mut hs) };
+        assert!(err != 0);
+        let handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+        if handle.is_null() || handle == INVALID_HANDLE_VALUE { panic!("Failed to open stdout") }
+        let mut out = Console(handle);
+        writeln!(&mut out, "Allocated: {}", hs.cbAllocated).unwrap();
+        writeln!(&mut out, "Committed: {}", hs.cbCommitted).unwrap();
+        writeln!(&mut out, "Reserved: {}", hs.cbReserved).unwrap();
+        writeln!(&mut out, "MaxReserve: {}", hs.cbMaxReserve).unwrap();
+    }
+
+    #[test]
+    fn alignment_header_size() {
+        assert!(size_of::<Header>() <= MIN_ALIGN);
+    }
 }
 
 #[cfg(test)]

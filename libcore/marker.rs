@@ -33,7 +33,7 @@ use hash::Hasher;
 
 /// Types able to be transferred across thread boundaries.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="send"]
+#[lang = "send"]
 #[rustc_on_unimplemented = "`{Self}` cannot be sent between threads safely"]
 pub unsafe trait Send {
     // empty.
@@ -46,10 +46,17 @@ impl<T> !Send for *mut T { }
 
 /// Types with a constant size known at compile-time.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="sized"]
+#[lang = "sized"]
 #[rustc_on_unimplemented = "`{Self}` does not have a constant size known at compile-time"]
 #[fundamental] // for Default, for example, which requires that `[T]: !Default` be evaluatable
 pub trait Sized {
+    // Empty.
+}
+
+/// Types that can be "unsized" to a dynamically sized type.
+#[unstable(feature = "unsize")]
+#[lang="unsize"]
+pub trait Unsize<T> {
     // Empty.
 }
 
@@ -112,11 +119,10 @@ pub trait Sized {
 /// ```
 ///
 /// The `PointList` `struct` cannot implement `Copy`, because `Vec<T>` is not `Copy`. If we
-/// attempt to derive a `Copy` implementation, we'll get an error.
+/// attempt to derive a `Copy` implementation, we'll get an error:
 ///
 /// ```text
-/// error: the trait `Copy` may not be implemented for this type; field `points` does not implement
-/// `Copy`
+/// the trait `Copy` may not be implemented for this type; field `points` does not implement `Copy`
 /// ```
 ///
 /// ## How can I implement `Copy`?
@@ -154,7 +160,7 @@ pub trait Sized {
 /// then it might be prudent to not implement `Copy`. This is because removing `Copy` is a breaking
 /// change: that second example would fail to compile if we made `Foo` non-`Copy`.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="copy"]
+#[lang = "copy"]
 pub trait Copy : Clone {
     // Empty.
 }
@@ -201,7 +207,7 @@ pub trait Copy : Clone {
 /// reference; not doing this is undefined behaviour (for example,
 /// `transmute`-ing from `&T` to `&mut T` is illegal).
 #[stable(feature = "rust1", since = "1.0.0")]
-#[lang="sync"]
+#[lang = "sync"]
 #[rustc_on_unimplemented = "`{Self}` cannot be shared between threads safely"]
 pub unsafe trait Sync {
     // Empty
@@ -217,7 +223,10 @@ impl<T> !Sync for *mut T { }
 /// ensure that they are never copied, even if they lack a destructor.
 #[unstable(feature = "core",
            reason = "likely to change with new variance strategy")]
-#[lang="no_copy_bound"]
+#[deprecated(since = "1.2.0",
+             reason = "structs are by default not copyable")]
+#[lang = "no_copy_bound"]
+#[allow(deprecated)]
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoCopy;
 
@@ -351,7 +360,7 @@ macro_rules! impls{
 /// struct is dropped, it may in turn drop one or more instances of
 /// the type `T`, though that may not be apparent from the other
 /// structure of the type itself. This is commonly necessary if the
-/// structure is using an unsafe pointer like `*mut T` whose referent
+/// structure is using a raw pointer like `*mut T` whose referent
 /// may be dropped when the type is dropped, as a `*mut T` is
 /// otherwise not treated as owned.
 ///
@@ -359,7 +368,7 @@ macro_rules! impls{
 /// better to use a reference type, like `PhantomData<&'a T>`
 /// (ideally) or `PhantomData<*const T>` (if no lifetime applies), so
 /// as not to indicate ownership.
-#[lang="phantom_data"]
+#[lang = "phantom_data"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct PhantomData<T:?Sized>;
 
@@ -379,7 +388,7 @@ mod impls {
 /// that function. Here is an example:
 ///
 /// ```
-/// #![feature(core)]
+/// #![feature(reflect_marker)]
 /// use std::marker::Reflect;
 /// use std::any::Any;
 /// fn foo<T:Reflect+'static>(x: &T) {
@@ -404,7 +413,8 @@ mod impls {
 ///
 /// [1]: http://en.wikipedia.org/wiki/Parametricity
 #[rustc_reflect_like]
-#[unstable(feature = "core", reason = "requires RFC and more experience")]
+#[unstable(feature = "reflect_marker",
+           reason = "requires RFC and more experience")]
 #[allow(deprecated)]
 #[rustc_on_unimplemented = "`{Self}` does not implement `Any`; \
                             ensure all type parameters are bounded by `Any`"]

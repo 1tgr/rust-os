@@ -19,6 +19,7 @@ pub use self::TraversalItem::*;
 use core::prelude::*;
 
 use core::cmp::Ordering::{Greater, Less, Equal};
+use core::intrinsics::arith_offset;
 use core::iter::Zip;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut, Index, IndexMut};
@@ -162,12 +163,12 @@ fn test_offset_calculation() {
 }
 
 fn calculate_allocation_generic<K, V>(capacity: usize, is_leaf: bool) -> (usize, usize) {
-    let (keys_size, keys_align) = (capacity * mem::size_of::<K>(), mem::min_align_of::<K>());
-    let (vals_size, vals_align) = (capacity * mem::size_of::<V>(), mem::min_align_of::<V>());
+    let (keys_size, keys_align) = (capacity * mem::size_of::<K>(), mem::align_of::<K>());
+    let (vals_size, vals_align) = (capacity * mem::size_of::<V>(), mem::align_of::<V>());
     let (edges_size, edges_align) = if is_leaf {
         (0, 1)
     } else {
-        ((capacity + 1) * mem::size_of::<Node<K, V>>(), mem::min_align_of::<Node<K, V>>())
+        ((capacity + 1) * mem::size_of::<Node<K, V>>(), mem::align_of::<Node<K, V>>())
     };
 
     calculate_allocation(
@@ -180,11 +181,11 @@ fn calculate_allocation_generic<K, V>(capacity: usize, is_leaf: bool) -> (usize,
 fn calculate_offsets_generic<K, V>(capacity: usize, is_leaf: bool) -> (usize, usize) {
     let keys_size = capacity * mem::size_of::<K>();
     let vals_size = capacity * mem::size_of::<V>();
-    let vals_align = mem::min_align_of::<V>();
+    let vals_align = mem::align_of::<V>();
     let edges_align = if is_leaf {
         1
     } else {
-        mem::min_align_of::<Node<K, V>>()
+        mem::align_of::<Node<K, V>>()
     };
 
     calculate_offsets(
@@ -209,7 +210,7 @@ impl<T> RawItems<T> {
         if mem::size_of::<T>() == 0 {
             RawItems {
                 head: ptr,
-                tail: (ptr as usize + len) as *const T,
+                tail: arith_offset(ptr as *const i8, len as isize) as *const T,
             }
         } else {
             RawItems {
@@ -223,7 +224,7 @@ impl<T> RawItems<T> {
         ptr::write(self.tail as *mut T, val);
 
         if mem::size_of::<T>() == 0 {
-            self.tail = (self.tail as usize + 1) as *const T;
+            self.tail = arith_offset(self.tail as *const i8, 1) as *const T;
         } else {
             self.tail = self.tail.offset(1);
         }
@@ -241,7 +242,7 @@ impl<T> Iterator for RawItems<T> {
                 let ret = Some(ptr::read(self.head));
 
                 if mem::size_of::<T>() == 0 {
-                    self.head = (self.head as usize + 1) as *const T;
+                    self.head = arith_offset(self.head as *const i8, 1) as *const T;
                 } else {
                     self.head = self.head.offset(1);
                 }
@@ -259,7 +260,7 @@ impl<T> DoubleEndedIterator for RawItems<T> {
         } else {
             unsafe {
                 if mem::size_of::<T>() == 0 {
-                    self.tail = (self.tail as usize - 1) as *const T;
+                    self.tail = arith_offset(self.tail as *const i8, -1) as *const T;
                 } else {
                     self.tail = self.tail.offset(-1);
                 }

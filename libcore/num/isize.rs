@@ -9,13 +9,8 @@
 // except according to those terms.
 
 //! Operations and constants for pointer-sized signed integers (`isize` type)
-//!
-//! This type was recently added to replace `int`. The rollout of the
-//! new type will gradually take place over the alpha cycle along with
-//! the development of clearer conventions around integer types.
 
 #![stable(feature = "rust1", since = "1.0.0")]
-#![doc(primitive = "isize")]
 
 #[cfg(target_pointer_width = "32")]
 int_module! { isize, 32 }

@@ -21,7 +21,7 @@ use core::ops::Deref;
 use core::option::Option;
 
 use fmt;
-use alloc::{rc, arc};
+use alloc::{boxed, rc, arc};
 
 use self::Cow::*;
 
@@ -37,6 +37,11 @@ use self::Cow::*;
 /// trait: if `T: Borrow<U>`, then `&U` can be borrowed from `&T`.  A given
 /// type can be borrowed as multiple different types. In particular, `Vec<T>:
 /// Borrow<Vec<T>>` and `Vec<T>: Borrow<[T]>`.
+///
+/// `Borrow` is very similar to, but different than, `AsRef`. See
+/// [the book][book] for more.
+///
+/// [book]: ../../book/borrow-and-asref.html
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Borrow<Borrowed: ?Sized> {
     /// Immutably borrows from an owned value.
@@ -111,11 +116,19 @@ impl<'a, T: ?Sized> BorrowMut<T> for &'a mut T {
     fn borrow_mut(&mut self) -> &mut T { &mut **self }
 }
 
-impl<T> Borrow<T> for rc::Rc<T> {
+impl<T: ?Sized> Borrow<T> for boxed::Box<T> {
     fn borrow(&self) -> &T { &**self }
 }
 
-impl<T> Borrow<T> for arc::Arc<T> {
+impl<T: ?Sized> BorrowMut<T> for boxed::Box<T> {
+    fn borrow_mut(&mut self) -> &mut T { &mut **self }
+}
+
+impl<T: ?Sized> Borrow<T> for rc::Rc<T> {
+    fn borrow(&self) -> &T { &**self }
+}
+
+impl<T: ?Sized> Borrow<T> for arc::Arc<T> {
     fn borrow(&self) -> &T { &**self }
 }
 
@@ -202,7 +215,7 @@ impl<'a, B: ?Sized> Clone for Cow<'a, B> where B: ToOwned {
 impl<'a, B: ?Sized> Cow<'a, B> where B: ToOwned {
     /// Acquires a mutable reference to the owned form of the data.
     ///
-    /// Copies the data if it is not already owned.
+    /// Clones the data if it is not already owned.
     ///
     /// # Examples
     ///
@@ -228,7 +241,7 @@ impl<'a, B: ?Sized> Cow<'a, B> where B: ToOwned {
 
     /// Extracts the owned data.
     ///
-    /// Copies the data if it is not already owned.
+    /// Clones the data if it is not already owned.
     ///
     /// # Examples
     ///

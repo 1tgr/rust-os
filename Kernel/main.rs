@@ -9,10 +9,17 @@
  * its use, and the author takes no liability.
  */
 #![feature(alloc)]
+#![feature(append)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
+#![feature(bitvec)]
+#![feature(box_raw)]
 #![feature(collections)]
 #![feature(core)]
+#![feature(core_intrinsics)]
+#![feature(fnbox)]
+#![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
+#![feature(slice_bytes)]
 
 /// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use] extern crate bitflags;

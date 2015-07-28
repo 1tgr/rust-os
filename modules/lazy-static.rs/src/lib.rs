@@ -116,7 +116,7 @@ macro_rules! lazy_static {
             type Target = $T;
             fn deref<'a>(&'a self) -> &'a $T {
                 use $crate::once::{Once, ONCE_INIT};
-                use alloc::boxed::{self,Box};
+                use alloc::boxed::Box;
                 use core::marker::Sync;
 
                 #[inline(always)]
@@ -127,7 +127,7 @@ macro_rules! lazy_static {
                 ONCE.call_once(|| {
                     let b = Box::new($e);
                     unsafe {
-                        DATA = boxed::into_raw(b);
+                        DATA = Box::into_raw(b);
                     }
                 });
                 unsafe {

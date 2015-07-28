@@ -349,7 +349,7 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p.clone()));
-        let s = String::from_str("hello");
+        let s = String::from("hello");
         let d = spawn(scheduler, move || s + &" world");
         assert_eq!("hello world", d.get());
     }

@@ -13,7 +13,7 @@
 //! For more details, see ::rustc_unicode::char (a.k.a. std::char)
 
 #![allow(non_snake_case)]
-#![doc(primitive = "char")]
+#![stable(feature = "core_char", since = "1.2.0")]
 
 use iter::Iterator;
 use mem::transmute;
@@ -74,17 +74,8 @@ pub const MAX: char = '\u{10ffff}';
 /// ```
 /// use std::char;
 ///
-/// let c = char::from_u32(10084); // produces `Some(❤)`
-/// assert_eq!(c, Some('❤'));
-/// ```
-///
-/// An invalid character:
-///
-/// ```
-/// use std::char;
-///
-/// let none = char::from_u32(1114112);
-/// assert_eq!(none, None);
+/// assert_eq!(char::from_u32(0x2764), Some('❤'));
+/// assert_eq!(char::from_u32(0x110000), None); // invalid character
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -93,8 +84,16 @@ pub fn from_u32(i: u32) -> Option<char> {
     if (i > MAX as u32) || (i >= 0xD800 && i <= 0xDFFF) {
         None
     } else {
-        Some(unsafe { transmute(i) })
+        Some(unsafe { from_u32_unchecked(i) })
     }
+}
+
+/// Converts a `u32` to an `char`, not checking whether it is a valid unicode
+/// codepoint.
+#[inline]
+#[unstable(feature = "char_from_unchecked", reason = "recently added API")]
+pub unsafe fn from_u32_unchecked(i: u32) -> char {
+    transmute(i)
 }
 
 /// Converts a number to the character representing it.
@@ -124,12 +123,11 @@ pub fn from_digit(num: u32, radix: u32) -> Option<char> {
         panic!("from_digit: radix is too high (maximum 36)");
     }
     if num < radix {
-        unsafe {
-            if num < 10 {
-                Some(transmute('0' as u32 + num))
-            } else {
-                Some(transmute('a' as u32 + num - 10))
-            }
+        let num = num as u8;
+        if num < 10 {
+            Some((b'0' + num) as char)
+        } else {
+            Some((b'a' + num - 10) as char)
         }
     } else {
         None
@@ -140,6 +138,8 @@ pub fn from_digit(num: u32, radix: u32) -> Option<char> {
 // unicode/char.rs, not here
 #[allow(missing_docs)] // docs in libunicode/u_char.rs
 #[doc(hidden)]
+#[unstable(feature = "core_char_ext",
+           reason = "the stable interface is `impl char` in later crate")]
 pub trait CharExt {
     fn is_digit(self, radix: u32) -> bool;
     fn to_digit(self, radix: u32) -> Option<u32>;
@@ -152,10 +152,12 @@ pub trait CharExt {
 }
 
 impl CharExt for char {
+    #[inline]
     fn is_digit(self, radix: u32) -> bool {
         self.to_digit(radix).is_some()
     }
 
+    #[inline]
     fn to_digit(self, radix: u32) -> Option<u32> {
         if radix > 36 {
             panic!("to_digit: radix is too high (maximum 36)");
@@ -170,10 +172,12 @@ impl CharExt for char {
         else { None }
     }
 
+    #[inline]
     fn escape_unicode(self) -> EscapeUnicode {
         EscapeUnicode { c: self, state: EscapeUnicodeState::Backslash }
     }
 
+    #[inline]
     fn escape_default(self) -> EscapeDefault {
         let init_state = match self {
             '\t' => EscapeDefaultState::Backslash('t'),
@@ -225,6 +229,9 @@ impl CharExt for char {
 /// If the buffer is not large enough, nothing will be written into it
 /// and a `None` will be returned.
 #[inline]
+#[unstable(feature = "char_internals",
+           reason = "this function should not be exposed publicly")]
+#[doc(hidden)]
 pub fn encode_utf8_raw(code: u32, dst: &mut [u8]) -> Option<usize> {
     // Marked #[inline] to allow llvm optimizing it away
     if code < MAX_ONE_B && !dst.is_empty() {
@@ -256,6 +263,9 @@ pub fn encode_utf8_raw(code: u32, dst: &mut [u8]) -> Option<usize> {
 /// If the buffer is not large enough, nothing will be written into it
 /// and a `None` will be returned.
 #[inline]
+#[unstable(feature = "char_internals",
+           reason = "this function should not be exposed publicly")]
+#[doc(hidden)]
 pub fn encode_utf16_raw(mut ch: u32, dst: &mut [u16]) -> Option<usize> {
     // Marked #[inline] to allow llvm optimizing it away
     if (ch & 0xFFFF) == ch && !dst.is_empty() {
@@ -315,16 +325,13 @@ impl Iterator for EscapeUnicode {
                 Some('{')
             }
             EscapeUnicodeState::Value(offset) => {
-                let v = match ((self.c as i32) >> (offset * 4)) & 0xf {
-                    i @ 0 ... 9 => '0' as i32 + i,
-                    i => 'a' as i32 + (i - 10)
-                };
+                let c = from_digit(((self.c as u32) >> (offset * 4)) & 0xf, 16).unwrap();
                 if offset == 0 {
                     self.state = EscapeUnicodeState::RightBrace;
                 } else {
                     self.state = EscapeUnicodeState::Value(offset - 1);
                 }
-                Some(unsafe { transmute(v) })
+                Some(c)
             }
             EscapeUnicodeState::RightBrace => {
                 self.state = EscapeUnicodeState::Done;

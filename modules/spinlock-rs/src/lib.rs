@@ -2,10 +2,11 @@
 #![crate_type = "lib"]
 #![warn(missing_docs)]
 #![feature(asm)]
+#![feature(const_fn)]
 
 //! Synchronization primitives based on spinning
 
-#![cfg_attr(feature = "no_std", feature(no_std, core))]
+#![cfg_attr(feature = "no_std", feature(no_std, core, core_prelude))]
 #![cfg_attr(feature = "no_std", no_std)]
 
 #[cfg(all(feature = "no_std", test))]

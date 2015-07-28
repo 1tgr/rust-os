@@ -223,7 +223,9 @@
 //! }
 //! ```
 //!
-//! `try!` is imported by the prelude, and is available everywhere.
+//! `try!` is imported by the prelude and is available everywhere, but it can only
+//! be used in functions that return `Result` because of the early return of
+//! `Err` that it provides.
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
@@ -418,7 +420,7 @@ impl<T, E> Result<T, E> {
     /// Converts from `Result<T, E>` to `&mut [T]` (without copying)
     ///
     /// ```
-    /// # #![feature(core)]
+    /// # #![feature(as_slice)]
     /// let mut x: Result<&str, u32> = Ok("Gold");
     /// {
     ///     let v = x.as_mut_slice();
@@ -432,7 +434,7 @@ impl<T, E> Result<T, E> {
     /// assert!(x.as_mut_slice().is_empty());
     /// ```
     #[inline]
-    #[unstable(feature = "core",
+    #[unstable(feature = "as_slice",
                reason = "waiting for mut conventions")]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match *self {
@@ -729,6 +731,26 @@ impl<T, E: fmt::Debug> Result<T, E> {
                 panic!("called `Result::unwrap()` on an `Err` value: {:?}", e)
         }
     }
+
+    /// Unwraps a result, yielding the content of an `Ok`.
+    ///
+    /// Panics if the value is an `Err`, with a panic message including the
+    /// passed message, and the content of the `Err`.
+    ///
+    /// # Examples
+    /// ```{.should_panic}
+    /// #![feature(result_expect)]
+    /// let x: Result<u32, &str> = Err("emergency failure");
+    /// x.expect("Testing expect"); // panics with `Testing expect: emergency failure`
+    /// ```
+    #[inline]
+    #[unstable(feature = "result_expect", reason = "newly introduced")]
+    pub fn expect(self, msg: &str) -> T {
+        match self {
+            Ok(t) => t,
+            Err(e) => panic!("{}: {:?}", msg, e),
+        }
+    }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -944,7 +966,11 @@ impl<A, E, V: FromIterator<A>> FromIterator<Result<A, E>> for Result<V, E> {
 /// If an `Err` is encountered, it is immediately returned.
 /// Otherwise, the folded value is returned.
 #[inline]
-#[unstable(feature = "core")]
+#[unstable(feature = "result_fold",
+           reason = "unclear if this function should exist")]
+#[deprecated(since = "1.2.0",
+             reason = "has not seen enough usage to justify its position in \
+                       the standard library")]
 pub fn fold<T,
             V,
             E,

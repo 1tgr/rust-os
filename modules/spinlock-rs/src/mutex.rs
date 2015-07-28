@@ -123,7 +123,7 @@ pub type StaticMutex = Mutex<()>;
 #[cfg(feature = "no_std")]
 pub const STATIC_MUTEX_INIT: StaticMutex = Mutex {
     lock: ATOMIC_USIZE_INIT,
-    data: UnsafeCell { value: () },
+    data: UnsafeCell::new(()),
 };
 
 impl<T> Mutex<T>
