@@ -1,6 +1,6 @@
 .gitignore
 
-RUSTC_ROOT = $(TUP_CWD)/rust-nightly-x86_64-unknown-linux-gnu/rustc/bin/
+RUSTC_ROOT = $(TUP_CWD)/../rust-nightly-x86_64-unknown-linux-gnu/rustc/bin/
 RUSTC = LD_LIBRARY_PATH=$(RUSTC_ROOT)../lib $(RUSTC_ROOT)rustc
 RUSTDOC = LD_LIBRARY_PATH=$(RUSTC_ROOT)../lib $(RUSTC_ROOT)rustdoc
 
