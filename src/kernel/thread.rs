@@ -264,30 +264,37 @@ impl<A> Promise<A> for Deferred<A> {
     }
 }
 
-pub fn spawn_remote<T, A>(scheduler: Arc<Scheduler>, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
-    let dstate = Arc::new(Mutex::new(DeferredState {
-        result: None,
-        waiters: VecDeque::new()
-    }));
-
-    let start = {
-        let dstate = dstate.clone();
-        let scheduler = scheduler.clone();
-        move || {
-            let result = start();
-            scheduler.resolve_deferred(&dstate, result);
-            scheduler.exit_current();
-        }
-    };
-
-    scheduler.spawn_inner(process, Box::new(start));
-
-    Deferred { scheduler: scheduler, state: dstate }
+pub trait SchedulerExt {
+    fn spawn_remote<T, A>(self, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static;
+    fn spawn<T, A>(self, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static;
 }
 
-pub fn spawn<T, A>(scheduler: Arc<Scheduler>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
-    let process = lock!(scheduler.state).current.process.clone();
-    spawn_remote(scheduler, process, start)
+impl SchedulerExt for Arc<Scheduler> {
+    fn spawn_remote<T, A>(self, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
+        let dstate = Arc::new(Mutex::new(DeferredState {
+            result: None,
+            waiters: VecDeque::new()
+        }));
+
+        let start = {
+            let dstate = dstate.clone();
+            let scheduler = self.clone();
+            move || {
+                let result = start();
+                scheduler.resolve_deferred(&dstate, result);
+                scheduler.exit_current();
+            }
+        };
+
+        self.spawn_inner(process, Box::new(start));
+
+        Deferred { scheduler: self, state: dstate }
+    }
+
+    fn spawn<T, A>(self, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
+        let process = lock!(self.state).current.process.clone();
+        self.spawn_remote(process, start)
+    }
 }
 
 struct TestSyscallHandler {
@@ -329,7 +336,7 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p.clone()));
-        let d = spawn(scheduler, || 123);
+        let d = scheduler.spawn(|| 123);
         assert_eq!(123, d.get());
     }
 
@@ -338,8 +345,8 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p.clone()));
-        let d1 = spawn(scheduler.clone(), || 456);
-        let d2 = spawn(scheduler, || 789);
+        let d1 = scheduler.clone().spawn(|| 456);
+        let d2 = scheduler.spawn(|| 789);
         assert_eq!(456, d1.get());
         assert_eq!(789, d2.get());
     }
@@ -350,7 +357,7 @@ test! {
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         let scheduler = Arc::new(Scheduler::new(p.clone()));
         let s = String::from("hello");
-        let d = spawn(scheduler, move || s + &" world");
+        let d = scheduler.spawn(move || s + &" world");
         assert_eq!("hello world", d.get());
     }
 
@@ -365,12 +372,12 @@ test! {
         let thread1_fn = {
             let scheduler = scheduler.clone();
             || {
-                let d = spawn(scheduler, thread2_fn);
+                let d = scheduler.spawn(thread2_fn);
                 d.get() * 2
             }
         };
 
-        let d = spawn(scheduler, thread1_fn);
+        let d = scheduler.spawn(thread1_fn);
         assert_eq!(1234 * 2, d.get());
     }
 
