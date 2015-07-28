@@ -51,5 +51,5 @@ LINKFLAGS += --gc-sections -z max-page-size=0x1000
 !RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type bin %f |>
 !RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type=lib --emit=link %f |>
 !RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --emit=obj %f |>
-!RUSTDOC = |> $(RUSTDOC) $(RUSTFLAGS) %f && tar -zcf %o doc && rm -r doc |>
+!RUSTDOC_CMD = |> echo $(RUSTDOC) $(RUSTFLAGS) %f -o ../../doc > %o && chmod +x %o |>
 

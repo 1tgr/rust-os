@@ -4,4 +4,4 @@ RUSTFLAGS += -L ../liballoc -L ../liblibc -L ../librustc_unicode
 RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib --extern collections=../libcollections/libcollections.rlib --extern core=../libcore/libcore.rlib --extern libc=../liblibc/liblibc.rlib
 
 : lib.rs | ../liballoc/liballoc.rlib ../libcollections/libcollections.rlib ../libcore/libcore.rlib ../liblibc/liblibc.rlib *.rs |> !RUSTC_LIB  |> %d.rlib
-
+: lib.rs |> !RUSTDOC_CMD |> rustdoc

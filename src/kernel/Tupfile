@@ -2,18 +2,18 @@ include_rules
 
 RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
 
-KERNEL_LIBS += ../liballoc/liballoc.rlib
-KERNEL_LIBS += ../libc/libc.a
-KERNEL_LIBS += ../libcollections/libcollections.rlib
-KERNEL_LIBS += ../libcore/libcore.rlib
-KERNEL_LIBS += ../liblibc/liblibc.rlib
-KERNEL_LIBS += ../librustc_unicode/librustc_unicode.rlib
-KERNEL_LIBS += ../libstd/libstd.rlib
-KERNEL_LIBS += ../libsyscall/libsyscall_kernel.rlib
-KERNEL_LIBS += ../modules/libbit-vec.rlib
-KERNEL_LIBS += ../modules/libbitflags.rlib
-KERNEL_LIBS += ../modules/liblazy-static.rlib
-KERNEL_LIBS += ../modules/libspin.rlib
+LIBS += ../liballoc/liballoc.rlib
+LIBS += ../libc/libc.a
+LIBS += ../libcollections/libcollections.rlib
+LIBS += ../libcore/libcore.rlib
+LIBS += ../liblibc/liblibc.rlib
+LIBS += ../librustc_unicode/librustc_unicode.rlib
+LIBS += ../libstd/libstd.rlib
+LIBS += ../libsyscall/libsyscall_kernel.rlib
+LIBS += ../modules/libbit-vec.rlib
+LIBS += ../modules/libbitflags.rlib
+LIBS += ../modules/liblazy-static.rlib
+LIBS += ../modules/libspin.rlib
 
 RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib
 RUSTFLAGS += --extern bit_vec=../modules/libbit-vec.rlib
@@ -27,16 +27,16 @@ RUSTFLAGS += --extern std=../libstd/libstd.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
-: main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}
-#: main.rs | $(KERNEL_LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
+: main.rs | $(LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}
+#: main.rs | $(LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 
-: main.rs | $(KERNEL_LIBS) *.rs ../hello/hello.bin |> !RUSTDOC |> doc.tar.gz
+: main.rs |> !RUSTDOC_CMD |> rustdoc
 
 ifeq (@(ARCH),amd64)
-: {objs} $(KERNEL_LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
+: {objs} $(LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
 : kernel.amd64.bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin
 : kernel.amd64.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
 else
-: {objs} $(KERNEL_LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
+: {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
 # : kernel.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
 endif

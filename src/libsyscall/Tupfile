@@ -7,4 +7,4 @@ RUSTFLAGS += --extern core=../libcore/libcore.rlib
 : lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> libsyscall.rlib
 : lib.rs | $(LIBS) *.rs |> !RUSTC_LIB --cfg feature=\"kernel\" |> libsyscall_kernel.rlib
 : lib.rs | $(LIBS) *.rs |> !RUSTC_LIB --cfg feature=\"kernel\" --pretty=expanded -Z unstable-options |> libsyscall_kernel_expanded.rs
-: lib.rs | $(LIBS) *.rs |> !RUSTDOC |> doc.tar.gz
+: lib.rs | $(LIBS) *.rs |> !RUSTDOC_CMD |> rustdoc

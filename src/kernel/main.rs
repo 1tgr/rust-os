@@ -8,6 +8,8 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
+#![crate_name = "kernel"]
+
 #![feature(alloc)]
 #![feature(append)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
