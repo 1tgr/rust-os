@@ -3,6 +3,7 @@
 #![warn(missing_docs)]
 #![feature(asm)]
 #![feature(const_fn)]
+#![feature(negate_unsigned)]
 
 //! Synchronization primitives based on spinning
 

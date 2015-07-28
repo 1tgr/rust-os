@@ -81,7 +81,7 @@ pub type StaticRwLock = RwLock<()>;
 #[cfg(feature = "no_std")]
 pub const STATIC_RWLOCK_INIT: StaticRwLock = RwLock {
     lock: ATOMIC_USIZE_INIT,
-    data: UnsafeCell { value: () },
+    data: UnsafeCell::new(()),
 };
 
 #[cfg(feature = "no_std")]

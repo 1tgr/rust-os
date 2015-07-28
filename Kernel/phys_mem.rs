@@ -1,9 +1,9 @@
 use ::multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
 use ::ptr;
+use bit_vec::BitVec;
 use libc::{c_int,c_void};
 use spin::Mutex;
 use std::cmp;
-use std::collections::bit_vec::BitVec;
 use std::intrinsics;
 
 extern {

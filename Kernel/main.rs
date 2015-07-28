@@ -11,9 +11,7 @@
 #![feature(alloc)]
 #![feature(append)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
-#![feature(bitvec)]
 #![feature(box_raw)]
-#![feature(collections)]
 #![feature(core)]
 #![feature(core_intrinsics)]
 #![feature(fnbox)]
@@ -31,6 +29,7 @@
 #[macro_use] mod test;
 
 extern crate alloc;
+extern crate bit_vec;
 extern crate libc;
 extern crate syscall;
 
