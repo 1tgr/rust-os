@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use syscall::ErrNum;
 
-pub fn setjmp() -> Option<jmp_buf> {
+fn setjmp() -> Option<jmp_buf> {
     unsafe {
         let mut jmp_buf = mem::uninitialized();
         if libc::setjmp(&mut jmp_buf) == 0 {
@@ -69,8 +69,8 @@ struct SchedulerState {
 }
 
 #[derive(Clone)]
-pub struct Deferred<A> {
-    scheduler: Arc<Scheduler>,
+pub struct Deferred<'a, A> {
+    scheduler: &'a Scheduler,
     state: Arc<Mutex<DeferredState<A>>>
 }
 
@@ -192,10 +192,11 @@ impl Scheduler {
         state.threads.append(&mut waiters);
     }
 
-    fn spawn_inner(&self, process: Arc<Process>, start: Box<FnBox()>) {
+    fn spawn_inner<'a>(&'a self, process: Arc<Process>, start: Box<FnBox() + 'a>) {
         let stack_len = 4096;
         let stack = unsafe { slice::from_raw_parts_mut(heap::allocate(stack_len, 16), stack_len) };
-        let jmp_buf = thread::new_jmp_buf(Box::new(start), stack);
+        let b: Box<FnBox() + 'a> = Box::new(start);
+        let jmp_buf = thread::new_jmp_buf(b, stack);
         let thread = Thread::new(process, stack);
 
         {
@@ -218,6 +219,31 @@ impl Scheduler {
         let process = lock!(self.state).current.process.clone();
         self.spawn_inner(process, Box::new(start))
     }
+
+    pub fn spawn_remote<'a, T, A>(&'a self, process: Arc<Process>, start: T) -> Deferred<'a, A> where T : FnOnce() -> A + 'a, A : 'a {
+        let dstate = Arc::new(Mutex::new(DeferredState {
+            result: None,
+            waiters: VecDeque::new()
+        }));
+
+        let start = {
+            let dstate = dstate.clone();
+            move || {
+                let result = start();
+                self.resolve_deferred(&dstate, result);
+                self.exit_current();
+            }
+        };
+
+        self.spawn_inner(process, Box::new(start));
+
+        Deferred { scheduler: self, state: dstate }
+    }
+
+    pub fn spawn<'a, T, A>(&'a self, start: T) -> Deferred<'a, A> where T : FnOnce() -> A + 'a, A : 'a {
+        let process = lock!(self.state).current.process.clone();
+        self.spawn_remote(process, start)
+    }
 }
 
 impl Drop for Scheduler {
@@ -239,8 +265,8 @@ pub trait Promise<A> {
     // fn then<B>(f: FnOnce(A) -> B) -> Promise<B>;
 }
 
-impl<A> Deferred<A> {
-    pub fn new(scheduler: Arc<Scheduler>) -> Deferred<A> {
+impl<'a, A> Deferred<'a, A> {
+    pub fn new(scheduler: &'a Scheduler) -> Self {
         let dstate = Arc::new(Mutex::new(DeferredState {
             result: None,
             waiters: VecDeque::new()
@@ -254,7 +280,7 @@ impl<A> Deferred<A> {
     }
 }
 
-impl<A> Promise<A> for Deferred<A> {
+impl<'a, A> Promise<A> for Deferred<'a, A> {
     fn get(&self) -> A {
         self.scheduler.get_deferred(&self.state)
     }
@@ -264,47 +290,14 @@ impl<A> Promise<A> for Deferred<A> {
     }
 }
 
-pub trait SchedulerExt {
-    fn spawn_remote<T, A>(self, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static;
-    fn spawn<T, A>(self, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static;
-}
-
-impl SchedulerExt for Arc<Scheduler> {
-    fn spawn_remote<T, A>(self, process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
-        let dstate = Arc::new(Mutex::new(DeferredState {
-            result: None,
-            waiters: VecDeque::new()
-        }));
-
-        let start = {
-            let dstate = dstate.clone();
-            let scheduler = self.clone();
-            move || {
-                let result = start();
-                scheduler.resolve_deferred(&dstate, result);
-                scheduler.exit_current();
-            }
-        };
-
-        self.spawn_inner(process, Box::new(start));
-
-        Deferred { scheduler: self, state: dstate }
-    }
-
-    fn spawn<T, A>(self, start: T) -> Deferred<A> where T : FnOnce() -> A + 'static, A : 'static {
-        let process = lock!(self.state).current.process.clone();
-        self.spawn_remote(process, start)
-    }
-}
-
-struct TestSyscallHandler {
-    scheduler: Arc<Scheduler>,
+struct TestSyscallHandler<'a> {
+    scheduler: &'a Scheduler,
     dstate: Arc<Mutex<DeferredState<i32>>>,
-    keyboard: Keyboard,
+    keyboard: Keyboard<'a>,
     process: Arc<Process>
 }
 
-impl ::syscall::Handler for TestSyscallHandler {
+impl<'a> ::syscall::Handler for TestSyscallHandler<'a> {
     fn write(&self, s: &str) -> Result<(), ErrNum> {
         Ok(debug::puts(s))
     }
@@ -335,7 +328,7 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Arc::new(Scheduler::new(p.clone()));
+        let scheduler = Scheduler::new(p.clone());
         let d = scheduler.spawn(|| 123);
         assert_eq!(123, d.get());
     }
@@ -344,8 +337,8 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Arc::new(Scheduler::new(p.clone()));
-        let d1 = scheduler.clone().spawn(|| 456);
+        let scheduler = Scheduler::new(p.clone());
+        let d1 = scheduler.spawn(|| 456);
         let d2 = scheduler.spawn(|| 789);
         assert_eq!(456, d1.get());
         assert_eq!(789, d2.get());
@@ -355,7 +348,7 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Arc::new(Scheduler::new(p.clone()));
+        let scheduler = Scheduler::new(p.clone());
         let s = String::from("hello");
         let d = scheduler.spawn(move || s + &" world");
         assert_eq!("hello world", d.get());
@@ -365,12 +358,11 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Arc::new(Scheduler::new(p.clone()));
+        let scheduler = Scheduler::new(p.clone());
 
         let thread2_fn = || 1234;
 
         let thread1_fn = {
-            let scheduler = scheduler.clone();
             || {
                 let d = scheduler.spawn(thread2_fn);
                 d.get() * 2
@@ -386,8 +378,8 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::for_kernel());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Arc::new(Scheduler::new(p.clone()));
-        let keyboard = Keyboard::new(scheduler.clone());
+        let scheduler = Scheduler::new(p.clone());
+        let keyboard = Keyboard::new(&scheduler);
         p.switch();
 
         let mut code_slice = p.alloc(HELLO.len(), true, true).unwrap();
@@ -402,13 +394,13 @@ test! {
         }));
 
         let handler = TestSyscallHandler {
-            scheduler: scheduler.clone(),
+            scheduler: &scheduler,
             dstate: dstate.clone(),
             keyboard: keyboard,
             process: p.clone()
         };
 
-        let d = Deferred { scheduler: scheduler.clone(), state: dstate };
+        let d = Deferred { scheduler: &scheduler, state: dstate };
         let _x = thread::register_syscall_handler(handler);
         scheduler.spawn_user_mode(code_slice.as_ptr(), stack_slice);
 

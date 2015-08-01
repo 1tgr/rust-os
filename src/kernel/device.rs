@@ -3,20 +3,19 @@ use spin::Mutex;
 use std::cmp;
 use std::collections::VecDeque;
 use std::slice::bytes;
-use std::sync::Arc;
 
-pub trait Device {
-    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>>;
+pub trait Device<'a> {
+    fn read_async(&self, buf: Vec<u8>) -> Deferred<'a, Result<(Vec<u8>, usize), &'static str>>;
 }
 
-struct IoRequest {
+struct IoRequest<'a> {
     buf: Vec<u8>,
-    d: Deferred<Result<(Vec<u8>, usize), &'static str>>,
+    d: Deferred<'a, Result<(Vec<u8>, usize), &'static str>>,
     current: usize
 }
 
-impl IoRequest {
-    pub fn new(buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize), &'static str>>) -> IoRequest {
+impl<'a> IoRequest<'a> {
+    pub fn new(buf: Vec<u8>, d: Deferred<'a, Result<(Vec<u8>, usize), &'static str>>) -> Self {
         IoRequest {
             buf: buf,
             d: d,
@@ -24,7 +23,7 @@ impl IoRequest {
         }
     }
 
-    pub fn fulfil(mut self, data: &mut &[u8]) -> Option<IoRequest> {
+    pub fn fulfil(mut self, data: &mut &[u8]) -> Option<IoRequest<'a>> {
         {
             let len = cmp::min(self.buf.len(), data.len());
             let (data1, data2) = data.split_at(len);
@@ -44,13 +43,13 @@ impl IoRequest {
     }
 }
 
-pub struct ByteDevice {
-    scheduler: Arc<Scheduler>,
-    requests: Mutex<VecDeque<IoRequest>>
+pub struct ByteDevice<'a> {
+    scheduler: &'a Scheduler,
+    requests: Mutex<VecDeque<IoRequest<'a>>>
 }
 
-impl ByteDevice {
-    pub fn new(scheduler: Arc<Scheduler>) -> ByteDevice {
+impl<'a> ByteDevice<'a> {
+    pub fn new(scheduler: &'a Scheduler) -> Self {
         ByteDevice {
             scheduler: scheduler,
             requests: Mutex::new(VecDeque::new())
@@ -64,7 +63,7 @@ impl ByteDevice {
             }
 
             let mut requests = lock!(self.requests);
-            let request: IoRequest =
+            let request: IoRequest<'a> =
                 match requests.pop_front() {
                     Some(request) => request,
                     None => { return; }
@@ -77,8 +76,8 @@ impl ByteDevice {
     }
 }
 
-impl Device for ByteDevice {
-    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>> {
+impl<'a> Device<'a> for ByteDevice<'a> {
+    fn read_async(&self, buf: Vec<u8>) -> Deferred<'a, Result<(Vec<u8>, usize), &'static str>> {
         let d = Deferred::new(self.scheduler.clone());
         lock!(self.requests).push_back(IoRequest::new(buf, d.clone()));
         d

@@ -243,13 +243,13 @@ impl KeyboardState {
 
 mod british;
 
-pub struct Keyboard {
-    _drop_irq_handler: DropIrqHandler,
-    device: Arc<ByteDevice>
+pub struct Keyboard<'a> {
+    _drop_irq_handler: DropIrqHandler<'a>,
+    device: Arc<ByteDevice<'a>>
 }
 
-impl Keyboard {
-    pub fn new(scheduler: Arc<Scheduler>) -> Keyboard {
+impl<'a> Keyboard<'a> {
+    pub fn new(scheduler: &'a Scheduler) -> Self {
         let device = Arc::new(ByteDevice::new(scheduler));
 
         let handler = {
@@ -357,11 +357,11 @@ impl Keyboard {
     }
 }
 
-impl Deref for Keyboard {
-    type Target = ByteDevice;
+impl<'a> Deref for Keyboard<'a> {
+    type Target = ByteDevice<'a>;
 
-    fn deref(&self) -> &ByteDevice {
-        &*self.device
+    fn deref(&self) -> &ByteDevice<'a> {
+        &self.device
     }
 }
 
@@ -370,8 +370,8 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Arc::new(Scheduler::new(p));
-        let _keyboard = Keyboard::new(scheduler);
+        let scheduler = Scheduler::new(p);
+        let _keyboard = Keyboard::new(&scheduler);
         //log!("Press any key to continue");
         //keyboard.read_key();
     }

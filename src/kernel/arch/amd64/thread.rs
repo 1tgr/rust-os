@@ -4,6 +4,7 @@ use lazy_static::once::{self,Once};
 use libc::jmp_buf;
 use std::boxed::FnBox;
 use std::mem;
+use syscall::{Dispatcher,Handler};
 use syscall::kernel::Dispatch;
 
 extern {
@@ -28,10 +29,13 @@ pub unsafe fn syscall_entry(regs: &Regs) -> isize {
     }
 }
 
-pub type DropSyscallHandler = DropSingleton<'static, Box<Dispatch>>;
+pub type DropSyscallHandler<'a> = DropSingleton<'a, Box<Dispatch>>;
 
-pub fn register_syscall_handler<T>(handler: T) -> DropSyscallHandler where T : ::syscall::Handler + 'static {
-    SYSCALL_DISPATCH.register(Box::new(::syscall::Dispatcher::new(handler)))
+pub fn register_syscall_handler<'a, T>(handler: T) -> DropSyscallHandler<'a> where T : Handler + 'a {
+    let b: Box<Dispatcher<T>> = Box::new(Dispatcher::new(handler));
+    let b: Box<Dispatch + 'a> = b;
+    let b: Box<Dispatch + 'static> = unsafe { mem::transmute(b) };
+    SYSCALL_DISPATCH.register(b)
 }
 
 #[no_mangle]
