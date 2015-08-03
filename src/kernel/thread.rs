@@ -1,8 +1,6 @@
 use ::arch::cpu;
-use ::arch::debug;
-use ::arch::keyboard::Keyboard;
 use ::arch::thread;
-use ::phys_mem::{self,PhysicalBitmap};
+use ::phys_mem::PhysicalBitmap;
 use ::process::Process;
 use ::virt_mem::VirtualTree;
 use alloc::heap;
@@ -11,11 +9,9 @@ use spin::{Mutex,MutexGuard};
 use std::boxed::FnBox;
 use std::collections::VecDeque;
 use std::mem;
-use std::slice::bytes;
 use std::slice;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use syscall::ErrNum;
 
 fn setjmp() -> Option<jmp_buf> {
     unsafe {
@@ -290,39 +286,6 @@ impl<'a, A> Promise<A> for Deferred<'a, A> {
     }
 }
 
-struct TestSyscallHandler<'a> {
-    scheduler: &'a Scheduler,
-    dstate: Arc<Mutex<DeferredState<i32>>>,
-    keyboard: Keyboard<'a>,
-    process: Arc<Process>
-}
-
-impl<'a> ::syscall::Handler for TestSyscallHandler<'a> {
-    fn write(&self, s: &str) -> Result<(), ErrNum> {
-        Ok(debug::puts(s))
-    }
-
-    fn exit_thread(&self, code: i32) -> Result<(), ErrNum> {
-        self.scheduler.resolve_deferred(&self.dstate, code);
-        self.scheduler.exit_current()
-    }
-
-    fn read_line(&self, buf: &mut [u8]) -> Result<usize, ErrNum> {
-        Ok(self.keyboard.read_line(buf))
-    }
-
-    fn alloc_pages(&self, len: usize) -> Result<*mut u8, ErrNum> {
-        match self.process.alloc(len, true, true) {
-            Ok(slice) => Ok(slice.as_mut_ptr()),
-            Err(_) => Err(ErrNum::OutOfMemory)
-        }
-    }
-
-    fn free_pages(&self, p: *mut u8) -> Result<bool, ErrNum> {
-        Ok(self.process.free(p))
-    }
-}
-
 test! {
     fn can_spawn_exit_thread() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
@@ -371,39 +334,5 @@ test! {
 
         let d = scheduler.spawn(thread1_fn);
         assert_eq!(1234 * 2, d.get());
-    }
-
-    fn can_run_hello_world() {
-        static HELLO: &'static [u8] = include_bytes!("../hello/hello.bin");
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::for_kernel());
-        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Scheduler::new(p.clone());
-        let keyboard = Keyboard::new(&scheduler);
-        p.switch();
-
-        let mut code_slice = p.alloc(HELLO.len(), true, true).unwrap();
-        let stack_slice = p.alloc(phys_mem::PAGE_SIZE, true, true).unwrap();
-        log!("code_slice = {:p}, stack_slice = {:p}", code_slice.as_ptr(), stack_slice.as_ptr());
-        bytes::copy_memory(HELLO, code_slice);
-        log!("code_slice = {:?}", &code_slice[0..16]);
-
-        let dstate = Arc::new(Mutex::new(DeferredState {
-            result: None,
-            waiters: VecDeque::new()
-        }));
-
-        let handler = TestSyscallHandler {
-            scheduler: &scheduler,
-            dstate: dstate.clone(),
-            keyboard: keyboard,
-            process: p.clone()
-        };
-
-        let d = Deferred { scheduler: &scheduler, state: dstate };
-        let _x = thread::register_syscall_handler(handler);
-        scheduler.spawn_user_mode(code_slice.as_ptr(), stack_slice);
-
-        assert_eq!(0x1234, d.get());
     }
 }

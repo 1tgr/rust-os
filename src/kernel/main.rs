@@ -54,6 +54,8 @@ pub mod thread;
 pub mod unwind;
 pub mod virt_mem;
 
+mod demo;
+
 use core::fmt::Write;
 use libc::{c_char,c_int};
 use logging::Writer;
@@ -87,6 +89,8 @@ const TEST_FIXTURES: &'static [Fixture] = &[
     process::TESTS,
     thread::TESTS,
     virt_mem::TESTS,
+
+    demo::TESTS
 ];
 
 // Kernel entrypoint
