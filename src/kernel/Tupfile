@@ -2,11 +2,14 @@ include_rules
 
 RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
 
-LIBS += ../liballoc/liballoc.rlib
+LIBS += ../libminiz-sys/libminiz.a
 LIBS += ../libc/libc.a
+
+LIBS += ../liballoc/liballoc.rlib
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
 LIBS += ../liblibc/liblibc.rlib
+LIBS += ../libminiz-sys/libminiz-sys.rlib
 LIBS += ../librustc_unicode/librustc_unicode.rlib
 LIBS += ../libstd/libstd.rlib
 LIBS += ../libsyscall/libsyscall_kernel.rlib
@@ -21,13 +24,15 @@ RUSTFLAGS += --extern bitflags=../modules/libbitflags.rlib
 RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
 RUSTFLAGS += --extern lazy_static=../modules/liblazy-static.rlib
+RUSTFLAGS += --extern miniz_sys=../libminiz-sys/libminiz-sys.rlib
 RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
 RUSTFLAGS += --extern spin=../modules/libspin.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
-: main.rs | $(LIBS) *.rs ../hello/hello.bin |> !RUSTC_OBJ |> kernel.o {objs}
+: ../hello/hello.bin |> zip -j %o %f |> initrd.zip
+: main.rs | $(LIBS) *.rs initrd.zip |> !RUSTC_OBJ |> kernel.o {objs}
 #: main.rs | $(LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 
 : main.rs |> !RUSTDOC_CMD |> rustdoc

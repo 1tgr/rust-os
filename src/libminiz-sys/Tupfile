@@ -1,0 +1,13 @@
+include_rules
+
+RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
+
+LIBS += ../liblibc/liblibc.rlib
+LIBS += ../libstd/libstd.rlib
+
+RUSTFLAGS += --extern libc=../liblibc/liblibc.rlib
+RUSTFLAGS += --extern std=../libstd/libstd.rlib
+
+: lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> libminiz-sys.rlib
+: foreach *.c |> !CC |> %B.o {objs}
+: {objs} |> !AR |> libminiz.a

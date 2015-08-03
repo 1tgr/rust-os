@@ -1,0 +1,11 @@
+#define DBL_MAX __DBL_MAX__
+#define FLT_MAX __FLT_MAX__
+#define INTMAX_MAX __INTMAX_MAX__
+#define INT_MAX __INT_MAX__
+#define LDBL_MAX __LDBL_MAX__
+#define LONG_LONG_MAX __LONG_LONG_MAX__
+#define LONG_MAX __LONG_MAX__
+#define SCHAR_MAX __SCHAR_MAX__
+#define SHRT_MAX __SHRT_MAX__
+#define SIZE_MAX __SIZE_MAX__
+#define WCHAR_MAX __WCHAR_MAX__

@@ -5,7 +5,8 @@ use ::phys_mem::{self,PhysicalBitmap};
 use ::process::Process;
 use ::thread::{Deferred,Promise,Scheduler};
 use ::virt_mem::VirtualTree;
-use std::slice::bytes;
+use miniz_sys as mz;
+use std::mem;
 use std::sync::Arc;
 use syscall::{ErrNum,Handler};
 
@@ -44,7 +45,7 @@ impl<'a> Handler for TestSyscallHandler<'a> {
 
 test! {
     fn can_run_hello_world() {
-        static HELLO: &'static [u8] = include_bytes!("../hello/hello.bin");
+        static INITRD: &'static [u8] = include_bytes!("initrd.zip");
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::for_kernel());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
@@ -52,10 +53,24 @@ test! {
         let keyboard = Keyboard::new(&scheduler);
         p.switch();
 
-        let mut code_slice = p.alloc(HELLO.len(), true, true).unwrap();
+        let mut code_slice;
+        unsafe {
+            let mut zip = mem::zeroed();
+            assert!(mz::mz_zip_reader_init_mem(&mut zip, INITRD.as_ptr() as *const _, INITRD.len() as u64, 0));
+
+            let index = mz::mz_zip_reader_locate_file(&mut zip, b"hello.bin\0" as *const _, 0 as *const _, 0);
+            assert!(index >= 0);
+
+            let index = index as u32;
+            let mut stat = mem::zeroed();
+            assert!(mz::mz_zip_reader_file_stat(&mut zip, index, &mut stat));
+            code_slice = p.alloc(stat.uncomp_size as usize, true, true).unwrap();
+            assert!(mz::mz_zip_reader_extract_to_mem(&mut zip, index, code_slice.as_mut_ptr() as *mut _, code_slice.len() as u64, 0));
+            mz::mz_zip_reader_end(&mut zip);
+        }
+
         let stack_slice = p.alloc(phys_mem::PAGE_SIZE, true, true).unwrap();
         log!("code_slice = {:p}, stack_slice = {:p}", code_slice.as_ptr(), stack_slice.as_ptr());
-        bytes::copy_memory(HELLO, code_slice);
         log!("code_slice = {:?}", &code_slice[0..16]);
 
         let deferred = Arc::new(Deferred::new(&scheduler));

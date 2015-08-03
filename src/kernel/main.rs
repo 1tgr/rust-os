@@ -33,6 +33,7 @@
 extern crate alloc;
 extern crate bit_vec;
 extern crate libc;
+extern crate miniz_sys;
 extern crate syscall;
 
 // Achitecture-specific modules
