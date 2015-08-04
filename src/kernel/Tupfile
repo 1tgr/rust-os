@@ -32,7 +32,8 @@ RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
 : ../hello/hello.bin |> zip -j %o %f |> initrd.zip
-: main.rs | $(LIBS) *.rs initrd.zip |> !RUSTC_OBJ |> kernel.o {objs}
+
+: main.rs | $(LIBS) *.rs |> !RUSTC_OBJ |> kernel.o {objs}
 #: main.rs | $(LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 
 : main.rs |> !RUSTDOC_CMD |> rustdoc

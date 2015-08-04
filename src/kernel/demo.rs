@@ -1,12 +1,14 @@
 use ::arch::debug;
 use ::arch::keyboard::Keyboard;
 use ::arch::thread;
+use ::multiboot::multiboot_module_t;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::process::Process;
 use ::thread::{Deferred,Promise,Scheduler};
 use ::virt_mem::VirtualTree;
 use miniz_sys as mz;
 use std::mem;
+use std::slice;
 use std::sync::Arc;
 use syscall::{ErrNum,Handler};
 
@@ -45,7 +47,6 @@ impl<'a> Handler for TestSyscallHandler<'a> {
 
 test! {
     fn can_run_hello_world() {
-        static INITRD: &'static [u8] = include_bytes!("initrd.zip");
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::for_kernel());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
@@ -55,8 +56,12 @@ test! {
 
         let mut code_slice;
         unsafe {
+            let info = phys_mem::multiboot_info();
+            let mods: &[multiboot_module_t] = slice::from_raw_parts(phys_mem::phys2virt(info.mods_addr as usize), info.mods_count as usize);
+            assert!(mods.len() >= 1);
+
             let mut zip = mem::zeroed();
-            assert!(mz::mz_zip_reader_init_mem(&mut zip, INITRD.as_ptr() as *const _, INITRD.len() as u64, 0));
+            assert!(mz::mz_zip_reader_init_mem(&mut zip, phys_mem::phys2virt::<u8>(mods[0].mod_start as usize) as *const u8 as *const _, (mods[0].mod_end - mods[0].mod_start) as u64, 0));
 
             let index = mz::mz_zip_reader_locate_file(&mut zip, b"hello.bin\0" as *const _, 0 as *const _, 0);
             assert!(index >= 0);

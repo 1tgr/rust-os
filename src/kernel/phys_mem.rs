@@ -37,7 +37,7 @@ impl PhysicalBitmap {
     }
 
     pub fn parse_multiboot() -> PhysicalBitmap {
-        let info: &multiboot_info_t = unsafe { phys2virt(mboot_ptr as usize) };
+        let info = multiboot_info();
         let kernel_len = ptr::bytes_between(&kernel_start, &kernel_end);
         let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
         let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
@@ -126,6 +126,10 @@ pub unsafe fn phys2virt<T>(addr: usize) -> &'static mut T {
 pub fn virt2phys<T>(ptr: *const T) -> usize {
     let kernel_base_ptr: *const u8 = unsafe { &KERNEL_BASE as *const u8 };
     ptr as usize - kernel_base_ptr as usize
+}
+
+pub fn multiboot_info() -> &'static multiboot_info_t {
+    unsafe { phys2virt(mboot_ptr as usize) }
 }
 
 test! {
