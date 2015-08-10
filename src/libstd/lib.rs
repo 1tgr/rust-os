@@ -2,16 +2,26 @@
 
 #![feature(alloc)]
 #![feature(allow_internal_unstable)]
+#![feature(box_raw)]
 #![feature(collections)]
 #![feature(collections_bound)]
+#![feature(const_fn)]
 #![feature(core)]
 #![feature(core_float)]
 #![feature(core_intrinsics)]
 #![feature(core_panic)]
+#![feature(int_error_internals)]
 #![feature(lang_items)]
 #![feature(macro_reexport)]
 #![feature(no_std)]
 #![feature(raw)]
+#![feature(reflect_marker)]
+#![feature(slice_position_elem)]
+#![feature(str_char)]
+#![feature(unicode)]
+#![feature(vec_push_all)]
+#![feature(vec_resize)]
+
 #![no_std]
 
 #[macro_use]
@@ -24,6 +34,7 @@ extern crate collections as core_collections;
 
 extern crate alloc;
 extern crate libc;
+extern crate rustc_unicode;
 
 pub mod prelude {
     pub mod v1 {
@@ -87,6 +98,7 @@ pub use core::option;
 pub use core::marker;
 
 pub use alloc::*;
+pub use core::any;
 pub use core::char;
 pub use core::clone;
 pub use core::convert;
@@ -110,6 +122,9 @@ pub mod collections {
     pub use core_collections::LinkedList;
     pub use core_collections::VecDeque;
 }
+
+pub mod error;
+pub mod io;
 
 pub mod sync {
     pub use alloc::arc::{Arc, Weak};
