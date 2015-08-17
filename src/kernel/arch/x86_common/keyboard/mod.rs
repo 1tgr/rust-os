@@ -4,7 +4,7 @@ use ::arch::isr::{self,DropIrqHandler};
 use ::device::{ByteDevice,Device};
 use ::phys_mem::PhysicalBitmap;
 use ::process::Process;
-use ::thread::{Promise,Scheduler};
+use ::thread::{self,Promise};
 use ::virt_mem::VirtualTree;
 use spin::Mutex;
 use std::char;
@@ -245,12 +245,12 @@ mod british;
 
 pub struct Keyboard<'a> {
     _drop_irq_handler: DropIrqHandler<'a>,
-    device: Arc<ByteDevice<'a>>
+    device: Arc<ByteDevice>
 }
 
 impl<'a> Keyboard<'a> {
-    pub fn new(scheduler: &'a Scheduler) -> Self {
-        let device = Arc::new(ByteDevice::new(scheduler));
+    pub fn new() -> Self {
+        let device = Arc::new(ByteDevice::new());
 
         let handler = {
             let device = device.clone();
@@ -311,7 +311,7 @@ impl<'a> Keyboard<'a> {
         let c: u32;
         loop {
             if let Some(result) = d.try_get() {
-                let (keys, _) = result.unwrap(); 
+                let (keys, _) = result.unwrap();
                 let p = keys[0..4].as_ptr() as *const u32;
                 c = unsafe { *p };
                 break;
@@ -358,9 +358,9 @@ impl<'a> Keyboard<'a> {
 }
 
 impl<'a> Deref for Keyboard<'a> {
-    type Target = ByteDevice<'a>;
+    type Target = ByteDevice;
 
-    fn deref(&self) -> &ByteDevice<'a> {
+    fn deref(&self) -> &ByteDevice {
         &self.device
     }
 }
@@ -370,9 +370,10 @@ test! {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        let scheduler = Scheduler::new(p);
-        let _keyboard = Keyboard::new(&scheduler);
-        //log!("Press any key to continue");
-        //keyboard.read_key();
+        thread::with_scheduler(p, || {
+            let _keyboard = Keyboard::new();
+            //log!("Press any key to continue");
+            //_keyboard.read_key();
+        });
     }
 }

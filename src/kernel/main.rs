@@ -1,6 +1,6 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * main.rs
  * - Top-level file for kernel
@@ -14,6 +14,7 @@
 #![feature(append)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
 #![feature(box_raw)]
+#![feature(const_fn)]
 #![feature(core)]
 #![feature(core_intrinsics)]
 #![feature(fnbox)]
@@ -113,4 +114,3 @@ pub fn kmain() -> ! {
     log!("end kmain");
     loop { }
 }
-

@@ -1,8 +1,7 @@
 .gitignore
 
-RUSTC_ROOT = $(TUP_CWD)/../rust-nightly-x86_64-unknown-linux-gnu/rustc/bin/
-RUSTC = LD_LIBRARY_PATH=$(RUSTC_ROOT)../lib $(RUSTC_ROOT)rustc
-RUSTDOC = LD_LIBRARY_PATH=$(RUSTC_ROOT)../lib $(RUSTC_ROOT)rustdoc
+RUSTC = $(TUP_CWD)/rust rustc
+RUSTDOC = $(TUP_CWD)/rust rustdoc
 
 ifeq (@(ARCH),amd64)
     LD := x86_64-elf-ld
@@ -52,4 +51,3 @@ LINKFLAGS += --gc-sections -z max-page-size=0x1000
 !RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type=lib --emit=link %f |>
 !RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --emit=obj %f |>
 !RUSTDOC_CMD = |> echo $(RUSTDOC) $(RUSTFLAGS) %f -o ../../doc > %o && chmod +x %o |>
-

@@ -8,7 +8,7 @@ pub struct Singleton<T> {
 unsafe impl<T> Sync for Singleton<T> { }
 
 impl<T> Singleton<T> {
-    pub fn new() -> Singleton<T> {
+    pub const fn new() -> Singleton<T> {
         Singleton {
             cell: AtomicPtr::new(0 as *mut T)
         }
@@ -48,4 +48,3 @@ impl<'a, T> Drop for DropSingleton<'a, T> {
         mem::drop(b);
     }
 }
-
