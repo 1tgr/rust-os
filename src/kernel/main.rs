@@ -21,6 +21,7 @@
 #![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
 #![feature(slice_bytes)]
+#![feature(split_off)]
 
 /// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use] extern crate bitflags;
@@ -87,6 +88,7 @@ const TEST_FIXTURES: &'static [Fixture] = &[
     arch::isr::TESTS,
     arch::keyboard::TESTS,
     arch::mmu::TESTS,
+    device::TESTS,
     phys_mem::TESTS,
     process::TESTS,
     thread::TESTS,

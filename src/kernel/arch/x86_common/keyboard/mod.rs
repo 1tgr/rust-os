@@ -4,13 +4,13 @@ use ::arch::isr::{self,DropIrqHandler};
 use ::device::{ByteDevice,Device};
 use ::phys_mem::PhysicalBitmap;
 use ::process::Process;
-use ::thread::{self,Promise};
+use ::thread::{self,Deferred,Promise};
 use ::virt_mem::VirtualTree;
 use spin::Mutex;
 use std::char;
 use std::cmp;
+use std::collections::VecDeque;
 use std::mem;
-use std::ops::Deref;
 use std::slice::bytes;
 use std::sync::Arc;
 
@@ -97,6 +97,7 @@ impl Key {
 }
 
 struct KeyboardState {
+    queue: VecDeque<u8>,
     extended: bool,
     keys: keys::Bucky,
     compose: u32,
@@ -111,13 +112,14 @@ enum Keypress {
 impl KeyboardState {
     pub fn new() -> KeyboardState {
         KeyboardState {
+            queue: VecDeque::new(),
             extended: false,
             keys: keys::Bucky::empty(),
             compose: 0
         }
     }
 
-    pub fn decode(&mut self, code: u8) -> Option<Keypress> {
+    fn decode(&mut self, code: u8) -> Option<Keypress> {
         const RAW_CTRL: u8 =        0x1D;
         const RAW_LEFT_SHIFT: u8 =  0x2A;
         const RAW_CAPS_LOCK: u8 =   0x3A;
@@ -239,69 +241,73 @@ impl KeyboardState {
             }
         }
     }
+
+    pub fn queue(&mut self, code: u8) {
+        let c =
+            match self.decode(code) {
+                Some(Keypress::Char(c)) => c,
+
+                Some(Keypress::Scancode(mut keys, scan, down)) => {
+                    keys.set(keys::BUCKY_RELEASE, !down);
+
+                    if let Some(key) = british::KEYS.get(scan as usize) {
+                        let c = key.pick(keys);
+
+                        let c =
+                            match char::from_u32(c) {
+                                Some(c) if keys.contains(keys::BUCKY_CAPS) => c.to_uppercase().next().unwrap_or(c) as u32,
+                                _ => c
+                            };
+
+                        keys.bits() | c
+                    } else {
+                        return;
+                    }
+                },
+
+                Some(Keypress::Leds(flags)) => {
+                    unsafe {
+                        cpu::outb(0x60, 0xed);
+                        cpu::outb(0x60, flags);
+                    }
+                    return;
+                },
+
+                None => { return; }
+            };
+
+        let data: [u8; 4] = unsafe { mem::transmute(c) };
+        self.queue.extend(data.iter());
+    }
 }
 
 mod british;
 
 pub struct Keyboard<'a> {
     _drop_irq_handler: DropIrqHandler<'a>,
+    state: Arc<Mutex<KeyboardState>>,
     device: Arc<ByteDevice>
 }
 
 impl<'a> Keyboard<'a> {
     pub fn new() -> Self {
+        let state = Arc::new(Mutex::new(KeyboardState::new()));
         let device = Arc::new(ByteDevice::new());
 
         let handler = {
+            let state = state.clone();
             let device = device.clone();
-            let state = Mutex::new(KeyboardState::new());
             move || {
-                let key = {
-                    let code = unsafe { cpu::inb(0x60) };
-                    lock!(state).decode(code)
-                };
-
-                let c =
-                    match key {
-                        Some(Keypress::Char(c)) => c,
-
-                        Some(Keypress::Scancode(mut keys, scan, down)) => {
-                            keys.set(keys::BUCKY_RELEASE, !down);
-
-                            if let Some(key) = british::KEYS.get(scan as usize) {
-                                let c = key.pick(keys);
-
-                                let c =
-                                    match char::from_u32(c) {
-                                        Some(c) if keys.contains(keys::BUCKY_CAPS) => c.to_uppercase().next().unwrap_or(c) as u32,
-                                        _ => c
-                                    };
-
-                                keys.bits() | c
-                            } else {
-                                return;
-                            }
-                        },
-
-                        Some(Keypress::Leds(flags)) => {
-                            unsafe {
-                                cpu::outb(0x60, 0xed);
-                                cpu::outb(0x60, flags);
-                            }
-                            return;
-                        },
-
-                        None => { return; }
-                    };
-
-                let data: [u8; 4] = unsafe { mem::transmute(c) };
-                let mut data: &[u8] = &data;
-                device.fulfil(&mut data);
+                let mut state = lock!(state);
+                let code = unsafe { cpu::inb(0x60) };
+                state.queue(code);
+                device.fulfil(&mut state.queue);
             }
         };
 
         Keyboard {
             _drop_irq_handler: isr::register_irq_handler(1, handler),
+            state: state,
             device: device
         }
     }
@@ -357,11 +363,10 @@ impl<'a> Keyboard<'a> {
     }
 }
 
-impl<'a> Deref for Keyboard<'a> {
-    type Target = ByteDevice;
-
-    fn deref(&self) -> &ByteDevice {
-        &self.device
+impl<'a> Device for Keyboard<'a> {
+    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>> {
+        let mut state = lock!(self.state);
+        self.device.read_async(&mut state.queue, buf)
     }
 }
 

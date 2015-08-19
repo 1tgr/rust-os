@@ -225,11 +225,13 @@ impl<A> Deferred<A> {
             None => { }
         }
 
-        let mut state = lock_sched!();
         dstate.result = Some(result);
 
         let mut waiters = mem::replace(&mut dstate.waiters, VecDeque::new());
-        state.threads.append(&mut waiters);
+        if waiters.len() > 0 {
+            let mut state = lock_sched!();
+            state.threads.append(&mut waiters);
+        }
     }
 }
 
