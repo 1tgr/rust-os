@@ -1,7 +1,59 @@
+use core::default::Default;
 use core::mem;
+use core::option::Option::{self,Some,None};
 use core::result::Result::{self,Ok,Err};
 use core::slice::{self,SliceExt};
-use core::str::{self,StrExt};
+
+struct TupleDeque6<T> {
+    tuple: (T, T, T, T, T, T),
+    len: u8
+}
+
+impl<T: Default> TupleDeque6<T> {
+    pub fn new() -> Self {
+        TupleDeque6 {
+            tuple: <_>::default(),
+            len: 0
+        }
+    }
+
+    pub fn pop_front(&mut self) -> Option<T> {
+        match self.len {
+            6 => { self.len = 5; Some(mem::replace(&mut self.tuple.0, T::default())) },
+            5 => { self.len = 4; Some(mem::replace(&mut self.tuple.1, T::default())) },
+            4 => { self.len = 3; Some(mem::replace(&mut self.tuple.2, T::default())) },
+            3 => { self.len = 2; Some(mem::replace(&mut self.tuple.3, T::default())) },
+            2 => { self.len = 1; Some(mem::replace(&mut self.tuple.4, T::default())) },
+            1 => { self.len = 0; Some(mem::replace(&mut self.tuple.5, T::default())) },
+            _ => None
+        }
+    }
+}
+
+impl<T> TupleDeque6<T> {
+    pub fn from_tuple(tuple: (T, T, T, T, T, T)) -> Self {
+        TupleDeque6 {
+            tuple: tuple,
+            len: 6
+        }
+    }
+
+    pub fn push_back(&mut self, item: T) {
+        match self.len {
+            0 => { self.tuple.0 = item; self.len = 1; },
+            1 => { self.tuple.1 = item; self.len = 2; },
+            2 => { self.tuple.2 = item; self.len = 3; },
+            3 => { self.tuple.3 = item; self.len = 4; },
+            4 => { self.tuple.4 = item; self.len = 5; },
+            5 => { self.tuple.5 = item; self.len = 6; },
+            _ => { panic!("tuple is full") }
+        }
+    }
+
+    pub fn unwrap(self) -> ((T, T, T, T, T, T), u8) {
+        (self.tuple, self.len)
+    }
+}
 
 #[repr(usize)]
 pub enum ErrNum {
@@ -9,9 +61,12 @@ pub enum ErrNum {
     OutOfMemory = 2
 }
 
+pub type FileHandle = usize;
+pub type PackedArgs = TupleDeque6<usize>;
+
 pub trait SyscallArgs {
-    fn as_args(self) -> (usize, usize);
-    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum>;
+    fn as_args(self, args: &mut PackedArgs);
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum>;
 }
 
 pub trait SyscallResult {
@@ -20,85 +75,96 @@ pub trait SyscallResult {
 }
 
 impl SyscallArgs for () {
-    fn as_args(self) -> (usize, usize) {
-        (0, 0)
+    fn as_args(self, _args: &mut PackedArgs) {
     }
 
-    fn from_args(_arg1: usize, _arg2: usize) -> Result<Self, ErrNum >{
+    fn from_args(_args: &mut PackedArgs) -> Result<Self, ErrNum >{
         Ok(())
     }
 }
 
 impl SyscallArgs for i32 {
-    fn as_args(self) -> (usize, usize) {
-        (self as usize, 0)
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize);
     }
 
-    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
-        Ok(arg1 as Self)
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        Ok(args.pop_front().unwrap() as Self)
     }
 }
 
 impl SyscallArgs for usize {
-    fn as_args(self) -> (usize, usize) {
-        (self, 0)
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self);
     }
 
-    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
-        Ok(arg1)
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        Ok(args.pop_front().unwrap())
     }
 }
 
 impl<T> SyscallArgs for *const T {
-    fn as_args(self) -> (usize, usize) {
-        (self as usize, 0)
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize)
     }
 
-    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
-        Ok(arg1 as Self)
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        Ok(args.pop_front().unwrap() as Self)
     }
 }
 
 impl<T> SyscallArgs for *mut T {
-    fn as_args(self) -> (usize, usize) {
-        (self as usize, 0)
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize)
     }
 
-    fn from_args(arg1: usize, _arg2: usize) -> Result<Self, ErrNum> {
-        Ok(arg1 as Self)
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        Ok(args.pop_front().unwrap() as Self)
     }
 }
 
 impl<'a, T> SyscallArgs for &'a [T] {
-    fn as_args(self) -> (usize, usize) {
-        (self.as_ptr() as usize, self.len())
+    fn as_args(self, args: &mut PackedArgs) {
+        (self.as_ptr(), self.len()).as_args(args);
     }
 
-    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum> {
-        Ok(unsafe { slice::from_raw_parts(arg1 as *mut T, arg2) })
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        let (ptr, len) = try!(SyscallArgs::from_args(args));
+        Ok(unsafe { slice::from_raw_parts(ptr, len) })
     }
 }
 
 impl<'a, T> SyscallArgs for &'a mut [T] {
-    fn as_args(self) -> (usize, usize) {
-        (self.as_mut_ptr() as usize, self.len())
+    fn as_args(self, args: &mut PackedArgs) {
+        (self.as_mut_ptr(), self.len()).as_args(args)
     }
 
-    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum> {
-        Ok(unsafe { slice::from_raw_parts_mut(arg1 as *mut T, arg2) })
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        let (ptr, len) = try!(SyscallArgs::from_args(args));
+        Ok(unsafe { slice::from_raw_parts_mut(ptr, len) })
     }
 }
 
-impl<'a> SyscallArgs for &'a str {
-    fn as_args(self) -> (usize, usize) {
-        self.as_bytes().as_args()
+impl<T: SyscallArgs> SyscallArgs for (T,) {
+    fn as_args(self, args: &mut PackedArgs) {
+        self.0.as_args(args)
     }
 
-    fn from_args(arg1: usize, arg2: usize) -> Result<Self, ErrNum> {
-        match str::from_utf8(try!(SyscallArgs::from_args(arg1, arg2))) {
-            Ok(s) => Ok(s),
-            Err(_) => Err(ErrNum::Utf8Error)
-        }
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        Ok((try!(SyscallArgs::from_args(args)),))
+    }
+}
+
+impl<T: SyscallArgs, U: SyscallArgs> SyscallArgs for (T, U) {
+    fn as_args(self, args: &mut PackedArgs) {
+        self.0.as_args(args);
+        self.1.as_args(args);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+        let a = try!(SyscallArgs::from_args(args));
+        let b = try!(SyscallArgs::from_args(args));
+        Ok((a, b))
     }
 }
 

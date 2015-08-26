@@ -15,7 +15,7 @@ struct Writer;
 
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        match syscall::write(s) {
+        match syscall::write(0, s.as_bytes()) {
             Ok(()) => Ok(()),
             Err(_) => Err(std::fmt::Error)
         }
@@ -38,7 +38,7 @@ fn read_line(s: &mut String) -> Result<(), ErrNum> {
     let v = unsafe { s.as_mut_vec() };
     let capacity = v.capacity();
     let mut slice = unsafe { slice::from_raw_parts_mut(v.as_mut_ptr(), capacity) };
-    let count = try!(syscall::read_line(slice));
+    let count = try!(syscall::read(1, slice));
     unsafe { v.set_len(cmp::min(count, capacity)) };
     Ok(())
 

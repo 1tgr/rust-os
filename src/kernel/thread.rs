@@ -13,6 +13,7 @@ use std::mem;
 use std::slice;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sys::Promise;
 
 static SCHEDULER: Singleton<Mutex<SchedulerState>> = Singleton::new();
 
@@ -194,12 +195,6 @@ pub fn spawn_remote<T, A>(process: Arc<Process>, start: T) -> Deferred<A> where 
 pub fn spawn<T, A>(start: T) -> Deferred<A> where T : FnOnce() -> A {
     let process = lock_sched!().current.process.clone();
     spawn_remote(process, start)
-}
-
-pub trait Promise<A> {
-    fn get(&self) -> A;
-    fn try_get(&self) -> Option<A>;
-    // fn then<B>(f: FnOnce(A) -> B) -> Promise<B>;
 }
 
 impl<A> Clone for Deferred<A> {

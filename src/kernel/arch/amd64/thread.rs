@@ -4,8 +4,8 @@ use lazy_static::once::{self,Once};
 use libc::jmp_buf;
 use std::boxed::FnBox;
 use std::mem;
+use syscall::kernel::{Dispatch,PackedArgs};
 use syscall::{Dispatcher,Handler};
-use syscall::kernel::Dispatch;
 
 extern {
     static thread_entry_asm: u8;
@@ -23,7 +23,7 @@ pub unsafe fn syscall_entry(regs: &Regs) -> isize {
     if let Some(ref d) = SYSCALL_DISPATCH.get() {
         let d: &Box<Dispatch> = d;
         let d: &Dispatch = &**d;
-        d.dispatch(regs.rax as usize, regs.rdi as usize, regs.rsi as usize)
+        d.dispatch(regs.rax as usize, PackedArgs::from_tuple((regs.rdi as usize, regs.rsi as usize, regs.rdx as usize, regs.rcx as usize, regs.r8 as usize, regs.r9 as usize)))
     } else {
         0
     }

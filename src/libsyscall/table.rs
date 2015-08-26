@@ -1,7 +1,9 @@
+use marshal::FileHandle;
+
 syscalls! {
-    0 => write(&'a str) -> (),
-    1 => exit_thread(i32) -> (),
-    2 => read_line(&'a mut [u8]) -> usize,
-    3 => alloc_pages(usize) -> *mut u8,
-    4 => free_pages(*mut u8) -> bool
+    0 => exit_thread(code: i32) -> (),
+    1 => alloc_pages(len: usize) -> *mut u8,
+    2 => free_pages(ptr: *mut u8) -> bool,
+    3 => write(file: FileHandle, bytes: &'a [u8]) -> (),
+    4 => read(file: FileHandle, buf: &'a mut [u8]) -> usize
 }

@@ -3,13 +3,15 @@ use ::arch::keyboard::Keyboard;
 use ::multiboot::multiboot_module_t;
 use ::phys_mem::{self,PhysicalBitmap};
 use ::process::Process;
-use ::thread::{self,Deferred,Promise};
+use ::thread::{self,Deferred};
 use ::virt_mem::VirtualTree;
 use miniz_sys as mz;
 use std::mem;
 use std::slice;
+use std::str;
 use std::sync::Arc;
-use syscall::{ErrNum,Handler};
+use std::sys::Promise;
+use syscall::{ErrNum,FileHandle,Handler};
 
 struct TestSyscallHandler<'a> {
     deferred: Arc<Deferred<i32>>,
@@ -18,16 +20,19 @@ struct TestSyscallHandler<'a> {
 }
 
 impl<'a> Handler for TestSyscallHandler<'a> {
-    fn write(&self, s: &str) -> Result<(), ErrNum> {
-        Ok(debug::puts(s))
-    }
-
     fn exit_thread(&self, code: i32) -> Result<(), ErrNum> {
         self.deferred.resolve(code);
         thread::exit()
     }
 
-    fn read_line(&self, buf: &mut [u8]) -> Result<usize, ErrNum> {
+    fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<(), ErrNum> {
+        match str::from_utf8(bytes) {
+            Ok(s) => Ok(debug::puts(s)),
+            Err(_) => Err(ErrNum::Utf8Error)
+        }
+    }
+
+    fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize, ErrNum> {
         Ok(self.keyboard.read_line(buf))
     }
 

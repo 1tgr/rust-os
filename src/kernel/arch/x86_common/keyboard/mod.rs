@@ -1,10 +1,10 @@
 use ::arch::cpu;
 use ::arch::debug;
 use ::arch::isr::{self,DropIrqHandler};
-use ::device::{ByteDevice,Device};
+use ::device::ByteDevice;
 use ::phys_mem::PhysicalBitmap;
 use ::process::Process;
-use ::thread::{self,Deferred,Promise};
+use ::thread;
 use ::virt_mem::VirtualTree;
 use spin::Mutex;
 use std::char;
@@ -13,6 +13,7 @@ use std::collections::VecDeque;
 use std::mem;
 use std::slice::bytes;
 use std::sync::Arc;
+use std::sys::{AsyncRead,Promise};
 
 //                  S    C    C+S  AGr  AGr+S
 pub struct Key(u32, u32, u32, u32, u32, u32);
@@ -363,8 +364,8 @@ impl<'a> Keyboard<'a> {
     }
 }
 
-impl<'a> Device for Keyboard<'a> {
-    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>> {
+impl<'a> AsyncRead for Keyboard<'a> {
+    fn read_async(&self, buf: Vec<u8>) -> Box<Promise<Result<(Vec<u8>, usize), &'static str>>> {
         let mut state = lock!(self.state);
         self.device.read_async(&mut state.queue, buf)
     }

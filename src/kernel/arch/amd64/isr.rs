@@ -111,7 +111,7 @@ pub fn init_once() {
             base: IDT.as_ptr() as u64
         };
 
-        cpu::lidt(&idtr); 
+        cpu::lidt(&idtr);
 
         const ICW1_ICW4: u8 = 0x01;         /* ICW4 (not) needed */
         const ICW1_INIT: u8 = 0x10;         /* Initialization - required! */
@@ -198,7 +198,7 @@ pub extern fn exception(num: u8, regs: &Regs) {
         log!("");
     }
 
-    unsafe { debug::print_stack_trace(regs.rbp as *const usize) };
+    unsafe { debug::print_stack_trace(regs.rsp as *const usize) };
     loop { }
 }
 

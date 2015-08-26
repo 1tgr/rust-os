@@ -1,11 +1,8 @@
-use ::thread::{Deferred,Promise};
+use ::thread::Deferred;
 use spin::Mutex;
 use std::cmp;
 use std::collections::VecDeque;
-
-pub trait Device {
-    fn read_async(&self, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>>;
-}
+use std::sys::Promise;
 
 struct IoRequest {
     buf: Vec<u8>,
@@ -78,11 +75,11 @@ impl ByteDevice {
         lock!(self.requests).push_back(IoRequest::new(buf, d))
     }
 
-    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Deferred<Result<(Vec<u8>, usize), &'static str>> {
+    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Box<Promise<Result<(Vec<u8>, usize), &'static str>>> {
         let d = Deferred::new();
         self.queue(buf, d.clone());
         self.fulfil(queue);
-        d
+        Box::new(d)
     }
 }
 
