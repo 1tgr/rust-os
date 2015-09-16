@@ -14,28 +14,31 @@
 #![feature(append)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
 #![feature(box_raw)]
+#![feature(collections)]
 #![feature(const_fn)]
 #![feature(core)]
 #![feature(core_intrinsics)]
 #![feature(fnbox)]
 #![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
+#![feature(no_std)]
 #![feature(slice_bytes)]
 #![feature(split_off)]
 
-/// Macros, need to be loaded before everything else due to how rust parses
-#[macro_use] extern crate bitflags;
-#[macro_use] extern crate core;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate spin;
+#![no_std]
 
-#[macro_use] mod macros;
+/// Macros, need to be loaded before everything else due to how rust parses
+#[macro_use] extern crate collections;
+#[macro_use] extern crate core;
+
+#[macro_use] pub mod bitflags;
+#[macro_use] pub mod lazy_static;
+#[macro_use] pub mod mutex;
+#[macro_use] pub mod macros;
 #[macro_use] mod test;
 
 extern crate alloc;
-extern crate bit_vec;
 extern crate libc;
-extern crate miniz_sys;
 extern crate syscall;
 
 // Achitecture-specific modules
@@ -46,10 +49,15 @@ pub mod arch;
 #[path="arch/x86/mod.rs"]
 pub mod arch;
 
+pub mod async;
+pub mod bit_vec;
 pub mod device;
 pub mod logging;
+pub mod miniz_sys;
 pub mod multiboot;
+pub mod once;
 pub mod phys_mem;
+pub mod prelude;
 pub mod process;
 pub mod ptr;
 pub mod singleton;
@@ -60,9 +68,9 @@ pub mod virt_mem;
 mod demo;
 
 use core::fmt::Write;
+use core::mem;
 use libc::{c_char,c_int};
 use logging::Writer;
-use std::mem;
 use test::Fixture;
 
 static mut errno: c_int = 0;

@@ -147,4 +147,3 @@ pub unsafe fn inb(port: u16) -> u8 {
 	asm!("inb %dx, %al" : "={al}" (ret) : "{dx}" (port) : : "volatile");
 	return ret;
 }
-

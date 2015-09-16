@@ -83,23 +83,27 @@
 //! assert_eq!(num_primes, 1_229);
 //! ```
 
-#![cfg_attr(all(test, feature = "nightly"), feature(test))]
-#[cfg(all(test, feature = "nightly"))] extern crate test;
-#[cfg(all(test, feature = "nightly"))] extern crate rand;
-
-use std::cmp::Ordering;
-use std::cmp;
-use std::fmt;
-use std::hash;
-use std::iter::{Chain, Enumerate, Repeat, Skip, Take, repeat};
-use std::iter::FromIterator;
-use std::slice;
-use std::{u8, usize};
+use collections::vec::Vec;
+use core::clone::Clone;
+use core::cmp::{Eq, Ord, Ordering, PartialOrd};
+use core::cmp;
+use core::default::Default;
+use core::fmt;
+use core::hash;
+use core::iter::FromIterator;
+use core::iter::{Chain, Enumerate, Repeat, Skip, Take, repeat};
+use core::iter::{DoubleEndedIterator, ExactSizeIterator};
+use core::iter::{Iterator, Extend, IntoIterator};
+use core::marker::Copy;
+use core::option::Option::{self, Some, None};
+use core::result::Result::{self, Ok};
+use core::slice;
+use core::{u8, usize};
 
 type MutBlocks<'a, B> = slice::IterMut<'a, B>;
 type MatchWords<'a, B> = Chain<Enumerate<Blocks<'a, B>>, Skip<Take<Enumerate<Repeat<B>>>>>;
 
-use std::ops::*;
+use core::ops::*;
 
 /// Abstracts over a pile of bits (basically unsigned primitives)
 pub trait BitBlock:
@@ -2180,4 +2184,3 @@ mod bench {
         b.bytes = cap as u64 / 8;
     }
 }
-

@@ -1,9 +1,10 @@
-use ::phys_mem;
-use ::ptr::{self,Align};
+use core::mem;
+use core::slice;
 use core::usize;
-use spin::Mutex;
-use std::mem;
-use std::slice;
+use mutex::Mutex;
+use phys_mem;
+use prelude::*;
+use ptr::{self,Align};
 
 extern {
     static kernel_end: u8;
@@ -96,7 +97,7 @@ impl VirtualState {
             let block1 = &mut self.blocks[pos];
             block1.len += block2.len;
         }
-        
+
         true
     }
 }
@@ -157,7 +158,7 @@ test! {
 
        assert!(tree.free(slice.as_mut_ptr()));
        assert_eq!(1, tree.block_count());
-   } 
+   }
 
    fn can_reserve_alloc_free() {
        let tree = VirtualTree::new();
@@ -172,5 +173,5 @@ test! {
 
        assert!(tree.free(slice.as_mut_ptr()));
        assert_eq!(3, tree.block_count());
-   } 
+   }
 }

@@ -1,5 +1,6 @@
-use std::mem;
-use std::sync::atomic::{AtomicPtr,Ordering};
+use core::atomic::{AtomicPtr,Ordering};
+use core::mem;
+use prelude::*;
 
 pub struct Singleton<T> {
     cell: AtomicPtr<T>

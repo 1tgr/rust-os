@@ -1,6 +1,7 @@
-use ::arch::mmu::AddressSpace;
-use ::phys_mem::PhysicalBitmap;
-use std::sync::Arc;
+use alloc::arc::Arc;
+use arch::mmu::AddressSpace;
+use phys_mem::PhysicalBitmap;
+use prelude::*;
 
 pub struct ArchProcess {
     address_space: AddressSpace

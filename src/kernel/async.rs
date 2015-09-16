@@ -1,4 +1,4 @@
-use prelude::v1::*;
+use prelude::*;
 
 pub trait Promise<A> {
     fn get(&self) -> A;

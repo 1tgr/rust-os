@@ -1,19 +1,7 @@
-#[cfg(not(feature = "no_std"))]
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-#[cfg(not(feature = "no_std"))]
-use std::cell::UnsafeCell;
-#[cfg(not(feature = "no_std"))]
-use std::marker::Sync;
-#[cfg(not(feature = "no_std"))]
-use std::ops::{Drop, Deref, DerefMut};
-
-#[cfg(feature = "no_std")]
+use arch;
 use core::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-#[cfg(feature = "no_std")]
 use core::cell::UnsafeCell;
-#[cfg(feature = "no_std")]
 use core::marker::Sync;
-#[cfg(feature = "no_std")]
 use core::ops::{Drop, Deref, DerefMut};
 
 /// This type provides MUTual EXclusion based on spinning.
@@ -57,7 +45,7 @@ use core::ops::{Drop, Deref, DerefMut};
 ///
 /// ```
 /// use spin;
-/// use std::sync::{Arc, Barrier};
+/// use core::sync::{Arc, Barrier};
 ///
 /// let numthreads = 1000;
 /// let spin_mutex = Arc::new(spin::Mutex::new(0));
@@ -106,7 +94,7 @@ unsafe impl<T> Sync for Mutex<T> {}
 /// A Mutex which may be used statically.
 ///
 /// ```
-/// use spin::{self, STATIC_MUTEX_INIT};
+/// use mutex::{self, STATIC_MUTEX_INIT};
 ///
 /// static SPLCK: spin::StaticMutex = STATIC_MUTEX_INIT;
 ///
@@ -116,11 +104,9 @@ unsafe impl<T> Sync for Mutex<T> {}
 ///     drop(lock);
 /// }
 /// ```
-#[cfg(feature = "no_std")]
 pub type StaticMutex = Mutex<()>;
 
 /// A initializer for StaticMutex, containing no data.
-#[cfg(feature = "no_std")]
 pub const STATIC_MUTEX_INIT: StaticMutex = Mutex {
     lock: ATOMIC_USIZE_INIT,
     data: UnsafeCell::new(()),
@@ -140,7 +126,7 @@ impl<T> Mutex<T>
 
     fn obtain_lock(&self, file_line: *const (&'static str, u32)) -> usize
     {
-        let token = super::interrupts::disable();
+        let token = arch::disable_interrupts();
         let null = 0;
         while self.lock.compare_and_swap(null, file_line as usize, Ordering::SeqCst) != null
         {
@@ -207,7 +193,7 @@ impl<'a, T> Drop for MutexGuard<'a, T>
     fn drop(&mut self)
     {
         self.lock.store(0, Ordering::SeqCst);
-        super::interrupts::restore(self.token);
+        arch::restore_interrupts(self.token);
     }
 }
 

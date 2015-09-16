@@ -36,7 +36,7 @@ Using the macro:
 #[macro_use]
 extern crate lazy_static;
 
-use std::collections::HashMap;
+use core::collections::HashMap;
 
 lazy_static! {
     static ref HASHMAP: HashMap<u32, &'static str> = {
@@ -67,16 +67,6 @@ put in a heap allocated box, due to the Rust language currently not providing an
 define uninitialized `static mut` values.
 
 */
-
-#![crate_name = "lazy_static"]
-#![feature(core)]
-#![feature(no_std)]
-#![no_std]
-
-extern crate core;
-#[macro_use] extern crate spin;
-
-pub mod once;
 
 #[macro_export]
 macro_rules! lazy_static {
@@ -112,7 +102,7 @@ macro_rules! lazy_static {
         static $N: $N = $N {__private_field: ()};
     };
     (MAKE DEREF ALLOC $N:ident, $T:ty, $e:expr) => {
-        impl ::std::ops::Deref for $N {
+        impl ::core::ops::Deref for $N {
             type Target = $T;
             fn deref<'a>(&'a self) -> &'a $T {
                 use $crate::once::{Once, ONCE_INIT};
@@ -138,7 +128,7 @@ macro_rules! lazy_static {
         }
     };
     (MAKE DEREF NOALLOC $N:ident, $T:ty, $e:expr) => {
-        impl ::std::ops::Deref for $N {
+        impl ::core::ops::Deref for $N {
             type Target = $T;
             fn deref<'a>(&'a self) -> &'a $T {
                 use $crate::once::{Once, ONCE_INIT};

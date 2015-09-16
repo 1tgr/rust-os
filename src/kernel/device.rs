@@ -1,8 +1,9 @@
-use ::thread::Deferred;
-use spin::Mutex;
-use std::cmp;
-use std::collections::VecDeque;
-use std::sys::Promise;
+use async::Promise;
+use collections::vec_deque::VecDeque;
+use core::cmp;
+use mutex::Mutex;
+use prelude::*;
+use thread::Deferred;
 
 struct IoRequest {
     buf: Vec<u8>,

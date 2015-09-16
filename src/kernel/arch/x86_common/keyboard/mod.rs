@@ -1,19 +1,20 @@
-use ::arch::cpu;
-use ::arch::debug;
-use ::arch::isr::{self,DropIrqHandler};
-use ::device::ByteDevice;
-use ::phys_mem::PhysicalBitmap;
-use ::process::Process;
-use ::thread;
-use ::virt_mem::VirtualTree;
-use spin::Mutex;
-use std::char;
-use std::cmp;
-use std::collections::VecDeque;
-use std::mem;
-use std::slice::bytes;
-use std::sync::Arc;
-use std::sys::{AsyncRead,Promise};
+use alloc::arc::Arc;
+use arch::cpu;
+use arch::debug;
+use arch::isr::{self,DropIrqHandler};
+use async::{AsyncRead,Promise};
+use collections::vec_deque::VecDeque;
+use core::char;
+use core::cmp;
+use core::mem;
+use core::slice::bytes;
+use device::ByteDevice;
+use mutex::Mutex;
+use phys_mem::PhysicalBitmap;
+use prelude::*;
+use process::Process;
+use thread;
+use virt_mem::VirtualTree;
 
 //                  S    C    C+S  AGr  AGr+S
 pub struct Key(u32, u32, u32, u32, u32, u32);

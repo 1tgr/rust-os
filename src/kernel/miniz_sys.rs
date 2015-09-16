@@ -1,7 +1,6 @@
-#![crate_name = "miniz_sys"]
 #![allow(non_camel_case_types)]
-
-extern crate libc;
+use libc;
+use prelude::*;
 
 pub const MZ_NO_FLUSH: libc::c_int = 0;
 pub const MZ_SYNC_FLUSH: libc::c_int = 2;

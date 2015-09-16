@@ -1,9 +1,10 @@
-use ::arch::cpu::{self,Regs};
-use ::singleton::{DropSingleton,Singleton};
-use lazy_static::once::{self,Once};
+use alloc::boxed::FnBox;
+use arch::cpu::{self,Regs};
+use core::mem;
 use libc::jmp_buf;
-use std::boxed::FnBox;
-use std::mem;
+use once::{self,Once};
+use prelude::*;
+use singleton::{DropSingleton,Singleton};
 use syscall::kernel::{Dispatch,PackedArgs};
 use syscall::{Dispatcher,Handler};
 

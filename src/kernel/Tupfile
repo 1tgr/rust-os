@@ -1,38 +1,26 @@
 include_rules
 
-RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
+RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode
 
-LIBS += ../libminiz-sys/libminiz.a
 LIBS += ../libc/libc.a
 
 LIBS += ../liballoc/liballoc.rlib
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
 LIBS += ../liblibc/liblibc.rlib
-LIBS += ../libminiz-sys/libminiz-sys.rlib
 LIBS += ../librustc_unicode/librustc_unicode.rlib
-LIBS += ../libstd/libstd.rlib
 LIBS += ../libsyscall/libsyscall_kernel.rlib
-LIBS += ../modules/libbit-vec.rlib
-LIBS += ../modules/libbitflags.rlib
-LIBS += ../modules/liblazy-static.rlib
-LIBS += ../modules/libspin.rlib
 
 RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib
-RUSTFLAGS += --extern bit_vec=../modules/libbit-vec.rlib
-RUSTFLAGS += --extern bitflags=../modules/libbitflags.rlib
 RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
-RUSTFLAGS += --extern lazy_static=../modules/liblazy-static.rlib
-RUSTFLAGS += --extern miniz_sys=../libminiz-sys/libminiz-sys.rlib
 RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
-RUSTFLAGS += --extern spin=../modules/libspin.rlib
-RUSTFLAGS += --extern std=../libstd/libstd.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
-: foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
 : ../hello/hello.bin |> zip -j %o %f |> initrd.zip
 
+: foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
+: foreach *.c |> !CC |> %B.o {objs}
 : main.rs | $(LIBS) *.rs |> !RUSTC_OBJ |> kernel.o {objs}
 #: main.rs | $(LIBS) *.rs |> !RUSTC_OBJ --pretty=expanded -Z unstable-options |> kernel_expanded.rs
 

@@ -1,19 +1,20 @@
-use ::arch::cpu;
-use ::arch::thread;
-use ::phys_mem::PhysicalBitmap;
-use ::process::Process;
-use ::singleton::Singleton;
-use ::virt_mem::VirtualTree;
+use alloc::arc::Arc;
+use alloc::boxed::FnBox;
 use alloc::heap;
+use arch::cpu;
+use arch::thread;
+use async::Promise;
+use collections::vec_deque::VecDeque;
+use core::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use core::mem;
+use core::slice;
 use libc::{self,jmp_buf};
-use spin::{Mutex,MutexGuard};
-use std::boxed::FnBox;
-use std::collections::VecDeque;
-use std::mem;
-use std::slice;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use std::sys::Promise;
+use mutex::{Mutex,MutexGuard};
+use phys_mem::PhysicalBitmap;
+use prelude::*;
+use process::Process;
+use singleton::Singleton;
+use virt_mem::VirtualTree;
 
 static SCHEDULER: Singleton<Mutex<SchedulerState>> = Singleton::new();
 

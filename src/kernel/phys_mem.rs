@@ -1,10 +1,11 @@
-use ::multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
-use ::ptr;
 use bit_vec::BitVec;
+use core::cmp;
+use core::intrinsics;
 use libc::{c_int,c_void};
-use spin::Mutex;
-use std::cmp;
-use std::intrinsics;
+use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
+use mutex::Mutex;
+use prelude::*;
+use ptr;
 
 extern {
     static mut KERNEL_BASE: u8;

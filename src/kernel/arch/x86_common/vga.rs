@@ -1,8 +1,8 @@
-use ::arch::cpu;
-use ::phys_mem;
+use arch::cpu;
 use core::intrinsics;
 use libc::c_char;
-use spin::Mutex;
+use mutex::Mutex;
+use phys_mem;
 
 struct VgaState {
     base_ptr: *mut u16,
@@ -38,7 +38,7 @@ impl VgaState {
         let position = self.row * 80 + self.col;
         let low = position & 0xff;
         let high = (position >> 8) & 0xff;
-     
+
         unsafe {
             cpu::outb(0x3D4, 0x0F);
             cpu::outb(0x3D5, low as u8);

@@ -17,7 +17,7 @@ use core::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 use core::isize;
 use core::mem::drop;
 use core::ops::FnOnce;
-use spin::{StaticMutex, STATIC_MUTEX_INIT};
+use mutex::{StaticMutex, STATIC_MUTEX_INIT};
 
 /// A synchronization primitive which can be used to run a one-time global
 /// initialization. Useful for one-time initialization for FFI or related
@@ -27,7 +27,7 @@ use spin::{StaticMutex, STATIC_MUTEX_INIT};
 /// # Examples
 ///
 /// ```
-/// use std::sync::{Once, ONCE_INIT};
+/// use core::sync::{Once, ONCE_INIT};
 ///
 /// static START: Once = ONCE_INIT;
 ///

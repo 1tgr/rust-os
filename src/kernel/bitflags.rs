@@ -50,7 +50,7 @@
 /// #[macro_use]
 /// extern crate bitflags;
 ///
-/// use std::fmt;
+/// use core::fmt;
 ///
 /// bitflags! {
 ///     flags Flags: u32 {
@@ -136,8 +136,8 @@ macro_rules! bitflags {
 
         $($(#[$Flag_attr])* pub const $Flag: $BitFlags = $BitFlags { bits: $value };)+
 
-        impl ::std::fmt::Debug for $BitFlags {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        impl ::core::fmt::Debug for $BitFlags {
+            fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 let out = format!("{} {{ bits: {:#b} }}",
                                   stringify!($BitFlags),
                                   self.bits);
@@ -167,11 +167,11 @@ macro_rules! bitflags {
             /// Convert from underlying bit representation, unless that
             /// representation contains bits that do not correspond to a flag.
             #[inline]
-            pub fn from_bits(bits: $T) -> ::std::option::Option<$BitFlags> {
+            pub fn from_bits(bits: $T) -> ::core::option::Option<$BitFlags> {
                 if (bits & !$BitFlags::all().bits()) != 0 {
-                    ::std::option::Option::None
+                    ::core::option::Option::None
                 } else {
-                    ::std::option::Option::Some($BitFlags { bits: bits })
+                    ::core::option::Option::Some($BitFlags { bits: bits })
                 }
             }
 
@@ -225,7 +225,7 @@ macro_rules! bitflags {
             }
         }
 
-        impl ::std::ops::BitOr for $BitFlags {
+        impl ::core::ops::BitOr for $BitFlags {
             type Output = $BitFlags;
 
             /// Returns the union of the two sets of flags.
@@ -235,7 +235,7 @@ macro_rules! bitflags {
             }
         }
 
-        impl ::std::ops::BitXor for $BitFlags {
+        impl ::core::ops::BitXor for $BitFlags {
             type Output = $BitFlags;
 
             /// Returns the left flags, but with all the right flags toggled.
@@ -245,7 +245,7 @@ macro_rules! bitflags {
             }
         }
 
-        impl ::std::ops::BitAnd for $BitFlags {
+        impl ::core::ops::BitAnd for $BitFlags {
             type Output = $BitFlags;
 
             /// Returns the intersection between the two sets of flags.
@@ -255,7 +255,7 @@ macro_rules! bitflags {
             }
         }
 
-        impl ::std::ops::Sub for $BitFlags {
+        impl ::core::ops::Sub for $BitFlags {
             type Output = $BitFlags;
 
             /// Returns the set difference of the two sets of flags.
@@ -265,7 +265,7 @@ macro_rules! bitflags {
             }
         }
 
-        impl ::std::ops::Not for $BitFlags {
+        impl ::core::ops::Not for $BitFlags {
             type Output = $BitFlags;
 
             /// Returns the complement of this set of flags.
@@ -290,7 +290,7 @@ macro_rules! bitflags {
 #[cfg(test)]
 #[allow(non_upper_case_globals, dead_code)]
 mod tests {
-    use std::hash::{SipHasher, Hash, Hasher};
+    use core::hash::{SipHasher, Hash, Hasher};
 
     bitflags! {
         #[doc = "> The first principle is that you must not fool yourself — and"]

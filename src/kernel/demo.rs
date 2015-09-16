@@ -1,17 +1,18 @@
-use ::arch::debug;
-use ::arch::keyboard::Keyboard;
-use ::multiboot::multiboot_module_t;
-use ::phys_mem::{self,PhysicalBitmap};
-use ::process::Process;
-use ::thread::{self,Deferred};
-use ::virt_mem::VirtualTree;
+use alloc::arc::Arc;
+use arch::debug;
+use arch::keyboard::Keyboard;
+use async::Promise;
+use core::mem;
+use core::slice;
+use core::str;
 use miniz_sys as mz;
-use std::mem;
-use std::slice;
-use std::str;
-use std::sync::Arc;
-use std::sys::Promise;
+use multiboot::multiboot_module_t;
+use phys_mem::{self,PhysicalBitmap};
+use prelude::*;
+use process::Process;
 use syscall::{ErrNum,FileHandle,Handler};
+use thread::{self,Deferred};
+use virt_mem::VirtualTree;
 
 struct TestSyscallHandler<'a> {
     deferred: Arc<Deferred<i32>>,

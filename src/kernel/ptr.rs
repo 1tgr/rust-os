@@ -1,4 +1,4 @@
-use std::slice;
+use core::slice;
 
 pub fn bytes_between<T>(ptr1: *const T, ptr2: *const T) -> usize {
     if ptr2 > ptr1 {

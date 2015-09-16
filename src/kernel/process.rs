@@ -1,9 +1,10 @@
-use ::arch::process::ArchProcess;
-use ::phys_mem::{self,PhysicalBitmap};
-use ::virt_mem::VirtualTree;
-use std::intrinsics;
-use std::slice;
-use std::sync::Arc;
+use alloc::arc::Arc;
+use arch::process::ArchProcess;
+use core::intrinsics;
+use core::slice;
+use phys_mem::{self,PhysicalBitmap};
+use prelude::*;
+use virt_mem::VirtualTree;
 
 pub struct Process {
     arch: ArchProcess,

@@ -1,11 +1,11 @@
-use ::arch::cpu::{self,DescriptorExtra,Dtr,InterruptDescriptor,Regs,Tss};
-use ::arch::debug;
-use ::arch::mmu;
-use ::ptr;
-use ::singleton::{DropSingleton,Singleton};
-use lazy_static::once::{self,Once};
-use std::default::Default;
-use std::mem;
+use arch::cpu::{self,DescriptorExtra,Dtr,InterruptDescriptor,Regs,Tss};
+use arch::debug;
+use arch::mmu;
+use core::mem;
+use once::{self,Once};
+use prelude::*;
+use ptr;
+use singleton::{DropSingleton,Singleton};
 
 extern {
     static GDT: u8;

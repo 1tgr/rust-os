@@ -1,11 +1,12 @@
-use ::arch::cpu;
-use ::phys_mem::{self,PhysicalBitmap};
-use ::ptr::Align;
-use spin::Mutex;
-use std::fmt::{Debug,Error,Formatter};
-use std::intrinsics;
-use std::marker::PhantomData;
-use std::sync::Arc;
+use alloc::arc::Arc;
+use arch::cpu;
+use core::fmt::{Debug,Error,Formatter};
+use core::intrinsics;
+use core::marker::PhantomData;
+use mutex::Mutex;
+use phys_mem::{self,PhysicalBitmap};
+use prelude::*;
+use ptr::Align;
 
 bitflags! {
     flags PageFlags: usize {
@@ -280,4 +281,3 @@ test! {
         }
     }
 }
-

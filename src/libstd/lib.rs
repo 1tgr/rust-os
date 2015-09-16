@@ -85,7 +85,6 @@ mod uint_macros;
 #[path = "num/f64.rs"]   pub mod f64;
 
 pub mod num;
-pub mod sys;
 
 // #16803 - #[derive] references std::cmp
 pub use core::cmp;

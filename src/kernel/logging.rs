@@ -1,5 +1,6 @@
-use ::arch::debug;
+use arch::debug;
 use core::fmt::{Error,Write};
+use prelude::*;
 
 pub struct Writer;
 
@@ -18,4 +19,3 @@ impl Write for Writer {
 		Ok(())
 	}
 }
-
