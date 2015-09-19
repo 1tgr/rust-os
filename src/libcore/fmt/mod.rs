@@ -12,7 +12,7 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use prelude::*;
+use prelude::v1::*;
 
 use cell::{Cell, RefCell, Ref, RefMut, BorrowState};
 use marker::PhantomData;
@@ -33,7 +33,8 @@ pub use self::builders::{DebugStruct, DebugTuple, DebugSet, DebugList, DebugMap}
 mod num;
 mod builders;
 
-#[unstable(feature = "fmt_internals", reason = "internal to format_args!")]
+#[unstable(feature = "fmt_internals", reason = "internal to format_args!",
+           issue = "0")]
 #[doc(hidden)]
 pub mod rt {
     pub mod v1;
@@ -90,7 +91,7 @@ pub trait Write {
     fn write_char(&mut self, c: char) -> Result {
         let mut utf_8 = [0u8; 4];
         let bytes_written = c.encode_utf8(&mut utf_8).unwrap_or(0);
-        self.write_str(unsafe { mem::transmute(&utf_8[..bytes_written]) })
+        self.write_str(unsafe { str::from_utf8_unchecked(&utf_8[..bytes_written]) })
     }
 
     /// Glue for usage of the `write!` macro with implementers of this trait.
@@ -120,6 +121,21 @@ pub trait Write {
     }
 }
 
+#[stable(feature = "fmt_write_blanket_impl", since = "1.4.0")]
+impl<'a, W: Write + ?Sized> Write for &'a mut W {
+    fn write_str(&mut self, s: &str) -> Result {
+        (**self).write_str(s)
+    }
+
+    fn write_char(&mut self, c: char) -> Result {
+        (**self).write_char(c)
+    }
+
+    fn write_fmt(&mut self, args: Arguments) -> Result {
+        (**self).write_fmt(args)
+    }
+}
+
 /// A struct to represent both where to emit formatting strings to and how they
 /// should be formatted. A mutable version of this is passed to all formatting
 /// traits.
@@ -146,7 +162,8 @@ enum Void {}
 /// compile time it is ensured that the function and the value have the correct
 /// types, and then this struct is used to canonicalize arguments to one type.
 #[derive(Copy)]
-#[unstable(feature = "fmt_internals", reason = "internal to format_args!")]
+#[unstable(feature = "fmt_internals", reason = "internal to format_args!",
+           issue = "0")]
 #[doc(hidden)]
 pub struct ArgumentV1<'a> {
     value: &'a Void,
@@ -166,7 +183,8 @@ impl<'a> ArgumentV1<'a> {
     }
 
     #[doc(hidden)]
-    #[unstable(feature = "fmt_internals", reason = "internal to format_args!")]
+    #[unstable(feature = "fmt_internals", reason = "internal to format_args!",
+               issue = "0")]
     pub fn new<'b, T>(x: &'b T,
                       f: fn(&T, &mut Formatter) -> Result) -> ArgumentV1<'b> {
         unsafe {
@@ -178,7 +196,8 @@ impl<'a> ArgumentV1<'a> {
     }
 
     #[doc(hidden)]
-    #[unstable(feature = "fmt_internals", reason = "internal to format_args!")]
+    #[unstable(feature = "fmt_internals", reason = "internal to format_args!",
+               issue = "0")]
     pub fn from_usize(x: &usize) -> ArgumentV1 {
         ArgumentV1::new(x, ArgumentV1::show_usize)
     }
@@ -201,7 +220,8 @@ impl<'a> Arguments<'a> {
     /// When using the format_args!() macro, this function is used to generate the
     /// Arguments structure.
     #[doc(hidden)] #[inline]
-    #[unstable(feature = "fmt_internals", reason = "internal to format_args!")]
+    #[unstable(feature = "fmt_internals", reason = "internal to format_args!",
+               issue = "0")]
     pub fn new_v1(pieces: &'a [&'a str],
                   args: &'a [ArgumentV1<'a>]) -> Arguments<'a> {
         Arguments {
@@ -218,7 +238,8 @@ impl<'a> Arguments<'a> {
     /// created with `argumentusize`. However, failing to do so doesn't cause
     /// unsafety, but will ignore invalid .
     #[doc(hidden)] #[inline]
-    #[unstable(feature = "fmt_internals", reason = "internal to format_args!")]
+    #[unstable(feature = "fmt_internals", reason = "internal to format_args!",
+               issue = "0")]
     pub fn new_v1_formatted(pieces: &'a [&'a str],
                             args: &'a [ArgumentV1<'a>],
                             fmt: &'a [rt::v1::Argument]) -> Arguments<'a> {
@@ -1077,19 +1098,23 @@ impl<'a> Formatter<'a> {
     pub fn flags(&self) -> u32 { self.flags }
 
     /// Character used as 'fill' whenever there is alignment
-    #[unstable(feature = "fmt_flags", reason = "method was just created")]
+    #[unstable(feature = "fmt_flags", reason = "method was just created",
+               issue = "27726")]
     pub fn fill(&self) -> char { self.fill }
 
     /// Flag indicating what form of alignment was requested
-    #[unstable(feature = "fmt_flags", reason = "method was just created")]
+    #[unstable(feature = "fmt_flags", reason = "method was just created",
+               issue = "27726")]
     pub fn align(&self) -> Alignment { self.align }
 
     /// Optionally specified integer width that the output should be
-    #[unstable(feature = "fmt_flags", reason = "method was just created")]
+    #[unstable(feature = "fmt_flags", reason = "method was just created",
+               issue = "27726")]
     pub fn width(&self) -> Option<usize> { self.width }
 
     /// Optionally specified precision for numeric types
-    #[unstable(feature = "fmt_flags", reason = "method was just created")]
+    #[unstable(feature = "fmt_flags", reason = "method was just created",
+               issue = "27726")]
     pub fn precision(&self) -> Option<usize> { self.precision }
 
     /// Creates a `DebugStruct` builder designed to assist with creation of
@@ -1287,7 +1312,7 @@ impl Debug for str {
     fn fmt(&self, f: &mut Formatter) -> Result {
         try!(write!(f, "\""));
         for c in self.chars().flat_map(|c| c.escape_default()) {
-            try!(write!(f, "{}", c));
+            try!(f.write_char(c))
         }
         write!(f, "\"")
     }
@@ -1306,7 +1331,7 @@ impl Debug for char {
         use char::CharExt;
         try!(write!(f, "'"));
         for c in self.escape_default() {
-            try!(write!(f, "{}", c));
+            try!(f.write_char(c))
         }
         write!(f, "'")
     }
@@ -1320,7 +1345,7 @@ impl Display for char {
         } else {
             let mut utf8 = [0; 4];
             let amt = self.encode_utf8(&mut utf8).unwrap_or(0);
-            let s: &str = unsafe { mem::transmute(&utf8[..amt]) };
+            let s: &str = unsafe { str::from_utf8_unchecked(&utf8[..amt]) };
             f.pad(s)
         }
     }
@@ -1340,12 +1365,7 @@ impl<T> Pointer for *const T {
             f.flags |= 1 << (FlagV1::SignAwareZeroPad as u32);
 
             if let None = f.width {
-                // The formats need two extra bytes, for the 0x
-                if cfg!(target_pointer_width = "32") {
-                    f.width = Some(10);
-                } else {
-                    f.width = Some(18);
-                }
+                f.width = Some((::usize::BITS/4) + 2);
             }
         }
         f.flags |= 1 << (FlagV1::Alternate as u32);

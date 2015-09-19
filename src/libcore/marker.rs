@@ -13,15 +13,6 @@
 //! Rust types can be classified in various useful ways according to
 //! intrinsic properties of the type. These classifications, often called
 //! 'kinds', are represented as traits.
-//!
-//! They cannot be implemented by user code, but are instead implemented
-//! by the compiler automatically for the types to which they apply.
-//!
-//! Marker types are special types that are used with unsafe code to
-//! inform the compiler of special constraints. Marker types should
-//! only be needed when you are creating an abstraction that is
-//! implemented using unsafe code. In that case, you may want to embed
-//! some of the marker types below into your type.
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
@@ -54,9 +45,9 @@ pub trait Sized {
 }
 
 /// Types that can be "unsized" to a dynamically sized type.
-#[unstable(feature = "unsize")]
+#[unstable(feature = "unsize", issue = "27732")]
 #[lang="unsize"]
-pub trait Unsize<T> {
+pub trait Unsize<T: ?Sized> {
     // Empty.
 }
 
@@ -205,7 +196,7 @@ pub trait Copy : Clone {
 /// Any types with interior mutability must also use the `std::cell::UnsafeCell`
 /// wrapper around the value(s) which can be mutated when behind a `&`
 /// reference; not doing this is undefined behaviour (for example,
-/// `transmute`-ing from `&T` to `&mut T` is illegal).
+/// `transmute`-ing from `&T` to `&mut T` is invalid).
 #[stable(feature = "rust1", since = "1.0.0")]
 #[lang = "sync"]
 #[rustc_on_unimplemented = "`{Self}` cannot be shared between threads safely"]
@@ -217,18 +208,6 @@ unsafe impl Sync for .. { }
 
 impl<T> !Sync for *const T { }
 impl<T> !Sync for *mut T { }
-
-/// A type which is considered "not POD", meaning that it is not
-/// implicitly copyable. This is typically embedded in other types to
-/// ensure that they are never copied, even if they lack a destructor.
-#[unstable(feature = "core",
-           reason = "likely to change with new variance strategy")]
-#[deprecated(since = "1.2.0",
-             reason = "structs are by default not copyable")]
-#[lang = "no_copy_bound"]
-#[allow(deprecated)]
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NoCopy;
 
 macro_rules! impls{
     ($t: ident) => (
@@ -273,7 +252,11 @@ macro_rules! impls{
 /// even though it does not. This allows you to inform the compiler about certain safety properties
 /// of your code.
 ///
-/// Though they both have scary names, `PhantomData<T>` and "phantom types" are unrelated. 👻👻👻
+/// # A ghastly note 👻👻👻
+///
+/// Though they both have scary names, `PhantomData<T>` and 'phantom types' are related, but not
+/// identical. Phantom types are a more general concept that don't require `PhantomData<T>` to
+/// implement, but `PhantomData<T>` is the most common way to implement them in a correct manner.
 ///
 /// # Examples
 ///
@@ -414,8 +397,8 @@ mod impls {
 /// [1]: http://en.wikipedia.org/wiki/Parametricity
 #[rustc_reflect_like]
 #[unstable(feature = "reflect_marker",
-           reason = "requires RFC and more experience")]
-#[allow(deprecated)]
+           reason = "requires RFC and more experience",
+           issue = "27749")]
 #[rustc_on_unimplemented = "`{Self}` does not implement `Any`; \
                             ensure all type parameters are bounded by `Any`"]
 pub trait Reflect {}

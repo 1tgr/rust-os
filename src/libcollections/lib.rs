@@ -20,11 +20,13 @@
 #![crate_type = "rlib"]
 #![unstable(feature = "collections",
             reason = "library is unlikely to be stabilized with the current \
-                      layout and name, use std::collections instead")]
-#![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
+                      layout and name, use std::collections instead",
+            issue = "27783")]
+#![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/nightly/",
-       html_playground_url = "http://play.rust-lang.org/",
+       html_root_url = "https://doc.rust-lang.org/nightly/",
+       html_playground_url = "https://play.rust-lang.org/",
+       issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
        test(no_crate_inject))]
 
 #![allow(trivial_casts)]
@@ -33,14 +35,10 @@
 #![feature(alloc)]
 #![feature(box_patterns)]
 #![feature(box_syntax)]
-#![feature(core)]
 #![feature(core_intrinsics)]
-#![feature(core_prelude)]
 #![feature(core_slice_ext)]
 #![feature(core_str_ext)]
 #![feature(heap_api)]
-#![feature(iter_cmp)]
-#![feature(iter_idx)]
 #![feature(iter_order)]
 #![feature(iter_arith)]
 #![feature(iter_arith)]
@@ -49,7 +47,6 @@
 #![feature(oom)]
 #![feature(pattern)]
 #![feature(ptr_as_ref)]
-#![feature(raw)]
 #![feature(slice_patterns)]
 #![feature(staged_api)]
 #![feature(step_by)]
@@ -59,15 +56,12 @@
 #![feature(unicode)]
 #![feature(unique)]
 #![feature(unsafe_no_drop_flag, filling_drop)]
+#![feature(decode_utf16)]
 #![feature(utf8_error)]
 #![cfg_attr(test, feature(rand, test))]
-#![cfg_attr(not(test), feature(str_words))]
 
 #![feature(no_std)]
 #![no_std]
-
-#[macro_use]
-extern crate core;
 
 extern crate rustc_unicode;
 extern crate alloc;
@@ -76,10 +70,6 @@ extern crate alloc;
 #[cfg(test)] extern crate test;
 
 pub use binary_heap::BinaryHeap;
-#[allow(deprecated)]
-pub use bit_vec::BitVec;
-#[allow(deprecated)]
-pub use bit_set::BitSet;
 pub use btree_map::BTreeMap;
 pub use btree_set::BTreeSet;
 pub use linked_list::LinkedList;
@@ -87,7 +77,6 @@ pub use enum_set::EnumSet;
 pub use vec_deque::VecDeque;
 pub use string::String;
 pub use vec::Vec;
-pub use vec_map::VecMap;
 
 // Needed for the vec! macro
 pub use alloc::boxed;
@@ -96,7 +85,6 @@ pub use alloc::boxed;
 mod macros;
 
 pub mod binary_heap;
-mod bit;
 mod btree;
 pub mod borrow;
 pub mod enum_set;
@@ -108,20 +96,6 @@ pub mod str;
 pub mod string;
 pub mod vec;
 pub mod vec_deque;
-pub mod vec_map;
-
-#[unstable(feature = "bitvec", reason = "RFC 509")]
-pub mod bit_vec {
-    #![allow(deprecated)]
-    pub use bit::{BitVec, Iter};
-}
-
-#[unstable(feature = "bitset", reason = "RFC 509")]
-pub mod bit_set {
-    #![allow(deprecated)]
-    pub use bit::{BitSet, Union, Intersection, Difference, SymmetricDifference};
-    pub use bit::SetIter as Iter;
-}
 
 #[stable(feature = "rust1", since = "1.0.0")]
 pub mod btree_map {
@@ -139,7 +113,7 @@ mod std {
 }
 
 /// An endpoint of a range of keys.
-#[unstable(feature = "collections_bound")]
+#[unstable(feature = "collections_bound", issue = "27787")]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub enum Bound<T> {
     /// An inclusive bound.

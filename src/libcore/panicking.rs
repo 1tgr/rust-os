@@ -31,7 +31,8 @@
 #![allow(dead_code, missing_docs)]
 #![unstable(feature = "core_panic",
             reason = "internal details of the implementation of the `panic!` \
-                      and related macros")]
+                      and related macros",
+            issue = "0")]
 
 use fmt;
 
@@ -61,6 +62,7 @@ pub fn panic_fmt(fmt: fmt::Arguments, file_line: &(&'static str, u32)) -> ! {
     #[allow(improper_ctypes)]
     extern {
         #[lang = "panic_fmt"]
+        #[unwind]
         fn panic_impl(fmt: fmt::Arguments, file: &'static str, line: u32) -> !;
     }
     let (file, line) = *file_line;

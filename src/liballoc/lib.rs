@@ -61,28 +61,31 @@
 #![crate_name = "alloc"]
 #![crate_type = "rlib"]
 #![staged_api]
+#![allow(unused_attributes)]
 #![unstable(feature = "alloc",
             reason = "this library is unlikely to be stabilized in its current \
-                      form or name")]
-#![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
+                      form or name",
+            issue = "27783")]
+#![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/nightly/",
+       html_root_url = "https://doc.rust-lang.org/nightly/",
+       issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
        test(no_crate_inject))]
 #![no_std]
+#![cfg_attr(not(stage0), needs_allocator)]
 
-// SNAP d4432b3
-#![allow(unused_features)] // until feature(placement_in_syntax) is in snap
 #![feature(allocator)]
 #![feature(box_syntax)]
 #![feature(coerce_unsized)]
 #![feature(core)]
 #![feature(core_intrinsics)]
-#![feature(core_prelude)]
+#![feature(core_slice_ext)]
 #![feature(custom_attribute)]
 #![feature(fundamental)]
 #![feature(lang_items)]
 #![feature(no_std)]
 #![feature(nonzero)]
+#![feature(num_bits_bytes)]
 #![feature(optin_builtin_traits)]
 #![feature(placement_in_syntax)]
 #![feature(placement_new_protocol)]
@@ -93,16 +96,14 @@
 #![feature(unsafe_no_drop_flag, filling_drop)]
 #![feature(unsize)]
 #![feature(core_slice_ext)]
+#![feature(core_str_ext)]
+#![cfg_attr(stage0, feature(alloc_system))]
+#![cfg_attr(not(stage0), feature(needs_allocator))]
 
-#![cfg_attr(test, feature(test, alloc, rustc_private, box_raw))]
-#![cfg_attr(all(not(feature = "external_funcs"), not(feature = "external_crate")),
-            feature(libc))]
+#![cfg_attr(test, feature(test, rustc_private))]
 
-#[macro_use]
-extern crate core;
-
-#[cfg(all(not(feature = "external_funcs"), not(feature = "external_crate")))]
-extern crate libc;
+#[cfg(stage0)]
+extern crate alloc_system;
 
 // Allow testing this library
 
@@ -132,7 +133,8 @@ pub mod raw_vec;
 /// Common out-of-memory routine
 #[cold]
 #[inline(never)]
-#[unstable(feature = "oom", reason = "not a scrutinized interface")]
+#[unstable(feature = "oom", reason = "not a scrutinized interface",
+           issue = "27700")]
 pub fn oom() -> ! {
     // FIXME(#14674): This really needs to do something other than just abort
     //                here, but any printing done must be *guaranteed* to not

@@ -15,9 +15,9 @@
 
 #![unstable(feature = "enumset",
             reason = "matches collection reform specification, \
-                      waiting for dust to settle")]
+                      waiting for dust to settle",
+            issue = "0")]
 
-use core::prelude::*;
 use core::marker;
 use core::fmt;
 use core::iter::{FromIterator};

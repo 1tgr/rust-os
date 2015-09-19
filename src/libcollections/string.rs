@@ -12,8 +12,6 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use core::prelude::*;
-
 use core::fmt;
 use core::hash;
 use core::iter::FromIterator;
@@ -22,8 +20,8 @@ use core::ops::{self, Deref, Add, Index};
 use core::ptr;
 use core::slice;
 use core::str::pattern::Pattern;
+use rustc_unicode::char::{decode_utf16, REPLACEMENT_CHARACTER};
 use rustc_unicode::str as unicode_str;
-use rustc_unicode::str::Utf16Item;
 
 use borrow::{Cow, IntoCow};
 use range::RangeArgument;
@@ -82,23 +80,6 @@ impl String {
         String {
             vec: Vec::with_capacity(capacity),
         }
-    }
-
-    /// Creates a new string buffer from the given string.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #![feature(collections)]
-    /// let s = String::from("hello");
-    /// assert_eq!(&s[..], "hello");
-    /// ```
-    #[inline]
-    #[unstable(feature = "collections", reason = "use `String::from` instead")]
-    #[deprecated(since = "1.2.0", reason = "use `String::from` instead")]
-    #[cfg(not(test))]
-    pub fn from_str(string: &str) -> String {
-        String { vec: <[_]>::to_vec(string.as_bytes()) }
     }
 
     // HACK(japaric): with cfg(test) the inherent `[T]::to_vec` method, which is
@@ -286,14 +267,7 @@ impl String {
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn from_utf16(v: &[u16]) -> Result<String, FromUtf16Error> {
-        let mut s = String::with_capacity(v.len());
-        for c in unicode_str::utf16_items(v) {
-            match c {
-                Utf16Item::ScalarValue(c) => s.push(c),
-                Utf16Item::LoneSurrogate(_) => return Err(FromUtf16Error(())),
-            }
-        }
-        Ok(s)
+        decode_utf16(v.iter().cloned()).collect::<Result<_, _>>().map_err(|_| FromUtf16Error(()))
     }
 
     /// Decode a UTF-16 encoded vector `v` into a string, replacing
@@ -313,7 +287,7 @@ impl String {
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn from_utf16_lossy(v: &[u16]) -> String {
-        unicode_str::utf16_items(v).map(|c| c.to_char_lossy()).collect()
+        decode_utf16(v.iter().cloned()).map(|r| r.unwrap_or(REPLACEMENT_CHARACTER)).collect()
     }
 
     /// Creates a new `String` from a length, capacity, and pointer.
@@ -362,7 +336,8 @@ impl String {
     /// Extracts a string slice containing the entire string.
     #[inline]
     #[unstable(feature = "convert",
-               reason = "waiting on RFC revision")]
+               reason = "waiting on RFC revision",
+               issue = "27729")]
     pub fn as_str(&self) -> &str {
         self
     }
@@ -702,7 +677,7 @@ impl String {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(drain)]
+    /// #![feature(drain)]
     ///
     /// let mut s = String::from("α is alpha, β is beta");
     /// let beta_offset = s.find('β').unwrap_or(s.len());
@@ -717,7 +692,8 @@ impl String {
     /// assert_eq!(s, "");
     /// ```
     #[unstable(feature = "drain",
-               reason = "recently added, matches RFC")]
+               reason = "recently added, matches RFC",
+               issue = "27711")]
     pub fn drain<R>(&mut self, range: R) -> Drain where R: RangeArgument<usize> {
         // Memory safety
         //
@@ -746,11 +722,21 @@ impl String {
     /// Converts the string into `Box<str>`.
     ///
     /// Note that this will drop any excess capacity.
-    #[unstable(feature = "box_str",
-               reason = "recently added, matches RFC")]
-    pub fn into_boxed_slice(self) -> Box<str> {
+    #[stable(feature = "box_str", since = "1.4.0")]
+    pub fn into_boxed_str(self) -> Box<str> {
         let slice = self.vec.into_boxed_slice();
         unsafe { mem::transmute::<Box<[u8]>, Box<str>>(slice) }
+    }
+
+    /// Converts the string into `Box<str>`.
+    ///
+    /// Note that this will drop any excess capacity.
+    #[unstable(feature = "box_str2",
+               reason = "recently added, matches RFC",
+               issue = "27785")]
+    #[deprecated(since = "1.4.0", reason = "renamed to `into_boxed_str`")]
+    pub fn into_boxed_slice(self) -> Box<str> {
+        self.into_boxed_str()
     }
 }
 
@@ -781,18 +767,27 @@ impl fmt::Display for FromUtf16Error {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl FromIterator<char> for String {
-    fn from_iter<I: IntoIterator<Item=char>>(iter: I) -> String {
+    fn from_iter<I: IntoIterator<Item=char>>(iterable: I) -> String {
         let mut buf = String::new();
-        buf.extend(iter);
+        buf.extend(iterable);
         buf
     }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a> FromIterator<&'a str> for String {
-    fn from_iter<I: IntoIterator<Item=&'a str>>(iter: I) -> String {
+    fn from_iter<I: IntoIterator<Item=&'a str>>(iterable: I) -> String {
         let mut buf = String::new();
-        buf.extend(iter);
+        buf.extend(iterable);
+        buf
+    }
+}
+
+#[stable(feature = "extend_string", since = "1.4.0")]
+impl FromIterator<String> for String {
+    fn from_iter<I: IntoIterator<Item=String>>(iterable: I) -> String {
+        let mut buf = String::new();
+        buf.extend(iterable);
         buf
     }
 }
@@ -811,20 +806,25 @@ impl Extend<char> for String {
 
 #[stable(feature = "extend_ref", since = "1.2.0")]
 impl<'a> Extend<&'a char> for String {
-    fn extend<I: IntoIterator<Item=&'a char>>(&mut self, iter: I) {
-        self.extend(iter.into_iter().cloned());
+    fn extend<I: IntoIterator<Item=&'a char>>(&mut self, iterable: I) {
+        self.extend(iterable.into_iter().cloned());
     }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a> Extend<&'a str> for String {
     fn extend<I: IntoIterator<Item=&'a str>>(&mut self, iterable: I) {
-        let iterator = iterable.into_iter();
-        // A guess that at least one byte per iterator element will be needed.
-        let (lower_bound, _) = iterator.size_hint();
-        self.reserve(lower_bound);
-        for s in iterator {
+        for s in iterable {
             self.push_str(s)
+        }
+    }
+}
+
+#[stable(feature = "extend_string", since = "1.4.0")]
+impl Extend<String> for String {
+    fn extend<I: IntoIterator<Item=String>>(&mut self, iterable: I) {
+        for s in iterable {
+            self.push_str(&s)
         }
     }
 }
@@ -975,7 +975,7 @@ impl ops::Index<ops::RangeFull> for String {
 
     #[inline]
     fn index(&self, _index: ops::RangeFull) -> &str {
-        unsafe { mem::transmute(&*self.vec) }
+        unsafe { str::from_utf8_unchecked(&self.vec) }
     }
 }
 
@@ -1014,7 +1014,7 @@ impl ops::Deref for String {
 
     #[inline]
     fn deref(&self) -> &str {
-        unsafe { mem::transmute(&self.vec[..]) }
+        unsafe { str::from_utf8_unchecked(&self.vec) }
     }
 }
 
@@ -1022,13 +1022,14 @@ impl ops::Deref for String {
 impl ops::DerefMut for String {
     #[inline]
     fn deref_mut(&mut self) -> &mut str {
-        unsafe { mem::transmute(&mut self.vec[..]) }
+        unsafe { mem::transmute(&mut *self.vec) }
     }
 }
 
 /// Error returned from `String::from`
 #[unstable(feature = "str_parse_error", reason = "may want to be replaced with \
-                                                  Void if it ever exists")]
+                                                  Void if it ever exists",
+           issue = "27734")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct ParseError(());
 
@@ -1119,7 +1120,8 @@ impl Into<Vec<u8>> for String {
     }
 }
 
-#[unstable(feature = "into_cow", reason = "may be replaced by `convert::Into`")]
+#[unstable(feature = "into_cow", reason = "may be replaced by `convert::Into`",
+           issue= "27735")]
 impl IntoCow<'static, str> for String {
     #[inline]
     fn into_cow(self) -> Cow<'static, str> {
@@ -1127,7 +1129,8 @@ impl IntoCow<'static, str> for String {
     }
 }
 
-#[unstable(feature = "into_cow", reason = "may be replaced by `convert::Into`")]
+#[unstable(feature = "into_cow", reason = "may be replaced by `convert::Into`",
+           issue = "27735")]
 impl<'a> IntoCow<'a, str> for &'a str {
     #[inline]
     fn into_cow(self) -> Cow<'a, str> {
@@ -1151,7 +1154,7 @@ impl fmt::Write for String {
 }
 
 /// A draining iterator for `String`.
-#[unstable(feature = "drain", reason = "recently added")]
+#[unstable(feature = "drain", reason = "recently added", issue = "27711")]
 pub struct Drain<'a> {
     /// Will be used as &'a mut String in the destructor
     string: *mut String,
@@ -1166,7 +1169,7 @@ pub struct Drain<'a> {
 unsafe impl<'a> Sync for Drain<'a> {}
 unsafe impl<'a> Send for Drain<'a> {}
 
-#[unstable(feature = "drain", reason = "recently added")]
+#[unstable(feature = "drain", reason = "recently added", issue = "27711")]
 impl<'a> Drop for Drain<'a> {
     fn drop(&mut self) {
         unsafe {
@@ -1180,7 +1183,7 @@ impl<'a> Drop for Drain<'a> {
     }
 }
 
-#[unstable(feature = "drain", reason = "recently added")]
+#[unstable(feature = "drain", reason = "recently added", issue = "27711")]
 impl<'a> Iterator for Drain<'a> {
     type Item = char;
 
@@ -1194,7 +1197,7 @@ impl<'a> Iterator for Drain<'a> {
     }
 }
 
-#[unstable(feature = "drain", reason = "recently added")]
+#[unstable(feature = "drain", reason = "recently added", issue = "27711")]
 impl<'a> DoubleEndedIterator for Drain<'a> {
     #[inline]
     fn next_back(&mut self) -> Option<char> {

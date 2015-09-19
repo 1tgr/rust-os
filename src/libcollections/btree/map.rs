@@ -17,14 +17,12 @@
 
 use self::Entry::*;
 
-use core::prelude::*;
-
 use core::cmp::Ordering;
 use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 use core::iter::{Map, FromIterator};
 use core::ops::Index;
-use core::{iter, fmt, mem, usize};
+use core::{fmt, mem, usize};
 use Bound::{self, Included, Excluded, Unbounded};
 
 use borrow::Borrow;
@@ -151,6 +149,7 @@ pub struct OccupiedEntry<'a, K:'a, V:'a> {
 impl<K: Ord, V> BTreeMap<K, V> {
     /// Makes a new empty BTreeMap with a reasonable choice for B.
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[allow(deprecated)]
     pub fn new() -> BTreeMap<K, V> {
         //FIXME(Gankro): Tune this as a function of size_of<K/V>?
         BTreeMap::with_b(6)
@@ -159,6 +158,10 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// Makes a new empty BTreeMap with the given B.
     ///
     /// B cannot be less than 2.
+    #[unstable(feature = "btree_b",
+               reason = "probably want this to be on the type, eventually",
+               issue = "27795")]
+    #[deprecated(since = "1.4.0", reason = "niche API")]
     pub fn with_b(b: usize) -> BTreeMap<K, V> {
         assert!(b > 1, "B must be greater than 1");
         BTreeMap {
@@ -182,6 +185,7 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert!(a.is_empty());
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
+    #[allow(deprecated)]
     pub fn clear(&mut self) {
         let b = self.b;
         // avoid recursive destructors by manually traversing the tree
@@ -458,7 +462,7 @@ impl<K: Ord, V> BTreeMap<K, V> {
                 }
             });
             match result {
-                Finished(ret) => return ret,
+                Finished(ret) => return ret.map(|(_, v)| v),
                 Continue(new_stack) => stack = new_stack
             }
         }
@@ -530,7 +534,6 @@ enum Continuation<A, B> {
 /// to nodes. By using this module much better safety guarantees can be made, and more search
 /// boilerplate gets cut out.
 mod stack {
-    use core::prelude::*;
     use core::marker;
     use core::mem;
     use core::ops::{Deref, DerefMut};
@@ -693,16 +696,16 @@ mod stack {
     impl<'a, K, V> SearchStack<'a, K, V, handle::KV, handle::Leaf> {
         /// Removes the key and value in the top element of the stack, then handles underflows as
         /// described in BTree's pop function.
-        fn remove_leaf(mut self) -> V {
+        fn remove_leaf(mut self) -> (K, V) {
             self.map.length -= 1;
 
             // Remove the key-value pair from the leaf that this search stack points to.
             // Then, note if the leaf is underfull, and promptly forget the leaf and its ptr
             // to avoid ownership issues.
-            let (value, mut underflow) = unsafe {
-                let (_, value) = self.top.from_raw_mut().remove_as_leaf();
+            let (key_val, mut underflow) = unsafe {
+                let key_val = self.top.from_raw_mut().remove_as_leaf();
                 let underflow = self.top.from_raw().node().is_underfull();
-                (value, underflow)
+                (key_val, underflow)
             };
 
             loop {
@@ -717,7 +720,7 @@ mod stack {
                             self.map.depth -= 1;
                             self.map.root.hoist_lone_child();
                         }
-                        return value;
+                        return key_val;
                     }
                     Some(mut handle) => {
                         if underflow {
@@ -728,7 +731,7 @@ mod stack {
                             }
                         } else {
                             // All done!
-                            return value;
+                            return key_val;
                         }
                     }
                 }
@@ -739,7 +742,7 @@ mod stack {
     impl<'a, K, V> SearchStack<'a, K, V, handle::KV, handle::LeafOrInternal> {
         /// Removes the key and value in the top element of the stack, then handles underflows as
         /// described in BTree's pop function.
-        pub fn remove(self) -> V {
+        pub fn remove(self) -> (K, V) {
             // Ensure that the search stack goes to a leaf. This is necessary to perform deletion
             // in a BTree. Note that this may put the tree in an inconsistent state (further
             // described in into_leaf's comments), but this is immediately fixed by the
@@ -915,7 +918,7 @@ impl<K: Eq, V: Eq> Eq for BTreeMap<K, V> {}
 impl<K: PartialOrd, V: PartialOrd> PartialOrd for BTreeMap<K, V> {
     #[inline]
     fn partial_cmp(&self, other: &BTreeMap<K, V>) -> Option<Ordering> {
-        iter::order::partial_cmp(self.iter(), other.iter())
+        self.iter().partial_cmp(other.iter())
     }
 }
 
@@ -923,7 +926,7 @@ impl<K: PartialOrd, V: PartialOrd> PartialOrd for BTreeMap<K, V> {
 impl<K: Ord, V: Ord> Ord for BTreeMap<K, V> {
     #[inline]
     fn cmp(&self, other: &BTreeMap<K, V>) -> Ordering {
-        iter::order::cmp(self.iter(), other.iter())
+        self.iter().cmp(other.iter())
     }
 }
 
@@ -1148,18 +1151,6 @@ impl<'a, K, V> DoubleEndedIterator for RangeMut<'a, K, V> {
 }
 
 impl<'a, K: Ord, V> Entry<'a, K, V> {
-    #[unstable(feature = "entry",
-               reason = "will soon be replaced by or_insert")]
-    #[deprecated(since = "1.0",
-                reason = "replaced with more ergonomic `or_insert` and `or_insert_with`")]
-    /// Returns a mutable reference to the entry if occupied, or the VacantEntry if vacant
-    pub fn get(self) -> Result<&'a mut V, VacantEntry<'a, K, V>> {
-        match self {
-            Occupied(entry) => Ok(entry.into_mut()),
-            Vacant(entry) => Err(entry),
-        }
-    }
-
     #[stable(feature = "rust1", since = "1.0.0")]
     /// Ensures a value is in the entry by inserting the default if empty, and returns
     /// a mutable reference to the value in the entry.
@@ -1220,7 +1211,7 @@ impl<'a, K: Ord, V> OccupiedEntry<'a, K, V> {
     /// Takes the value of the entry out of the map, and returns it.
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn remove(self) -> V {
-        self.stack.remove()
+        self.stack.remove().1
     }
 }
 
@@ -1504,7 +1495,8 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(btree_range, collections_bound)]
+    /// #![feature(btree_range, collections_bound)]
+    ///
     /// use std::collections::BTreeMap;
     /// use std::collections::Bound::{Included, Unbounded};
     ///
@@ -1518,8 +1510,13 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// assert_eq!(Some((&5, &"b")), map.range(Included(&4), Unbounded).next());
     /// ```
     #[unstable(feature = "btree_range",
-               reason = "matches collection reform specification, waiting for dust to settle")]
-    pub fn range<'a>(&'a self, min: Bound<&K>, max: Bound<&K>) -> Range<'a, K, V> {
+               reason = "matches collection reform specification, waiting for dust to settle",
+               issue = "27787")]
+    pub fn range<Min: ?Sized + Ord = K, Max: ?Sized + Ord = K>(&self, min: Bound<&Min>,
+                                                               max: Bound<&Max>)
+        -> Range<K, V> where
+        K: Borrow<Min> + Borrow<Max>,
+    {
         range_impl!(&self.root, min, max, as_slices_internal, iter, Range, edges, [])
     }
 
@@ -1531,14 +1528,15 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(btree_range, collections_bound)]
+    /// #![feature(btree_range, collections_bound)]
+    ///
     /// use std::collections::BTreeMap;
     /// use std::collections::Bound::{Included, Excluded};
     ///
     /// let mut map: BTreeMap<&str, i32> = ["Alice", "Bob", "Carol", "Cheryl"].iter()
     ///                                                                       .map(|&s| (s, 0))
     ///                                                                       .collect();
-    /// for (_, balance) in map.range_mut(Included(&"B"), Excluded(&"Cheryl")) {
+    /// for (_, balance) in map.range_mut(Included("B"), Excluded("Cheryl")) {
     ///     *balance += 100;
     /// }
     /// for (name, balance) in &map {
@@ -1546,8 +1544,13 @@ impl<K: Ord, V> BTreeMap<K, V> {
     /// }
     /// ```
     #[unstable(feature = "btree_range",
-               reason = "matches collection reform specification, waiting for dust to settle")]
-    pub fn range_mut<'a>(&'a mut self, min: Bound<&K>, max: Bound<&K>) -> RangeMut<'a, K, V> {
+               reason = "matches collection reform specification, waiting for dust to settle",
+               issue = "27787")]
+    pub fn range_mut<Min: ?Sized + Ord = K, Max: ?Sized + Ord = K>(&mut self, min: Bound<&Min>,
+                                                                   max: Bound<&Max>)
+        -> RangeMut<K, V> where
+        K: Borrow<Min> + Borrow<Max>,
+    {
         range_impl!(&mut self.root, min, max, as_slices_internal_mut, iter_mut, RangeMut,
                                                                       edges_mut, [mut])
     }
@@ -1602,6 +1605,89 @@ impl<K: Ord, V> BTreeMap<K, V> {
             match result {
                 Finished(finished) => return finished,
                 Continue((new_stack, renewed_key)) => {
+                    stack = new_stack;
+                    key = renewed_key;
+                }
+            }
+        }
+    }
+}
+
+impl<K, Q: ?Sized> super::Recover<Q> for BTreeMap<K, ()> where K: Borrow<Q> + Ord, Q: Ord {
+    type Key = K;
+
+    fn get(&self, key: &Q) -> Option<&K> {
+        let mut cur_node = &self.root;
+        loop {
+            match Node::search(cur_node, key) {
+                Found(handle) => return Some(handle.into_kv().0),
+                GoDown(handle) => match handle.force() {
+                    Leaf(_) => return None,
+                    Internal(internal_handle) => {
+                        cur_node = internal_handle.into_edge();
+                        continue;
+                    }
+                }
+            }
+        }
+    }
+
+    fn take(&mut self, key: &Q) -> Option<K> {
+        // See `remove` for an explanation of this.
+
+        let mut stack = stack::PartialSearchStack::new(self);
+        loop {
+            let result = stack.with(move |pusher, node| {
+                match Node::search(node, key) {
+                    Found(handle) => {
+                        // Perfect match. Terminate the stack here, and remove the entry
+                        Finished(Some(pusher.seal(handle).remove()))
+                    },
+                    GoDown(handle) => {
+                        // We need to keep searching, try to go down the next edge
+                        match handle.force() {
+                            // We're at a leaf; the key isn't in here
+                            Leaf(_) => Finished(None),
+                            Internal(internal_handle) => Continue(pusher.push(internal_handle))
+                        }
+                    }
+                }
+            });
+            match result {
+                Finished(ret) => return ret.map(|(k, _)| k),
+                Continue(new_stack) => stack = new_stack
+            }
+        }
+    }
+
+    fn replace(&mut self, mut key: K) -> Option<K> {
+        // See `insert` for an explanation of this.
+
+        let mut stack = stack::PartialSearchStack::new(self);
+
+        loop {
+            let result = stack.with(move |pusher, node| {
+                match Node::search::<K, _>(node, &key) {
+                    Found(mut handle) => {
+                        mem::swap(handle.key_mut(), &mut key);
+                        Finished(Some(key))
+                    },
+                    GoDown(handle) => {
+                        match handle.force() {
+                            Leaf(leaf_handle) => {
+                                pusher.seal(leaf_handle).insert(key, ());
+                                Finished(None)
+                            }
+                            Internal(internal_handle) => {
+                                Continue((pusher.push(internal_handle), key, ()))
+                            }
+                        }
+                    }
+                }
+            });
+            match result {
+                Finished(ret) => return ret,
+                Continue((new_stack, renewed_key, _)) => {
                     stack = new_stack;
                     key = renewed_key;
                 }

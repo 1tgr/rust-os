@@ -23,35 +23,32 @@
 // Do not remove on snapshot creation. Needed for bootstrap. (Issue #22364)
 #![cfg_attr(stage0, feature(custom_attribute))]
 #![crate_name = "rustc_unicode"]
-#![unstable(feature = "unicode")]
+#![unstable(feature = "unicode", issue = "27783")]
 #![staged_api]
 #![crate_type = "rlib"]
-#![doc(html_logo_url = "http://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
+#![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
-       html_root_url = "http://doc.rust-lang.org/nightly/",
-       html_playground_url = "http://play.rust-lang.org/",
+       html_root_url = "https://doc.rust-lang.org/nightly/",
+       html_playground_url = "https://play.rust-lang.org/",
+       issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
        test(no_crate_inject))]
 #![no_std]
 
-#![feature(core)]
+#![feature(char_from_unchecked)]
 #![feature(core_char_ext)]
-#![feature(core_prelude)]
 #![feature(core_slice_ext)]
 #![feature(core_str_ext)]
-#![feature(iter_arith)]
 #![feature(lang_items)]
 #![feature(no_std)]
 #![feature(staged_api)]
 
-extern crate core;
-
-mod normalize;
 mod tables;
 mod u_str;
 pub mod char;
 
+#[allow(deprecated)]
 pub mod str {
-    pub use u_str::{UnicodeStr, SplitWhitespace, Words, Graphemes, GraphemeIndices};
+    pub use u_str::{UnicodeStr, SplitWhitespace};
     pub use u_str::{utf8_char_width, is_utf16, Utf16Items, Utf16Item};
     pub use u_str::{utf16_items, Utf16Encoder};
 }

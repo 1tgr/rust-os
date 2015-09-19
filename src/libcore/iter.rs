@@ -56,11 +56,9 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use self::MinMaxResult::*;
-
 use clone::Clone;
 use cmp;
-use cmp::{Ord, PartialOrd, PartialEq};
+use cmp::{Ord, PartialOrd, PartialEq, Ordering};
 use default::Default;
 use marker;
 use mem;
@@ -100,6 +98,13 @@ pub trait Iterator {
     ///
     /// An upper bound of `None` means either there is no known upper bound, or
     /// the upper bound does not fit within a `usize`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let it = (0..10).filter(|x| x % 2 == 0).chain(15..20);
+    /// assert_eq!((5, Some(15)), it.size_hint());
+    /// ```
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
     fn size_hint(&self) -> (usize, Option<usize>) { (0, None) }
@@ -147,8 +152,7 @@ pub trait Iterator {
         last
     }
 
-    /// Loops through `n` iterations, returning the `n`th element of the
-    /// iterator.
+    /// Skips the `n` first elements of the iterator and returns the next one.
     ///
     /// # Examples
     ///
@@ -187,7 +191,7 @@ pub trait Iterator {
     fn chain<U>(self, other: U) -> Chain<Self, U::IntoIter> where
         Self: Sized, U: IntoIterator<Item=Self::Item>,
     {
-        Chain{a: self, b: other.into_iter(), flag: false}
+        Chain{a: self, b: other.into_iter(), state: ChainState::Both}
     }
 
     /// Creates an iterator that iterates over both this and the specified
@@ -619,6 +623,8 @@ pub trait Iterator {
 
     /// Tests whether the predicate holds true for all elements in the iterator.
     ///
+    /// Does not consume the iterator past the first non-matching element.
+    ///
     /// # Examples
     ///
     /// ```
@@ -805,86 +811,6 @@ pub trait Iterator {
             .map(|(_, x)| x)
     }
 
-    /// `min_max` finds the minimum and maximum elements in the iterator.
-    ///
-    /// The return type `MinMaxResult` is an enum of three variants:
-    ///
-    /// - `NoElements` if the iterator is empty.
-    /// - `OneElement(x)` if the iterator has exactly one element.
-    /// - `MinMax(x, y)` is returned otherwise, where `x <= y`. Two
-    ///    values are equal if and only if there is more than one
-    ///    element in the iterator and all elements are equal.
-    ///
-    /// On an iterator of length `n`, `min_max` does `1.5 * n` comparisons,
-    /// and so is faster than calling `min` and `max` separately which does `2 *
-    /// n` comparisons.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #![feature(iter_min_max)]
-    /// use std::iter::MinMaxResult::{NoElements, OneElement, MinMax};
-    ///
-    /// let a: [i32; 0] = [];
-    /// assert_eq!(a.iter().min_max(), NoElements);
-    ///
-    /// let a = [1];
-    /// assert_eq!(a.iter().min_max(), OneElement(&1));
-    ///
-    /// let a = [1, 2, 3, 4, 5];
-    /// assert_eq!(a.iter().min_max(), MinMax(&1, &5));
-    ///
-    /// let a = [1, 1, 1, 1];
-    /// assert_eq!(a.iter().min_max(), MinMax(&1, &1));
-    /// ```
-    #[unstable(feature = "iter_min_max",
-               reason = "return type may change or may wish to have a closure \
-                         based version as well")]
-    fn min_max(mut self) -> MinMaxResult<Self::Item> where Self: Sized, Self::Item: Ord
-    {
-        let (mut min, mut max) = match self.next() {
-            None => return NoElements,
-            Some(x) => {
-                match self.next() {
-                    None => return OneElement(x),
-                    Some(y) => if x <= y {(x, y)} else {(y, x)}
-                }
-            }
-        };
-
-        loop {
-            // `first` and `second` are the two next elements we want to look
-            // at.  We first compare `first` and `second` (#1). The smaller one
-            // is then compared to current minimum (#2). The larger one is
-            // compared to current maximum (#3). This way we do 3 comparisons
-            // for 2 elements.
-            let first = match self.next() {
-                None => break,
-                Some(x) => x
-            };
-            let second = match self.next() {
-                None => {
-                    if first < min {
-                        min = first;
-                    } else if first >= max {
-                        max = first;
-                    }
-                    break;
-                }
-                Some(x) => x
-            };
-            if first <= second {
-                if first < min { min = first }
-                if second >= max { max = second }
-            } else {
-                if second < min { min = second }
-                if first >= max { max = first }
-            }
-        }
-
-        MinMax(min, max)
-    }
-
     /// Returns the element that gives the maximum value from the
     /// specified function.
     ///
@@ -894,13 +820,15 @@ pub trait Iterator {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(iter_cmp)]
+    /// #![feature(iter_cmp)]
+    ///
     /// let a = [-3_i32, 0, 1, 5, -10];
     /// assert_eq!(*a.iter().max_by(|x| x.abs()).unwrap(), -10);
     /// ```
     #[inline]
     #[unstable(feature = "iter_cmp",
-               reason = "may want to produce an Ordering directly; see #15311")]
+               reason = "may want to produce an Ordering directly; see #15311",
+               issue = "27724")]
     fn max_by<B: Ord, F>(self, f: F) -> Option<Self::Item> where
         Self: Sized,
         F: FnMut(&Self::Item) -> B,
@@ -922,13 +850,15 @@ pub trait Iterator {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(iter_cmp)]
+    /// #![feature(iter_cmp)]
+    ///
     /// let a = [-3_i32, 0, 1, 5, -10];
     /// assert_eq!(*a.iter().min_by(|x| x.abs()).unwrap(), 0);
     /// ```
     #[inline]
     #[unstable(feature = "iter_cmp",
-               reason = "may want to produce an Ordering directly; see #15311")]
+               reason = "may want to produce an Ordering directly; see #15311",
+               issue = "27724")]
     fn min_by<B: Ord, F>(self, f: F) -> Option<Self::Item> where
         Self: Sized,
         F: FnMut(&Self::Item) -> B,
@@ -1040,33 +970,19 @@ pub trait Iterator {
         Cycle{orig: self.clone(), iter: self}
     }
 
-    /// Use an iterator to reverse a container in place.
-    #[unstable(feature = "core",
-               reason = "uncertain about placement or widespread use")]
-    #[deprecated(since = "1.2.0",
-                 reason = "not performant enough to justify inclusion")]
-    fn reverse_in_place<'a, T: 'a>(&mut self) where
-        Self: Sized + Iterator<Item=&'a mut T> + DoubleEndedIterator
-    {
-        loop {
-            match (self.next(), self.next_back()) {
-                (Some(x), Some(y)) => mem::swap(x, y),
-                _ => break
-            }
-        }
-    }
-
     /// Iterates over the entire iterator, summing up all the elements
     ///
     /// # Examples
     ///
     /// ```
-    /// # #![feature(iter_arith)]
+    /// #![feature(iter_arith)]
+    ///
     /// let a = [1, 2, 3, 4, 5];
     /// let it = a.iter();
     /// assert_eq!(it.sum::<i32>(), 15);
     /// ```
-    #[unstable(feature="iter_arith", reason = "bounds recently changed")]
+    #[unstable(feature = "iter_arith", reason = "bounds recently changed",
+               issue = "27739")]
     fn sum<S=<Self as Iterator>::Item>(self) -> S where
         S: Add<Self::Item, Output=S> + Zero,
         Self: Sized,
@@ -1079,7 +995,8 @@ pub trait Iterator {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(iter_arith)]
+    /// #![feature(iter_arith)]
+    ///
     /// fn factorial(n: u32) -> u32 {
     ///     (1..).take_while(|&i| i <= n).product()
     /// }
@@ -1087,12 +1004,205 @@ pub trait Iterator {
     /// assert_eq!(factorial(1), 1);
     /// assert_eq!(factorial(5), 120);
     /// ```
-    #[unstable(feature="iter_arith", reason = "bounds recently changed")]
+    #[unstable(feature="iter_arith", reason = "bounds recently changed",
+               issue = "27739")]
     fn product<P=<Self as Iterator>::Item>(self) -> P where
         P: Mul<Self::Item, Output=P> + One,
         Self: Sized,
     {
         self.fold(One::one(), |p, e| p * e)
+    }
+
+    /// Lexicographically compares the elements of this `Iterator` with those
+    /// of another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn cmp<I>(mut self, other: I) -> Ordering where
+        I: IntoIterator<Item = Self::Item>,
+        Self::Item: Ord,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return Ordering::Equal,
+                (None, _   ) => return Ordering::Less,
+                (_   , None) => return Ordering::Greater,
+                (Some(x), Some(y)) => match x.cmp(&y) {
+                    Ordering::Equal => (),
+                    non_eq => return non_eq,
+                },
+            }
+        }
+    }
+
+    /// Lexicographically compares the elements of this `Iterator` with those
+    /// of another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn partial_cmp<I>(mut self, other: I) -> Option<Ordering> where
+        I: IntoIterator,
+        Self::Item: PartialOrd<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return Some(Ordering::Equal),
+                (None, _   ) => return Some(Ordering::Less),
+                (_   , None) => return Some(Ordering::Greater),
+                (Some(x), Some(y)) => match x.partial_cmp(&y) {
+                    Some(Ordering::Equal) => (),
+                    non_eq => return non_eq,
+                },
+            }
+        }
+    }
+
+    /// Determines if the elements of this `Iterator` are equal to those of
+    /// another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn eq<I>(mut self, other: I) -> bool where
+        I: IntoIterator,
+        Self::Item: PartialEq<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return true,
+                (None, _) | (_, None) => return false,
+                (Some(x), Some(y)) => if x != y { return false },
+            }
+        }
+    }
+
+    /// Determines if the elements of this `Iterator` are unequal to those of
+    /// another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn ne<I>(mut self, other: I) -> bool where
+        I: IntoIterator,
+        Self::Item: PartialEq<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return false,
+                (None, _) | (_, None) => return true,
+                (Some(x), Some(y)) => if x.ne(&y) { return true },
+            }
+        }
+    }
+
+    /// Determines if the elements of this `Iterator` are lexicographically
+    /// less than those of another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn lt<I>(mut self, other: I) -> bool where
+        I: IntoIterator,
+        Self::Item: PartialOrd<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return false,
+                (None, _   ) => return true,
+                (_   , None) => return false,
+                (Some(x), Some(y)) => {
+                    match x.partial_cmp(&y) {
+                        Some(Ordering::Less) => return true,
+                        Some(Ordering::Equal) => {}
+                        Some(Ordering::Greater) => return false,
+                        None => return false,
+                    }
+                },
+            }
+        }
+    }
+
+    /// Determines if the elements of this `Iterator` are lexicographically
+    /// less or equal to those of another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn le<I>(mut self, other: I) -> bool where
+        I: IntoIterator,
+        Self::Item: PartialOrd<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return true,
+                (None, _   ) => return true,
+                (_   , None) => return false,
+                (Some(x), Some(y)) => {
+                    match x.partial_cmp(&y) {
+                        Some(Ordering::Less) => return true,
+                        Some(Ordering::Equal) => {}
+                        Some(Ordering::Greater) => return false,
+                        None => return false,
+                    }
+                },
+            }
+        }
+    }
+
+    /// Determines if the elements of this `Iterator` are lexicographically
+    /// greater than those of another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn gt<I>(mut self, other: I) -> bool where
+        I: IntoIterator,
+        Self::Item: PartialOrd<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return false,
+                (None, _   ) => return false,
+                (_   , None) => return true,
+                (Some(x), Some(y)) => {
+                    match x.partial_cmp(&y) {
+                        Some(Ordering::Less) => return false,
+                        Some(Ordering::Equal) => {}
+                        Some(Ordering::Greater) => return true,
+                        None => return false,
+                    }
+                }
+            }
+        }
+    }
+
+    /// Determines if the elements of this `Iterator` are lexicographically
+    /// greater than or equal to those of another.
+    #[unstable(feature = "iter_order", reason = "needs review and revision", issue = "27737")]
+    fn ge<I>(mut self, other: I) -> bool where
+        I: IntoIterator,
+        Self::Item: PartialOrd<I::Item>,
+        Self: Sized,
+    {
+        let mut other = other.into_iter();
+
+        loop {
+            match (self.next(), other.next()) {
+                (None, None) => return true,
+                (None, _   ) => return false,
+                (_   , None) => return true,
+                (Some(x), Some(y)) => {
+                    match x.partial_cmp(&y) {
+                        Some(Ordering::Less) => return false,
+                        Some(Ordering::Equal) => {}
+                        Some(Ordering::Greater) => return true,
+                        None => return false,
+                    }
+                },
+            }
+        }
     }
 }
 
@@ -1221,29 +1331,6 @@ impl<'a, I: DoubleEndedIterator + ?Sized> DoubleEndedIterator for &'a mut I {
     fn next_back(&mut self) -> Option<I::Item> { (**self).next_back() }
 }
 
-/// An object implementing random access indexing by `usize`
-///
-/// A `RandomAccessIterator` should be either infinite or a
-/// `DoubleEndedIterator`.  Calling `next()` or `next_back()` on a
-/// `RandomAccessIterator` reduces the indexable range accordingly. That is,
-/// `it.idx(1)` will become `it.idx(0)` after `it.next()` is called.
-#[unstable(feature = "iter_idx",
-           reason = "not widely used, may be better decomposed into Index \
-                     and ExactSizeIterator")]
-#[deprecated(since = "1.2.0",
-             reason = "trait has not proven itself as a widely useful \
-                       abstraction for iterators, and more time may be needed \
-                       for iteration on the design")]
-#[allow(deprecated)]
-pub trait RandomAccessIterator: Iterator {
-    /// Returns the number of indexable elements. At most `std::usize::MAX`
-    /// elements are indexable, even if the iterator represents a longer range.
-    fn indexable(&self) -> usize;
-
-    /// Returns an element at an index, or `None` if the index is out of bounds
-    fn idx(&mut self, index: usize) -> Option<Self::Item>;
-}
-
 /// An iterator that knows its exact length
 ///
 /// This trait is a helper for iterators like the vector iterator, so that
@@ -1313,73 +1400,6 @@ impl<I> DoubleEndedIterator for Rev<I> where I: DoubleEndedIterator {
     fn next_back(&mut self) -> Option<<I as Iterator>::Item> { self.iter.next() }
 }
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I> RandomAccessIterator for Rev<I>
-    where I: DoubleEndedIterator + RandomAccessIterator
-{
-    #[inline]
-    fn indexable(&self) -> usize { self.iter.indexable() }
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<<I as Iterator>::Item> {
-        let amt = self.indexable();
-        if amt > index {
-            self.iter.idx(amt - index - 1)
-        } else {
-            None
-        }
-    }
-}
-
-/// `MinMaxResult` is an enum returned by `min_max`. See `Iterator::min_max` for
-/// more detail.
-#[derive(Clone, PartialEq, Debug)]
-#[unstable(feature = "iter_min_max",
-           reason = "unclear whether such a fine-grained result is widely useful")]
-pub enum MinMaxResult<T> {
-    /// Empty iterator
-    NoElements,
-
-    /// Iterator with one element, so the minimum and maximum are the same
-    OneElement(T),
-
-    /// More than one element in the iterator, the first element is not larger
-    /// than the second
-    MinMax(T, T)
-}
-
-#[unstable(feature = "iter_min_max", reason = "type is unstable")]
-impl<T: Clone> MinMaxResult<T> {
-    /// `into_option` creates an `Option` of type `(T,T)`. The returned `Option`
-    /// has variant `None` if and only if the `MinMaxResult` has variant
-    /// `NoElements`. Otherwise variant `Some(x,y)` is returned where `x <= y`.
-    /// If `MinMaxResult` has variant `OneElement(x)`, performing this operation
-    /// will make one clone of `x`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # #![feature(iter_min_max)]
-    /// use std::iter::MinMaxResult::{self, NoElements, OneElement, MinMax};
-    ///
-    /// let r: MinMaxResult<i32> = NoElements;
-    /// assert_eq!(r.into_option(), None);
-    ///
-    /// let r = OneElement(1);
-    /// assert_eq!(r.into_option(), Some((1, 1)));
-    ///
-    /// let r = MinMax(1, 2);
-    /// assert_eq!(r.into_option(), Some((1, 2)));
-    /// ```
-    pub fn into_option(self) -> Option<(T,T)> {
-        match self {
-            NoElements => None,
-            OneElement(x) => Some((x.clone(), x)),
-            MinMax(x, y) => Some((x, y))
-        }
-    }
-}
-
 /// An iterator that clones the elements of an underlying iterator
 #[stable(feature = "iter_cloned", since = "1.1.0")]
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
@@ -1417,22 +1437,6 @@ impl<'a, I, T: 'a> ExactSizeIterator for Cloned<I>
     where I: ExactSizeIterator<Item=&'a T>, T: Clone
 {}
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<'a, I, T: 'a> RandomAccessIterator for Cloned<I>
-    where I: RandomAccessIterator<Item=&'a T>, T: Clone
-{
-    #[inline]
-    fn indexable(&self) -> usize {
-        self.it.indexable()
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<T> {
-        self.it.idx(index).cloned()
-    }
-}
-
 /// An iterator that repeats endlessly
 #[derive(Clone)]
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
@@ -1465,34 +1469,6 @@ impl<I> Iterator for Cycle<I> where I: Clone + Iterator {
     }
 }
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I> RandomAccessIterator for Cycle<I> where
-    I: Clone + RandomAccessIterator,
-{
-    #[inline]
-    fn indexable(&self) -> usize {
-        if self.orig.indexable() > 0 {
-            usize::MAX
-        } else {
-            0
-        }
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<<I as Iterator>::Item> {
-        let liter = self.iter.indexable();
-        let lorig = self.orig.indexable();
-        if lorig == 0 {
-            None
-        } else if index < liter {
-            self.iter.idx(index)
-        } else {
-            self.orig.idx((index - liter) % lorig)
-        }
-    }
-}
-
 /// An iterator that strings two iterators together
 #[derive(Clone)]
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
@@ -1500,7 +1476,30 @@ impl<I> RandomAccessIterator for Cycle<I> where
 pub struct Chain<A, B> {
     a: A,
     b: B,
-    flag: bool,
+    state: ChainState,
+}
+
+// The iterator protocol specifies that iteration ends with the return value
+// `None` from `.next()` (or `.next_back()`) and it is unspecified what
+// further calls return. The chain adaptor must account for this since it uses
+// two subiterators.
+//
+//  It uses three states:
+//
+//  - Both: `a` and `b` are remaining
+//  - Front: `a` remaining
+//  - Back: `b` remaining
+//
+//  The fourth state (neither iterator is remaining) only occurs after Chain has
+//  returned None once, so we don't need to store this state.
+#[derive(Clone)]
+enum ChainState {
+    // both front and back iterator are remaining
+    Both,
+    // only front is remaining
+    Front,
+    // only back is remaining
+    Back,
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1512,42 +1511,58 @@ impl<A, B> Iterator for Chain<A, B> where
 
     #[inline]
     fn next(&mut self) -> Option<A::Item> {
-        if self.flag {
-            self.b.next()
-        } else {
-            match self.a.next() {
-                Some(x) => return Some(x),
-                _ => ()
-            }
-            self.flag = true;
-            self.b.next()
+        match self.state {
+            ChainState::Both => match self.a.next() {
+                elt @ Some(..) => elt,
+                None => {
+                    self.state = ChainState::Back;
+                    self.b.next()
+                }
+            },
+            ChainState::Front => self.a.next(),
+            ChainState::Back => self.b.next(),
         }
     }
 
     #[inline]
     fn count(self) -> usize {
-        (if !self.flag { self.a.count() } else { 0 }) + self.b.count()
+        match self.state {
+            ChainState::Both => self.a.count() + self.b.count(),
+            ChainState::Front => self.a.count(),
+            ChainState::Back => self.b.count(),
+        }
     }
 
     #[inline]
     fn nth(&mut self, mut n: usize) -> Option<A::Item> {
-        if !self.flag {
-            for x in self.a.by_ref() {
-                if n == 0 {
-                    return Some(x)
+        match self.state {
+            ChainState::Both | ChainState::Front => {
+                for x in self.a.by_ref() {
+                    if n == 0 {
+                        return Some(x)
+                    }
+                    n -= 1;
                 }
-                n -= 1;
+                if let ChainState::Both = self.state {
+                    self.state = ChainState::Back;
+                }
             }
-            self.flag = true;
+            ChainState::Back => {}
         }
-        self.b.nth(n)
+        if let ChainState::Back = self.state {
+            self.b.nth(n)
+        } else {
+            None
+        }
     }
 
     #[inline]
     fn last(self) -> Option<A::Item> {
-        let a_last = if self.flag { None } else { self.a.last() };
-        let b_last = self.b.last();
-        b_last.or(a_last)
+        match self.state {
+            ChainState::Both => self.b.last().or(self.a.last()),
+            ChainState::Front => self.a.last(),
+            ChainState::Back => self.b.last()
+        }
     }
 
     #[inline]
@@ -1573,32 +1588,16 @@ impl<A, B> DoubleEndedIterator for Chain<A, B> where
 {
     #[inline]
     fn next_back(&mut self) -> Option<A::Item> {
-        match self.b.next_back() {
-            Some(x) => Some(x),
-            None => self.a.next_back()
-        }
-    }
-}
-
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<A, B> RandomAccessIterator for Chain<A, B> where
-    A: RandomAccessIterator,
-    B: RandomAccessIterator<Item = A::Item>,
-{
-    #[inline]
-    fn indexable(&self) -> usize {
-        let (a, b) = (self.a.indexable(), self.b.indexable());
-        a.saturating_add(b)
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<A::Item> {
-        let len = self.a.indexable();
-        if index < len {
-            self.a.idx(index)
-        } else {
-            self.b.idx(index - len)
+        match self.state {
+            ChainState::Both => match self.b.next_back() {
+                elt @ Some(..) => elt,
+                None => {
+                    self.state = ChainState::Front;
+                    self.a.next_back()
+                }
+            },
+            ChainState::Front => self.a.next_back(),
+            ChainState::Back => self.b.next_back(),
         }
     }
 }
@@ -1669,27 +1668,6 @@ impl<A, B> DoubleEndedIterator for Zip<A, B> where
     }
 }
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<A, B> RandomAccessIterator for Zip<A, B> where
-    A: RandomAccessIterator,
-    B: RandomAccessIterator
-{
-    #[inline]
-    fn indexable(&self) -> usize {
-        cmp::min(self.a.indexable(), self.b.indexable())
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<(A::Item, B::Item)> {
-        self.a.idx(index).and_then(|x| {
-            self.b.idx(index).and_then(|y| {
-                Some((x, y))
-            })
-        })
-    }
-}
-
 /// An iterator that maps the values of `iter` with `f`
 #[must_use = "iterator adaptors are lazy and do nothing unless consumed"]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1705,7 +1683,7 @@ impl<B, I: Iterator, F> Iterator for Map<I, F> where F: FnMut(I::Item) -> B {
 
     #[inline]
     fn next(&mut self) -> Option<B> {
-        self.iter.next().map(|a| (self.f)(a))
+        self.iter.next().map(&mut self.f)
     }
 
     #[inline]
@@ -1720,23 +1698,7 @@ impl<B, I: DoubleEndedIterator, F> DoubleEndedIterator for Map<I, F> where
 {
     #[inline]
     fn next_back(&mut self) -> Option<B> {
-        self.iter.next_back().map(|a| (self.f)(a))
-    }
-}
-
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<B, I: RandomAccessIterator, F> RandomAccessIterator for Map<I, F> where
-    F: FnMut(I::Item) -> B,
-{
-    #[inline]
-    fn indexable(&self) -> usize {
-        self.iter.indexable()
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<B> {
-        self.iter.idx(index).map(|a| (self.f)(a))
+        self.iter.next_back().map(&mut self.f)
     }
 }
 
@@ -1896,23 +1858,6 @@ impl<I> DoubleEndedIterator for Enumerate<I> where
             // elements fits into a `usize`.
             (self.count + len, a)
         })
-    }
-}
-
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I> RandomAccessIterator for Enumerate<I> where I: RandomAccessIterator {
-    #[inline]
-    fn indexable(&self) -> usize {
-        self.iter.indexable()
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<(usize, <I as Iterator>::Item)> {
-        // Can safely add, `ExactSizeIterator` (ancestor of
-        // `RandomAccessIterator`) promises that the number of elements fits
-        // into a `usize`.
-        self.iter.idx(index).map(|a| (self.count + index, a))
     }
 }
 
@@ -2150,24 +2095,6 @@ impl<I> Iterator for Skip<I> where I: Iterator {
     }
 }
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I> RandomAccessIterator for Skip<I> where I: RandomAccessIterator{
-    #[inline]
-    fn indexable(&self) -> usize {
-        self.iter.indexable().saturating_sub(self.n)
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<<I as Iterator>::Item> {
-        if index >= self.indexable() {
-            None
-        } else {
-            self.iter.idx(index + self.n)
-        }
-    }
-}
-
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<I> ExactSizeIterator for Skip<I> where I: ExactSizeIterator {}
 
@@ -2223,24 +2150,6 @@ impl<I> Iterator for Take<I> where I: Iterator{
     }
 }
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I> RandomAccessIterator for Take<I> where I: RandomAccessIterator{
-    #[inline]
-    fn indexable(&self) -> usize {
-        cmp::min(self.iter.indexable(), self.n)
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<<I as Iterator>::Item> {
-        if index >= self.n {
-            None
-        } else {
-            self.iter.idx(index)
-        }
-    }
-}
-
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<I> ExactSizeIterator for Take<I> where I: ExactSizeIterator {}
 
@@ -2252,11 +2161,7 @@ impl<I> ExactSizeIterator for Take<I> where I: ExactSizeIterator {}
 pub struct Scan<I, St, F> {
     iter: I,
     f: F,
-
-    /// The current internal state to be passed to the closure next.
-    #[unstable(feature = "scan_state",
-               reason = "public fields are otherwise rare in the stdlib")]
-    pub state: St,
+    state: St,
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -2305,7 +2210,7 @@ impl<I: Iterator, U: IntoIterator, F> Iterator for FlatMap<I, U, F>
                     return Some(x)
                 }
             }
-            match self.iter.next().map(|x| (self.f)(x)) {
+            match self.iter.next().map(&mut self.f) {
                 None => return self.backiter.as_mut().and_then(|it| it.next()),
                 next => self.frontiter = next.map(IntoIterator::into_iter),
             }
@@ -2338,7 +2243,7 @@ impl<I: DoubleEndedIterator, U, F> DoubleEndedIterator for FlatMap<I, U, F> wher
                     return Some(y)
                 }
             }
-            match self.iter.next_back().map(|x| (self.f)(x)) {
+            match self.iter.next_back().map(&mut self.f) {
                 None => return self.frontiter.as_mut().and_then(|it| it.next_back()),
                 next => self.backiter = next.map(IntoIterator::into_iter),
             }
@@ -2424,34 +2329,8 @@ impl<I> DoubleEndedIterator for Fuse<I> where I: DoubleEndedIterator {
     }
 }
 
-// Allow RandomAccessIterators to be fused without affecting random-access behavior
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I> RandomAccessIterator for Fuse<I> where I: RandomAccessIterator {
-    #[inline]
-    fn indexable(&self) -> usize {
-        self.iter.indexable()
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<<I as Iterator>::Item> {
-        self.iter.idx(index)
-    }
-}
-
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<I> ExactSizeIterator for Fuse<I> where I: ExactSizeIterator {}
-
-impl<I> Fuse<I> {
-    /// Resets the `Fuse` such that the next call to `.next()` or
-    /// `.next_back()` will call the underlying iterator again even if it
-    /// previously returned `None`.
-    #[inline]
-    #[unstable(feature = "iter_reset_fuse", reason = "seems marginal")]
-    pub fn reset_fuse(&mut self) {
-        self.done = false
-    }
-}
 
 /// An iterator that calls a function with a reference to each
 /// element before yielding it.
@@ -2501,111 +2380,14 @@ impl<I: DoubleEndedIterator, F> DoubleEndedIterator for Inspect<I, F>
     }
 }
 
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<I: RandomAccessIterator, F> RandomAccessIterator for Inspect<I, F>
-    where F: FnMut(&I::Item),
-{
-    #[inline]
-    fn indexable(&self) -> usize {
-        self.iter.indexable()
-    }
-
-    #[inline]
-    fn idx(&mut self, index: usize) -> Option<I::Item> {
-        let element = self.iter.idx(index);
-        self.do_inspect(element)
-    }
-}
-
-/// An iterator that passes mutable state to a closure and yields the result.
-///
-/// # Examples
-///
-/// An iterator that yields sequential Fibonacci numbers, and stops on overflow.
-///
-/// ```
-/// #![feature(iter_unfold)]
-/// use std::iter::Unfold;
-///
-/// // This iterator will yield up to the last Fibonacci number before the max
-/// // value of `u32`. You can simply change `u32` to `u64` in this line if
-/// // you want higher values than that.
-/// let mut fibonacci = Unfold::new((Some(0u32), Some(1u32)),
-///                                 |&mut (ref mut x2, ref mut x1)| {
-///     // Attempt to get the next Fibonacci number
-///     // `x1` will be `None` if previously overflowed.
-///     let next = match (*x2, *x1) {
-///         (Some(x2), Some(x1)) => x2.checked_add(x1),
-///         _ => None,
-///     };
-///
-///     // Shift left: ret <- x2 <- x1 <- next
-///     let ret = *x2;
-///     *x2 = *x1;
-///     *x1 = next;
-///
-///     ret
-/// });
-///
-/// for i in fibonacci {
-///     println!("{}", i);
-/// }
-/// ```
-#[unstable(feature = "iter_unfold")]
-#[derive(Clone)]
-#[deprecated(since = "1.2.0",
-             reason = "has not gained enough traction to retain its position \
-                       in the standard library")]
-#[allow(deprecated)]
-pub struct Unfold<St, F> {
-    f: F,
-    /// Internal state that will be passed to the closure on the next iteration
-    #[unstable(feature = "iter_unfold")]
-    pub state: St,
-}
-
-#[unstable(feature = "iter_unfold")]
-#[deprecated(since = "1.2.0",
-             reason = "has not gained enough traction to retain its position \
-                       in the standard library")]
-#[allow(deprecated)]
-impl<A, St, F> Unfold<St, F> where F: FnMut(&mut St) -> Option<A> {
-    /// Creates a new iterator with the specified closure as the "iterator
-    /// function" and an initial state to eventually pass to the closure
-    #[inline]
-    pub fn new(initial_state: St, f: F) -> Unfold<St, F> {
-        Unfold {
-            f: f,
-            state: initial_state
-        }
-    }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-#[allow(deprecated)]
-impl<A, St, F> Iterator for Unfold<St, F> where F: FnMut(&mut St) -> Option<A> {
-    type Item = A;
-
-    #[inline]
-    fn next(&mut self) -> Option<A> {
-        (self.f)(&mut self.state)
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        // no possible known bounds at this point
-        (0, None)
-    }
-}
-
 /// Objects that can be stepped over in both directions.
 ///
 /// The `steps_between` function provides a way to efficiently compare
 /// two `Step` objects.
 #[unstable(feature = "step_trait",
-           reason = "likely to be replaced by finer-grained traits")]
-pub trait Step: PartialOrd {
+           reason = "likely to be replaced by finer-grained traits",
+           issue = "27741")]
+pub trait Step: PartialOrd + Sized {
     /// Steps `self` if possible.
     fn step(&self, by: &Self) -> Option<Self>;
 
@@ -2704,7 +2486,9 @@ step_impl_signed!(isize i8 i16 i32);
 step_impl_unsigned!(u64);
 #[cfg(target_pointer_width = "64")]
 step_impl_signed!(i64);
-#[cfg(target_pointer_width = "32")]
+// If the target pointer width is not 64-bits, we
+// assume here that it is less than 64-bits.
+#[cfg(not(target_pointer_width = "64"))]
 step_impl_no_between!(u64 i64);
 
 /// An adapter for stepping range iterators by a custom amount.
@@ -2713,7 +2497,8 @@ step_impl_no_between!(u64 i64);
 /// parameter is the type being iterated over, while `R` is the range
 /// type (usually one of `std::ops::{Range, RangeFrom}`.
 #[derive(Clone)]
-#[unstable(feature = "step_by", reason = "recent addition")]
+#[unstable(feature = "step_by", reason = "recent addition",
+           issue = "27741")]
 pub struct StepBy<A, R> {
     step_by: A,
     range: R,
@@ -2732,7 +2517,8 @@ impl<A: Step> RangeFrom<A> {
     /// ```
     ///
     /// This prints all even `u8` values.
-    #[unstable(feature = "step_by", reason = "recent addition")]
+    #[unstable(feature = "step_by", reason = "recent addition",
+               issue = "27741")]
     pub fn step_by(self, by: A) -> StepBy<A, Self> {
         StepBy {
             step_by: by,
@@ -2741,7 +2527,6 @@ impl<A: Step> RangeFrom<A> {
     }
 }
 
-#[allow(deprecated)]
 impl<A: Step> ops::Range<A> {
     /// Creates an iterator with the same range, but stepping by the
     /// given amount at each iteration.
@@ -2751,7 +2536,8 @@ impl<A: Step> ops::Range<A> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(step_by)]
+    /// #![feature(step_by)]
+    ///
     /// for i in (0..10).step_by(2) {
     ///     println!("{}", i);
     /// }
@@ -2766,7 +2552,8 @@ impl<A: Step> ops::Range<A> {
     /// 6
     /// 8
     /// ```
-    #[unstable(feature = "step_by", reason = "recent addition")]
+    #[unstable(feature = "step_by", reason = "recent addition",
+               issue = "27741")]
     pub fn step_by(self, by: A) -> StepBy<A, Self> {
         StepBy {
             step_by: by,
@@ -2798,7 +2585,8 @@ impl<A> Iterator for StepBy<A, RangeFrom<A>> where
 /// An iterator over the range [start, stop]
 #[derive(Clone)]
 #[unstable(feature = "range_inclusive",
-           reason = "likely to be replaced by range notation and adapters")]
+           reason = "likely to be replaced by range notation and adapters",
+           issue = "27777")]
 pub struct RangeInclusive<A> {
     range: ops::Range<A>,
     done: bool,
@@ -2807,7 +2595,8 @@ pub struct RangeInclusive<A> {
 /// Returns an iterator over the range [start, stop].
 #[inline]
 #[unstable(feature = "range_inclusive",
-           reason = "likely to be replaced by range notation and adapters")]
+           reason = "likely to be replaced by range notation and adapters",
+           issue = "27777")]
 pub fn range_inclusive<A>(start: A, stop: A) -> RangeInclusive<A>
     where A: Step + One + Clone
 {
@@ -2818,7 +2607,8 @@ pub fn range_inclusive<A>(start: A, stop: A) -> RangeInclusive<A>
 }
 
 #[unstable(feature = "range_inclusive",
-           reason = "likely to be replaced by range notation and adapters")]
+           reason = "likely to be replaced by range notation and adapters",
+           issue = "27777")]
 impl<A> Iterator for RangeInclusive<A> where
     A: PartialEq + Step + One + Clone,
     for<'a> &'a A: Add<&'a A, Output = A>
@@ -2851,7 +2641,8 @@ impl<A> Iterator for RangeInclusive<A> where
 }
 
 #[unstable(feature = "range_inclusive",
-           reason = "likely to be replaced by range notation and adapters")]
+           reason = "likely to be replaced by range notation and adapters",
+           issue = "27777")]
 impl<A> DoubleEndedIterator for RangeInclusive<A> where
     A: PartialEq + Step + One + Clone,
     for<'a> &'a A: Add<&'a A, Output = A>,
@@ -2873,7 +2664,6 @@ impl<A> DoubleEndedIterator for RangeInclusive<A> where
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(deprecated)]
 impl<A: Step + Zero + Clone> Iterator for StepBy<A, ops::Range<A>> {
     type Item = A;
 
@@ -2918,7 +2708,6 @@ macro_rules! range_exact_iter_impl {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(deprecated)]
 impl<A: Step + One> Iterator for ops::Range<A> where
     for<'a> &'a A: Add<&'a A, Output = A>
 {
@@ -2949,7 +2738,6 @@ impl<A: Step + One> Iterator for ops::Range<A> where
 range_exact_iter_impl!(usize u8 u16 u32 isize i8 i16 i32);
 
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(deprecated)]
 impl<A: Step + One + Clone> DoubleEndedIterator for ops::Range<A> where
     for<'a> &'a A: Add<&'a A, Output = A>,
     for<'a> &'a A: Sub<&'a A, Output = A>
@@ -2966,7 +2754,6 @@ impl<A: Step + One + Clone> DoubleEndedIterator for ops::Range<A> where
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(deprecated)]
 impl<A: Step + One> Iterator for ops::RangeFrom<A> where
     for<'a> &'a A: Add<&'a A, Output = A>
 {
@@ -3001,56 +2788,6 @@ impl<A: Clone> Iterator for Repeat<A> {
 impl<A: Clone> DoubleEndedIterator for Repeat<A> {
     #[inline]
     fn next_back(&mut self) -> Option<A> { Some(self.element.clone()) }
-}
-
-#[unstable(feature = "iter_idx", reason = "trait is experimental")]
-#[allow(deprecated)]
-impl<A: Clone> RandomAccessIterator for Repeat<A> {
-    #[inline]
-    fn indexable(&self) -> usize { usize::MAX }
-    #[inline]
-    fn idx(&mut self, _: usize) -> Option<A> { Some(self.element.clone()) }
-}
-
-type IterateState<T, F> = (F, Option<T>, bool);
-
-/// An iterator that repeatedly applies a given function, starting
-/// from a given seed value.
-#[unstable(feature = "iter_iterate")]
-#[deprecated(since = "1.2.0",
-             reason = "has not gained enough traction to retain its position \
-                       in the standard library")]
-#[allow(deprecated)]
-pub type Iterate<T, F> = Unfold<IterateState<T, F>, fn(&mut IterateState<T, F>) -> Option<T>>;
-
-/// Creates a new iterator that produces an infinite sequence of
-/// repeated applications of the given function `f`.
-#[unstable(feature = "iter_iterate")]
-#[deprecated(since = "1.2.0",
-             reason = "has not gained enough traction to retain its position \
-                       in the standard library")]
-#[allow(deprecated)]
-pub fn iterate<T, F>(seed: T, f: F) -> Iterate<T, F> where
-    T: Clone,
-    F: FnMut(T) -> T,
-{
-    fn next<T, F>(st: &mut IterateState<T, F>) -> Option<T> where
-        T: Clone,
-        F: FnMut(T) -> T,
-    {
-        let &mut (ref mut f, ref mut val, ref mut first) = st;
-        if *first {
-            *first = false;
-        } else if let Some(x) = val.take() {
-            *val = Some((*f)(x))
-        }
-        val.clone()
-    }
-
-    // coerce to a fn pointer
-    let next: fn(&mut IterateState<T,F>) -> Option<T> = next;
-
-    Unfold::new((f, Some(seed), true), next)
 }
 
 /// Creates a new iterator that endlessly repeats the element `elt`.
@@ -3162,145 +2899,79 @@ pub fn once<T>(value: T) -> Once<T> {
 ///
 /// If two sequences are equal up until the point where one ends,
 /// the shorter sequence compares less.
-#[unstable(feature = "iter_order", reason = "needs review and revision")]
+#[deprecated(since = "1.4.0", reason = "use the equivalent methods on `Iterator` instead")]
+#[unstable(feature = "iter_order", reason = "needs review and revision",
+           issue = "27737")]
 pub mod order {
     use cmp;
     use cmp::{Eq, Ord, PartialOrd, PartialEq};
-    use cmp::Ordering::{Equal, Less, Greater};
     use option::Option;
-    use option::Option::{Some, None};
     use super::Iterator;
 
     /// Compare `a` and `b` for equality using `Eq`
-    pub fn equals<A, L, R>(mut a: L, mut b: R) -> bool where
+    pub fn equals<A, L, R>(a: L, b: R) -> bool where
         A: Eq,
         L: Iterator<Item=A>,
         R: Iterator<Item=A>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return true,
-                (None, _) | (_, None) => return false,
-                (Some(x), Some(y)) => if x != y { return false },
-            }
-        }
+        a.eq(b)
     }
 
     /// Order `a` and `b` lexicographically using `Ord`
-    pub fn cmp<A, L, R>(mut a: L, mut b: R) -> cmp::Ordering where
+    pub fn cmp<A, L, R>(a: L, b: R) -> cmp::Ordering where
         A: Ord,
         L: Iterator<Item=A>,
         R: Iterator<Item=A>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return Equal,
-                (None, _   ) => return Less,
-                (_   , None) => return Greater,
-                (Some(x), Some(y)) => match x.cmp(&y) {
-                    Equal => (),
-                    non_eq => return non_eq,
-                },
-            }
-        }
+        a.cmp(b)
     }
 
     /// Order `a` and `b` lexicographically using `PartialOrd`
-    pub fn partial_cmp<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> Option<cmp::Ordering> where
+    pub fn partial_cmp<L: Iterator, R: Iterator>(a: L, b: R) -> Option<cmp::Ordering> where
         L::Item: PartialOrd<R::Item>
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return Some(Equal),
-                (None, _   ) => return Some(Less),
-                (_   , None) => return Some(Greater),
-                (Some(x), Some(y)) => match x.partial_cmp(&y) {
-                    Some(Equal) => (),
-                    non_eq => return non_eq,
-                },
-            }
-        }
+        a.partial_cmp(b)
     }
 
     /// Compare `a` and `b` for equality (Using partial equality, `PartialEq`)
-    pub fn eq<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> bool where
+    pub fn eq<L: Iterator, R: Iterator>(a: L, b: R) -> bool where
         L::Item: PartialEq<R::Item>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return true,
-                (None, _) | (_, None) => return false,
-                (Some(x), Some(y)) => if !x.eq(&y) { return false },
-            }
-        }
+        a.eq(b)
     }
 
     /// Compares `a` and `b` for nonequality (Using partial equality, `PartialEq`)
-    pub fn ne<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> bool where
+    pub fn ne<L: Iterator, R: Iterator>(a: L, b: R) -> bool where
         L::Item: PartialEq<R::Item>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return false,
-                (None, _) | (_, None) => return true,
-                (Some(x), Some(y)) => if x.ne(&y) { return true },
-            }
-        }
+        a.ne(b)
     }
 
     /// Returns `a` < `b` lexicographically (Using partial order, `PartialOrd`)
-    pub fn lt<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> bool where
+    pub fn lt<L: Iterator, R: Iterator>(a: L, b: R) -> bool where
         L::Item: PartialOrd<R::Item>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return false,
-                (None, _   ) => return true,
-                (_   , None) => return false,
-                (Some(x), Some(y)) => if x.ne(&y) { return x.lt(&y) },
-            }
-        }
+        a.lt(b)
     }
 
     /// Returns `a` <= `b` lexicographically (Using partial order, `PartialOrd`)
-    pub fn le<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> bool where
+    pub fn le<L: Iterator, R: Iterator>(a: L, b: R) -> bool where
         L::Item: PartialOrd<R::Item>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return true,
-                (None, _   ) => return true,
-                (_   , None) => return false,
-                (Some(x), Some(y)) => if x.ne(&y) { return x.le(&y) },
-            }
-        }
+        a.le(b)
     }
 
     /// Returns `a` > `b` lexicographically (Using partial order, `PartialOrd`)
-    pub fn gt<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> bool where
+    pub fn gt<L: Iterator, R: Iterator>(a: L, b: R) -> bool where
         L::Item: PartialOrd<R::Item>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return false,
-                (None, _   ) => return false,
-                (_   , None) => return true,
-                (Some(x), Some(y)) => if x.ne(&y) { return x.gt(&y) },
-            }
-        }
+        a.gt(b)
     }
 
     /// Returns `a` >= `b` lexicographically (Using partial order, `PartialOrd`)
-    pub fn ge<L: Iterator, R: Iterator>(mut a: L, mut b: R) -> bool where
+    pub fn ge<L: Iterator, R: Iterator>(a: L, b: R) -> bool where
         L::Item: PartialOrd<R::Item>,
     {
-        loop {
-            match (a.next(), b.next()) {
-                (None, None) => return true,
-                (None, _   ) => return false,
-                (_   , None) => return true,
-                (Some(x), Some(y)) => if x.ne(&y) { return x.ge(&y) },
-            }
-        }
+        a.ge(b)
     }
 }

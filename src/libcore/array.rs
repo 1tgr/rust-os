@@ -16,15 +16,18 @@
 
 #![unstable(feature = "fixed_size_array",
             reason = "traits and impls are better expressed through generic \
-                      integer constants")]
+                      integer constants",
+            issue = "27778")]
 
+use borrow::{Borrow, BorrowMut};
 use clone::Clone;
 use cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
 use convert::{AsRef, AsMut};
+use default::Default;
 use fmt;
 use hash::{Hash, self};
 use iter::IntoIterator;
-use marker::{Copy, Sized};
+use marker::{Copy, Sized, Unsize};
 use option::Option;
 use slice::{Iter, IterMut, SliceExt};
 
@@ -39,21 +42,21 @@ pub trait FixedSizeArray<T> {
     fn as_mut_slice(&mut self) -> &mut [T];
 }
 
+impl<T, A: Unsize<[T]>> FixedSizeArray<T> for A {
+    #[inline]
+    fn as_slice(&self) -> &[T] {
+        self
+    }
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self
+    }
+}
+
 // macro for implementing n-ary tuple functions and operations
 macro_rules! array_impls {
     ($($N:expr)+) => {
         $(
-            impl<T> FixedSizeArray<T> for [T; $N] {
-                #[inline]
-                fn as_slice(&self) -> &[T] {
-                    &self[..]
-                }
-                #[inline]
-                fn as_mut_slice(&mut self) -> &mut [T] {
-                    &mut self[..]
-                }
-            }
-
             impl<T> AsRef<[T]> for [T; $N] {
                 #[inline]
                 fn as_ref(&self) -> &[T] {
@@ -65,6 +68,20 @@ macro_rules! array_impls {
                 #[inline]
                 fn as_mut(&mut self) -> &mut [T] {
                     &mut self[..]
+                }
+            }
+
+            #[stable(feature = "array_borrow", since = "1.4.0")]
+            impl<T> Borrow<[T]> for [T; $N] {
+                fn borrow(&self) -> &[T] {
+                    self
+                }
+            }
+
+            #[stable(feature = "array_borrow", since = "1.4.0")]
+            impl<T> BorrowMut<[T]> for [T; $N] {
+                fn borrow_mut(&mut self) -> &mut [T] {
+                    self
                 }
             }
 
@@ -161,3 +178,26 @@ array_impls! {
     20 21 22 23 24 25 26 27 28 29
     30 31 32
 }
+
+// The Default impls cannot be generated using the array_impls! macro because
+// they require array literals.
+
+macro_rules! array_impl_default {
+    {$n:expr, $t:ident $($ts:ident)*} => {
+        #[stable(since = "1.4.0", feature = "array_default")]
+        impl<T> Default for [T; $n] where T: Default {
+            fn default() -> [T; $n] {
+                [$t::default(), $($ts::default()),*]
+            }
+        }
+        array_impl_default!{($n - 1), $($ts)*}
+    };
+    {$n:expr,} => {
+        #[stable(since = "1.4.0", feature = "array_default")]
+        impl<T> Default for [T; $n] {
+            fn default() -> [T; $n] { [] }
+        }
+    };
+}
+
+array_impl_default!{32, T T T T T T T T T T T T T T T T T T T T T T T T T T T T T T T T}

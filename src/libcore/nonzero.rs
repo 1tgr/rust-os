@@ -10,7 +10,8 @@
 
 //! Exposes the NonZero lang item which provides optimization hints.
 #![unstable(feature = "nonzero",
-            reason = "needs an RFC to flesh out the design")]
+            reason = "needs an RFC to flesh out the design",
+            issue = "27730")]
 
 use marker::Sized;
 use ops::{CoerceUnsized, Deref};
@@ -50,7 +51,7 @@ impl<T: Zeroable> Deref for NonZero<T> {
     type Target = T;
 
     #[inline]
-    fn deref<'a>(&'a self) -> &'a T {
+    fn deref(&self) -> &T {
         let NonZero(ref inner) = *self;
         inner
     }

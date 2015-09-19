@@ -234,7 +234,7 @@ use self::Result::{Ok, Err};
 use clone::Clone;
 use fmt;
 use iter::{Iterator, DoubleEndedIterator, FromIterator, ExactSizeIterator, IntoIterator};
-use ops::{FnMut, FnOnce};
+use ops::FnOnce;
 use option::Option::{self, None, Some};
 use slice;
 
@@ -405,7 +405,9 @@ impl<T, E> Result<T, E> {
 
     /// Converts from `Result<T, E>` to `&[T]` (without copying)
     #[inline]
-    #[unstable(feature = "as_slice", since = "unsure of the utility here")]
+    #[unstable(feature = "as_slice", reason = "unsure of the utility here",
+               issue = "27776")]
+    #[deprecated(since = "1.4.0", reason = "niche API, unclear of usefulness")]
     pub fn as_slice(&self) -> &[T] {
         match *self {
             Ok(ref x) => slice::ref_slice(x),
@@ -420,7 +422,8 @@ impl<T, E> Result<T, E> {
     /// Converts from `Result<T, E>` to `&mut [T]` (without copying)
     ///
     /// ```
-    /// # #![feature(as_slice)]
+    /// #![feature(as_slice)]
+    ///
     /// let mut x: Result<&str, u32> = Ok("Gold");
     /// {
     ///     let v = x.as_mut_slice();
@@ -435,7 +438,9 @@ impl<T, E> Result<T, E> {
     /// ```
     #[inline]
     #[unstable(feature = "as_slice",
-               reason = "waiting for mut conventions")]
+               reason = "waiting for mut conventions",
+               issue = "27776")]
+    #[deprecated(since = "1.4.0", reason = "niche API, unclear of usefulness")]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         match *self {
             Ok(ref mut x) => slice::mut_ref_slice(x),
@@ -533,7 +538,7 @@ impl<T, E> Result<T, E> {
     /// ```
     /// let mut x: Result<u32, &str> = Ok(7);
     /// match x.iter_mut().next() {
-    ///     Some(&mut ref mut x) => *x = 40,
+    ///     Some(v) => *v = 40,
     ///     None => {},
     /// }
     /// assert_eq!(x, Ok(40));
@@ -739,12 +744,11 @@ impl<T, E: fmt::Debug> Result<T, E> {
     ///
     /// # Examples
     /// ```{.should_panic}
-    /// #![feature(result_expect)]
     /// let x: Result<u32, &str> = Err("emergency failure");
     /// x.expect("Testing expect"); // panics with `Testing expect: emergency failure`
     /// ```
     #[inline]
-    #[unstable(feature = "result_expect", reason = "newly introduced")]
+    #[stable(feature = "result_expect", since = "1.4.0")]
     pub fn expect(self, msg: &str) -> T {
         match self {
             Ok(t) => t,
@@ -809,6 +813,26 @@ impl<T, E> IntoIterator for Result<T, E> {
     #[inline]
     fn into_iter(self) -> IntoIter<T> {
         IntoIter { inner: self.ok() }
+    }
+}
+
+#[stable(since = "1.4.0", feature = "result_iter")]
+impl<'a, T, E> IntoIterator for &'a Result<T, E> {
+    type Item = &'a T;
+    type IntoIter = Iter<'a, T>;
+
+    fn into_iter(self) -> Iter<'a, T> {
+        self.iter()
+    }
+}
+
+#[stable(since = "1.4.0", feature = "result_iter")]
+impl<'a, T, E> IntoIterator for &'a mut Result<T, E> {
+    type Item = &'a mut T;
+    type IntoIter = IterMut<'a, T>;
+
+    fn into_iter(mut self) -> IterMut<'a, T> {
+        self.iter_mut()
     }
 }
 
@@ -955,36 +979,4 @@ impl<A, E, V: FromIterator<A>> FromIterator<Result<A, E>> for Result<V, E> {
             None => Ok(v),
         }
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////
-// FromIterator
-/////////////////////////////////////////////////////////////////////////////
-
-/// Performs a fold operation over the result values from an iterator.
-///
-/// If an `Err` is encountered, it is immediately returned.
-/// Otherwise, the folded value is returned.
-#[inline]
-#[unstable(feature = "result_fold",
-           reason = "unclear if this function should exist")]
-#[deprecated(since = "1.2.0",
-             reason = "has not seen enough usage to justify its position in \
-                       the standard library")]
-pub fn fold<T,
-            V,
-            E,
-            F: FnMut(V, T) -> V,
-            Iter: Iterator<Item=Result<T, E>>>(
-            iterator: Iter,
-            mut init: V,
-            mut f: F)
-            -> Result<V, E> {
-    for t in iterator {
-        match t {
-            Ok(v) => init = f(init, v),
-            Err(u) => return Err(u)
-        }
-    }
-    Ok(init)
 }

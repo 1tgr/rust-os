@@ -19,7 +19,7 @@ use char::CharExt;
 use cmp::{Eq, PartialOrd};
 use fmt;
 use intrinsics;
-use marker::Copy;
+use marker::{Copy, Sized};
 use mem::size_of;
 use option::Option::{self, Some, None};
 use result::Result::{self, Ok, Err};
@@ -44,13 +44,15 @@ pub struct Wrapping<T>(#[stable(feature = "rust1", since = "1.0.0")] pub T);
 
 pub mod wrapping;
 pub mod flt2dec;
+pub mod dec2flt;
 
 /// Types that have a "zero" value.
 ///
 /// This trait is intended for use in conjunction with `Add`, as an identity:
 /// `x + T::zero() == x`.
 #[unstable(feature = "zero_one",
-           reason = "unsure of placement, wants to use associated constants")]
+           reason = "unsure of placement, wants to use associated constants",
+           issue = "27739")]
 pub trait Zero {
     /// The "zero" (usually, additive identity) for this type.
     fn zero() -> Self;
@@ -61,7 +63,8 @@ pub trait Zero {
 /// This trait is intended for use in conjunction with `Mul`, as an identity:
 /// `x * T::one() == x`.
 #[unstable(feature = "zero_one",
-           reason = "unsure of placement, wants to use associated constants")]
+           reason = "unsure of placement, wants to use associated constants",
+           issue = "27739")]
 pub trait One {
     /// The "one" (usually, multiplicative identity) for this type.
     fn one() -> Self;
@@ -136,7 +139,6 @@ macro_rules! int_impl {
         /// assert_eq!(u32::from_str_radix("A", 16), Ok(10));
         /// ```
         #[stable(feature = "rust1", since = "1.0.0")]
-        #[allow(deprecated)]
         pub fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseIntError> {
             from_str_radix(src, radix)
         }
@@ -479,8 +481,8 @@ macro_rules! int_impl {
         /// wrapping around at the boundary of the type.
         ///
         /// Such wrap-around never actually occurs mathematically;
-        /// implementation artifacts make `x % y` illegal for `MIN /
-        /// -1` on a signed type illegal (where `MIN` is the negative
+        /// implementation artifacts make `x % y` invalid for `MIN /
+        /// -1` on a signed type (where `MIN` is the negative
         /// minimal value). In such a case, this function returns `0`.
         #[stable(feature = "num_wrapping", since = "1.2.0")]
         #[inline(always)]
@@ -535,25 +537,21 @@ macro_rules! int_impl {
             let mut base = self;
             let mut acc = Self::one();
 
-            let mut prev_base = self;
-            let mut base_oflo = false;
-            while exp > 0 {
+            while exp > 1 {
                 if (exp & 1) == 1 {
-                    if base_oflo {
-                        // ensure overflow occurs in the same manner it
-                        // would have otherwise (i.e. signal any exception
-                        // it would have otherwise).
-                        acc = acc * (prev_base * prev_base);
-                    } else {
-                        acc = acc * base;
-                    }
+                    acc = acc * base;
                 }
-                prev_base = base;
-                let (new_base, new_base_oflo) = base.overflowing_mul(base);
-                base = new_base;
-                base_oflo = new_base_oflo;
                 exp /= 2;
+                base = base * base;
             }
+
+            // Deal with the final bit of the exponent separately, since
+            // squaring the base afterwards is not necessary and may cause a
+            // needless overflow.
+            if exp == 1 {
+                acc = acc * base;
+            }
+
             acc
         }
 
@@ -691,7 +689,6 @@ macro_rules! uint_impl {
         /// `Err(ParseIntError)` if the string did not represent a valid number.
         /// Otherwise, `Ok(n)` where `n` is the integer represented by `src`.
         #[stable(feature = "rust1", since = "1.0.0")]
-        #[allow(deprecated)]
         pub fn from_str_radix(src: &str, radix: u32) -> Result<Self, ParseIntError> {
             from_str_radix(src, radix)
         }
@@ -1051,8 +1048,8 @@ macro_rules! uint_impl {
         /// wrapping around at the boundary of the type.
         ///
         /// Such wrap-around never actually occurs mathematically;
-        /// implementation artifacts make `x % y` illegal for `MIN /
-        /// -1` on a signed type illegal (where `MIN` is the negative
+        /// implementation artifacts make `x % y` invalid for `MIN /
+        /// -1` on a signed type (where `MIN` is the negative
         /// minimal value). In such a case, this function returns `0`.
         #[stable(feature = "num_wrapping", since = "1.2.0")]
         #[inline(always)]
@@ -1263,8 +1260,9 @@ pub enum FpCategory {
 /// A built-in floating point number.
 #[doc(hidden)]
 #[unstable(feature = "core_float",
-           reason = "stable interface is via `impl f{32,64}` in later crates")]
-pub trait Float {
+           reason = "stable interface is via `impl f{32,64}` in later crates",
+           issue = "27702")]
+pub trait Float: Sized {
     /// Returns the NaN value.
     fn nan() -> Self;
     /// Returns the infinite value.
@@ -1295,18 +1293,6 @@ pub trait Float {
     /// Returns the mantissa, exponent and sign as integers, respectively.
     fn integer_decode(self) -> (u64, i16, i8);
 
-    /// Return the largest integer less than or equal to a number.
-    fn floor(self) -> Self;
-    /// Return the smallest integer greater than or equal to a number.
-    fn ceil(self) -> Self;
-    /// Return the nearest integer to a number. Round half-way cases away from
-    /// `0.0`.
-    fn round(self) -> Self;
-    /// Return the integer part of a number.
-    fn trunc(self) -> Self;
-    /// Return the fractional part of a number.
-    fn fract(self) -> Self;
-
     /// Computes the absolute value of `self`. Returns `Float::nan()` if the
     /// number is `Float::nan()`.
     fn abs(self) -> Self;
@@ -1323,10 +1309,6 @@ pub trait Float {
     /// `Float::neg_infinity()`.
     fn is_negative(self) -> bool;
 
-    /// Fused multiply-add. Computes `(self * a) + b` with only one rounding
-    /// error. This produces a more accurate result with better performance than
-    /// a separate multiplication operation followed by an add.
-    fn mul_add(self, a: Self, b: Self) -> Self;
     /// Take the reciprocal (inverse) of a number, `1/x`.
     fn recip(self) -> Self;
 
@@ -1334,28 +1316,6 @@ pub trait Float {
     ///
     /// Using this function is generally faster than using `powf`
     fn powi(self, n: i32) -> Self;
-    /// Raise a number to a floating point power.
-    fn powf(self, n: Self) -> Self;
-
-    /// Take the square root of a number.
-    ///
-    /// Returns NaN if `self` is a negative number.
-    fn sqrt(self) -> Self;
-    /// Take the reciprocal (inverse) square root of a number, `1/sqrt(x)`.
-    fn rsqrt(self) -> Self;
-
-    /// Returns `e^(self)`, (the exponential function).
-    fn exp(self) -> Self;
-    /// Returns 2 raised to the power of the number, `2^(self)`.
-    fn exp2(self) -> Self;
-    /// Returns the natural logarithm of the number.
-    fn ln(self) -> Self;
-    /// Returns the logarithm of the number with respect to an arbitrary base.
-    fn log(self, base: Self) -> Self;
-    /// Returns the base 2 logarithm of the number.
-    fn log2(self) -> Self;
-    /// Returns the base 10 logarithm of the number.
-    fn log10(self) -> Self;
 
     /// Convert radians to degrees.
     fn to_degrees(self) -> Self;
@@ -1363,52 +1323,9 @@ pub trait Float {
     fn to_radians(self) -> Self;
 }
 
-macro_rules! from_str_float_impl {
-    ($t:ty) => {
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl FromStr for $t {
-            type Err = ParseFloatError;
-
-            /// Converts a string in base 10 to a float.
-            /// Accepts an optional decimal exponent.
-            ///
-            /// This function accepts strings such as
-            ///
-            /// * '3.14'
-            /// * '-3.14'
-            /// * '2.5E10', or equivalently, '2.5e10'
-            /// * '2.5E-10'
-            /// * '.' (understood as 0)
-            /// * '5.'
-            /// * '.5', or, equivalently,  '0.5'
-            /// * 'inf', '-inf', 'NaN'
-            ///
-            /// Leading and trailing whitespace represent an error.
-            ///
-            /// # Arguments
-            ///
-            /// * src - A string
-            ///
-            /// # Return value
-            ///
-            /// `Err(ParseFloatError)` if the string did not represent a valid
-            /// number.  Otherwise, `Ok(n)` where `n` is the floating-point
-            /// number represented by `src`.
-            #[inline]
-            #[allow(deprecated)]
-            fn from_str(src: &str) -> Result<Self, ParseFloatError> {
-                Self::from_str_radix(src, 10)
-            }
-        }
-    }
-}
-from_str_float_impl!(f32);
-from_str_float_impl!(f64);
-
 macro_rules! from_str_radix_int_impl {
     ($($t:ty)*) => {$(
         #[stable(feature = "rust1", since = "1.0.0")]
-        #[allow(deprecated)]
         impl FromStr for $t {
             type Err = ParseIntError;
             fn from_str(src: &str) -> Result<Self, ParseIntError> {
@@ -1528,7 +1445,8 @@ enum IntErrorKind {
 impl ParseIntError {
     #[unstable(feature = "int_error_internals",
                reason = "available through Error trait and this method should \
-                         not be exposed publicly")]
+                         not be exposed publicly",
+               issue = "0")]
     #[doc(hidden)]
     pub fn __description(&self) -> &str {
         match self.kind {
@@ -1547,38 +1465,4 @@ impl fmt::Display for ParseIntError {
     }
 }
 
-/// An error which can be returned when parsing a float.
-#[derive(Debug, Clone, PartialEq)]
-#[stable(feature = "rust1", since = "1.0.0")]
-pub struct ParseFloatError {
-    #[doc(hidden)]
-    #[unstable(feature = "float_error_internals",
-               reason = "should not be exposed publicly")]
-    pub __kind: FloatErrorKind
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[unstable(feature = "float_error_internals",
-           reason = "should not be exposed publicly")]
-#[doc(hidden)]
-pub enum FloatErrorKind {
-    Empty,
-    Invalid,
-}
-
-impl ParseFloatError {
-    #[doc(hidden)]
-    pub fn __description(&self) -> &str {
-        match self.__kind {
-            FloatErrorKind::Empty => "cannot parse float from empty string",
-            FloatErrorKind::Invalid => "invalid float literal",
-        }
-    }
-}
-
-#[stable(feature = "rust1", since = "1.0.0")]
-impl fmt::Display for ParseFloatError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.__description().fmt(f)
-    }
-}
+pub use num::dec2flt::ParseFloatError;

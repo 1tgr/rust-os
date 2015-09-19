@@ -94,7 +94,7 @@ use fmt;
 #[lang = "drop"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Drop {
-    /// The `drop` method, called when the value goes out of scope.
+    /// A method called when the value goes out of scope.
     #[stable(feature = "rust1", since = "1.0.0")]
     fn drop(&mut self);
 }
@@ -423,7 +423,7 @@ pub trait Rem<RHS=Self> {
     fn rem(self, rhs: RHS) -> Self::Output;
 }
 
-macro_rules! rem_impl {
+macro_rules! rem_impl_integer {
     ($($t:ty)*) => ($(
         /// This operation satisfies `n % d == n - (n / d) * d`.  The
         /// result has the same sign as the left operand.
@@ -439,13 +439,34 @@ macro_rules! rem_impl {
     )*)
 }
 
-rem_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+rem_impl_integer! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+
+#[cfg(not(stage0))]
+macro_rules! rem_impl_float {
+    ($($t:ty)*) => ($(
+        #[stable(feature = "rust1", since = "1.0.0")]
+        impl Rem for $t {
+            type Output = $t;
+
+            #[inline]
+            fn rem(self, other: $t) -> $t { self % other }
+        }
+
+        forward_ref_binop! { impl Rem, rem for $t, $t }
+    )*)
+}
+
+#[cfg(not(stage0))]
+rem_impl_float! { f32 f64 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
+#[cfg(stage0)]
 impl Rem for f32 {
     type Output = f32;
 
-    // see notes in `core::f32::Float::floor`
+    // The builtin f32 rem operator is broken when targeting
+    // MSVC; see comment in std::f32::floor.
+    // FIXME: See also #27859.
     #[inline]
     #[cfg(target_env = "msvc")]
     fn rem(self, other: f32) -> f32 {
@@ -461,6 +482,7 @@ impl Rem for f32 {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
+#[cfg(stage0)]
 impl Rem for f64 {
     type Output = f64;
 
@@ -471,7 +493,9 @@ impl Rem for f64 {
     }
 }
 
+#[cfg(stage0)]
 forward_ref_binop! { impl Rem, rem for f64, f64 }
+#[cfg(stage0)]
 forward_ref_binop! { impl Rem, rem for f32, f32 }
 
 /// The `Neg` trait is used to specify the functionality of unary `-`.
@@ -941,7 +965,7 @@ pub trait Index<Idx: ?Sized> {
 
     /// The method for the indexing (`Foo[Bar]`) operation
     #[stable(feature = "rust1", since = "1.0.0")]
-    fn index<'a>(&'a self, index: Idx) -> &'a Self::Output;
+    fn index(&self, index: Idx) -> &Self::Output;
 }
 
 /// The `IndexMut` trait is used to specify the functionality of indexing
@@ -984,7 +1008,7 @@ pub trait Index<Idx: ?Sized> {
 pub trait IndexMut<Idx: ?Sized>: Index<Idx> {
     /// The method for the indexing (`Foo[Bar]`) operation
     #[stable(feature = "rust1", since = "1.0.0")]
-    fn index_mut<'a>(&'a mut self, index: Idx) -> &'a mut Self::Output;
+    fn index_mut(&mut self, index: Idx) -> &mut Self::Output;
 }
 
 /// An unbounded range.
@@ -1095,7 +1119,7 @@ pub trait Deref {
 
     /// The method called to dereference a value
     #[stable(feature = "rust1", since = "1.0.0")]
-    fn deref<'a>(&'a self) -> &'a Self::Target;
+    fn deref(&self) -> &Self::Target;
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1156,7 +1180,7 @@ impl<'a, T: ?Sized> Deref for &'a mut T {
 pub trait DerefMut: Deref {
     /// The method called to mutably dereference a value
     #[stable(feature = "rust1", since = "1.0.0")]
-    fn deref_mut<'a>(&'a mut self) -> &'a mut Self::Target;
+    fn deref_mut(&mut self) -> &mut Self::Target;
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1247,7 +1271,7 @@ mod impls {
 
 /// Trait that indicates that this is a pointer or a wrapper for one,
 /// where unsizing can be performed on the pointee.
-#[unstable(feature = "coerce_unsized")]
+#[unstable(feature = "coerce_unsized", issue = "27732")]
 #[lang="coerce_unsized"]
 pub trait CoerceUnsized<T> {
     // Empty.
@@ -1293,7 +1317,7 @@ impl<T: ?Sized+Unsize<U>, U: ?Sized> CoerceUnsized<*const U> for *const T {}
 /// If evaluating EXPR fails, then the destructor for the
 /// implementation of Place to clean up any intermediate state
 /// (e.g. deallocate box storage, pop a stack, etc).
-#[unstable(feature = "placement_new_protocol")]
+#[unstable(feature = "placement_new_protocol", issue = "27779")]
 pub trait Place<Data: ?Sized> {
     /// Returns the address where the input value will be written.
     /// Note that the data at this address is generally uninitialized,
@@ -1324,7 +1348,7 @@ pub trait Place<Data: ?Sized> {
 /// Values for types implementing this trait usually are transient
 /// intermediate values (e.g. the return value of `Vec::emplace_back`)
 /// or `Copy`, since the `make_place` method takes `self` by value.
-#[unstable(feature = "placement_new_protocol")]
+#[unstable(feature = "placement_new_protocol", issue = "27779")]
 pub trait Placer<Data: ?Sized> {
     /// `Place` is the intermedate agent guarding the
     /// uninitialized state for `Data`.
@@ -1335,7 +1359,7 @@ pub trait Placer<Data: ?Sized> {
 }
 
 /// Specialization of `Place` trait supporting `in (PLACE) EXPR`.
-#[unstable(feature = "placement_new_protocol")]
+#[unstable(feature = "placement_new_protocol", issue = "27779")]
 pub trait InPlace<Data: ?Sized>: Place<Data> {
     /// `Owner` is the type of the end value of `in (PLACE) EXPR`
     ///
@@ -1372,7 +1396,7 @@ pub trait InPlace<Data: ?Sized>: Place<Data> {
 /// `<T as Boxed>` in turn dictates determines which
 /// implementation of `BoxPlace` to use, namely:
 /// `<<T as Boxed>::Place as BoxPlace>`.
-#[unstable(feature = "placement_new_protocol")]
+#[unstable(feature = "placement_new_protocol", issue = "27779")]
 pub trait Boxed {
     /// The kind of data that is stored in this kind of box.
     type Data;  /* (`Data` unused b/c cannot yet express below bound.) */
@@ -1386,7 +1410,7 @@ pub trait Boxed {
 }
 
 /// Specialization of `Place` trait supporting `box EXPR`.
-#[unstable(feature = "placement_new_protocol")]
+#[unstable(feature = "placement_new_protocol", issue = "27779")]
 pub trait BoxPlace<Data: ?Sized> : Place<Data> {
     /// Creates a globally fresh place.
     fn make_place() -> Self;

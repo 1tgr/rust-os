@@ -32,16 +32,12 @@
 use core::char::CharExt as C;
 use core::option::Option::{self, Some, None};
 use core::iter::Iterator;
-use tables::{derived_property, property, general_category, conversions, charwidth};
+use tables::{derived_property, property, general_category, conversions};
 
 // stable reexports
 pub use core::char::{MAX, from_u32, from_u32_unchecked, from_digit, EscapeUnicode, EscapeDefault};
 
 // unstable reexports
-#[allow(deprecated)]
-pub use normalize::{decompose_canonical, decompose_compatible, compose};
-#[allow(deprecated)]
-pub use tables::normalization::canonical_combining_class;
 pub use tables::UNICODE_VERSION;
 
 /// An iterator over the lowercase mapping of a given character, returned from
@@ -278,7 +274,8 @@ impl char {
     /// In both of these examples, 'ß' takes two bytes to encode.
     ///
     /// ```
-    /// # #![feature(unicode)]
+    /// #![feature(unicode)]
+    ///
     /// let mut b = [0; 2];
     ///
     /// let result = 'ß'.encode_utf8(&mut b);
@@ -289,7 +286,8 @@ impl char {
     /// A buffer that's too small:
     ///
     /// ```
-    /// # #![feature(unicode)]
+    /// #![feature(unicode)]
+    ///
     /// let mut b = [0; 1];
     ///
     /// let result = 'ß'.encode_utf8(&mut b);
@@ -297,7 +295,8 @@ impl char {
     /// assert_eq!(result, None);
     /// ```
     #[unstable(feature = "unicode",
-               reason = "pending decision about Iterator/Writer/Reader")]
+               reason = "pending decision about Iterator/Writer/Reader",
+               issue = "27784")]
     #[inline]
     pub fn encode_utf8(self, dst: &mut [u8]) -> Option<usize> {
         C::encode_utf8(self, dst)
@@ -315,7 +314,8 @@ impl char {
     /// In both of these examples, 'ß' takes one `u16` to encode.
     ///
     /// ```
-    /// # #![feature(unicode)]
+    /// #![feature(unicode)]
+    ///
     /// let mut b = [0; 1];
     ///
     /// let result = 'ß'.encode_utf16(&mut b);
@@ -326,7 +326,8 @@ impl char {
     /// A buffer that's too small:
     ///
     /// ```
-    /// # #![feature(unicode)]
+    /// #![feature(unicode)]
+    ///
     /// let mut b = [0; 0];
     ///
     /// let result = 'ß'.encode_utf8(&mut b);
@@ -334,7 +335,8 @@ impl char {
     /// assert_eq!(result, None);
     /// ```
     #[unstable(feature = "unicode",
-               reason = "pending decision about Iterator/Writer/Reader")]
+               reason = "pending decision about Iterator/Writer/Reader",
+               issue = "27784")]
     #[inline]
     pub fn encode_utf16(self, dst: &mut [u16]) -> Option<usize> {
         C::encode_utf16(self, dst)
@@ -359,7 +361,8 @@ impl char {
     /// [UAX #31](http://unicode.org/reports/tr31/#NFKC_Modifications),
     /// mostly similar to ID_Start but modified for closure under NFKx.
     #[unstable(feature = "unicode",
-               reason = "mainly needed for compiler internals")]
+               reason = "mainly needed for compiler internals",
+               issue = "0")]
     #[inline]
     pub fn is_xid_start(self) -> bool { derived_property::XID_Start(self) }
 
@@ -370,7 +373,8 @@ impl char {
     /// [UAX #31](http://unicode.org/reports/tr31/#NFKC_Modifications),
     /// mostly similar to 'ID_Continue' but modified for closure under NFKx.
     #[unstable(feature = "unicode",
-               reason = "mainly needed for compiler internals")]
+               reason = "mainly needed for compiler internals",
+               issue = "0")]
     #[inline]
     pub fn is_xid_continue(self) -> bool { derived_property::XID_Continue(self) }
 
@@ -472,7 +476,7 @@ impl char {
     /// it maps one Unicode character to its uppercase equivalent
     /// according to the Unicode database [1]
     /// and the additional complex mappings [`SpecialCasing.txt`].
-    /// Conditional mappings (based on context or language) are not considerd here.
+    /// Conditional mappings (based on context or language) are not considered here.
     ///
     /// A full reference can be found here [2].
     ///
@@ -498,22 +502,117 @@ impl char {
     pub fn to_uppercase(self) -> ToUppercase {
         ToUppercase(CaseMappingIter::new(conversions::to_upper(self)))
     }
+}
 
-    /// Returns this character's displayed width in columns, or `None` if it is a
-    /// control character other than `'\x00'`.
-    ///
-    /// `is_cjk` determines behavior for characters in the Ambiguous category:
-    /// if `is_cjk` is `true`, these are 2 columns wide; otherwise, they are 1.
-    /// In CJK contexts, `is_cjk` should be `true`, else it should be `false`.
-    /// [Unicode Standard Annex #11](http://www.unicode.org/reports/tr11/)
-    /// recommends that these characters be treated as 1 column (i.e.,
-    /// `is_cjk` = `false`) if the context cannot be reliably determined.
-    #[deprecated(reason = "use the crates.io `unicode-width` library instead",
-                 since = "1.0.0")]
-    #[unstable(feature = "unicode",
-               reason = "needs expert opinion. is_cjk flag stands out as ugly")]
-    #[inline]
-    pub fn width(self, is_cjk: bool) -> Option<usize> {
-        charwidth::width(self, is_cjk)
+/// An iterator that decodes UTF-16 encoded codepoints from an iterator of `u16`s.
+#[unstable(feature = "decode_utf16", reason = "recently exposed", issue = "27830")]
+#[derive(Clone)]
+pub struct DecodeUtf16<I> where I: Iterator<Item=u16> {
+    iter: I,
+    buf: Option<u16>,
+}
+
+/// Create an iterator over the UTF-16 encoded codepoints in `iterable`,
+/// returning unpaired surrogates as `Err`s.
+///
+/// # Examples
+///
+/// ```
+/// #![feature(decode_utf16)]
+///
+/// use std::char::decode_utf16;
+///
+/// fn main() {
+///     // 𝄞mus<invalid>ic<invalid>
+///     let v = [0xD834, 0xDD1E, 0x006d, 0x0075,
+///              0x0073, 0xDD1E, 0x0069, 0x0063,
+///              0xD834];
+///
+///     assert_eq!(decode_utf16(v.iter().cloned()).collect::<Vec<_>>(),
+///                vec![Ok('𝄞'),
+///                     Ok('m'), Ok('u'), Ok('s'),
+///                     Err(0xDD1E),
+///                     Ok('i'), Ok('c'),
+///                     Err(0xD834)]);
+/// }
+/// ```
+///
+/// A lossy decoder can be obtained by replacing `Err` results with the replacement character:
+///
+/// ```
+/// #![feature(decode_utf16)]
+///
+/// use std::char::{decode_utf16, REPLACEMENT_CHARACTER};
+///
+/// fn main() {
+///     // 𝄞mus<invalid>ic<invalid>
+///     let v = [0xD834, 0xDD1E, 0x006d, 0x0075,
+///              0x0073, 0xDD1E, 0x0069, 0x0063,
+///              0xD834];
+///
+///     assert_eq!(decode_utf16(v.iter().cloned())
+///                    .map(|r| r.unwrap_or(REPLACEMENT_CHARACTER))
+///                    .collect::<String>(),
+///                "𝄞mus�ic�");
+/// }
+/// ```
+#[unstable(feature = "decode_utf16", reason = "recently exposed", issue = "27830")]
+#[inline]
+pub fn decode_utf16<I: IntoIterator<Item=u16>>(iterable: I) -> DecodeUtf16<I::IntoIter> {
+    DecodeUtf16 {
+        iter: iterable.into_iter(),
+        buf: None,
     }
 }
+
+#[unstable(feature = "decode_utf16", reason = "recently exposed", issue = "27830")]
+impl<I: Iterator<Item=u16>> Iterator for DecodeUtf16<I> {
+    type Item = Result<char, u16>;
+
+    fn next(&mut self) -> Option<Result<char, u16>> {
+        let u = match self.buf.take() {
+            Some(buf) => buf,
+            None => match self.iter.next() {
+                Some(u) => u,
+                None => return None
+            }
+        };
+
+        if u < 0xD800 || 0xDFFF < u {
+            // not a surrogate
+            Some(Ok(unsafe { from_u32_unchecked(u as u32) }))
+        } else if u >= 0xDC00 {
+            // a trailing surrogate
+            Some(Err(u))
+        } else {
+            let u2 = match self.iter.next() {
+                Some(u2) => u2,
+                // eof
+                None => return Some(Err(u))
+            };
+            if u2 < 0xDC00 || u2 > 0xDFFF {
+                // not a trailing surrogate so we're not a valid
+                // surrogate pair, so rewind to redecode u2 next time.
+                self.buf = Some(u2);
+                return Some(Err(u))
+            }
+
+            // all ok, so lets decode it.
+            let c = (((u - 0xD800) as u32) << 10 | (u2 - 0xDC00) as u32) + 0x1_0000;
+            Some(Ok(unsafe { from_u32_unchecked(c) }))
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (low, high) = self.iter.size_hint();
+        // we could be entirely valid surrogates (2 elements per
+        // char), or entirely non-surrogates (1 element per char)
+        (low / 2, high)
+    }
+}
+
+/// U+FFFD REPLACEMENT CHARACTER (�) is used in Unicode to represent a decoding error.
+/// It can occur, for example, when giving ill-formed UTF-8 bytes to `String::from_utf8_lossy`.
+#[unstable(feature = "decode_utf16", reason = "recently added", issue = "27830")]
+pub const REPLACEMENT_CHARACTER: char = '\u{FFFD}';

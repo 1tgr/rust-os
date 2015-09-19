@@ -19,8 +19,9 @@
 
 use self::Ordering::*;
 
+use mem;
 use marker::Sized;
-use option::Option::{self, Some, None};
+use option::Option::{self, Some};
 
 /// Trait for equality comparisons which are [partial equivalence
 /// relations](http://en.wikipedia.org/wiki/Partial_equivalence_relation).
@@ -114,6 +115,10 @@ pub enum Ordering {
 }
 
 impl Ordering {
+    unsafe fn from_i8_unchecked(v: i8) -> Ordering {
+        mem::transmute(v)
+    }
+
     /// Reverse the `Ordering`.
     ///
     /// * `Less` becomes `Greater`.
@@ -155,7 +160,7 @@ impl Ordering {
             //
             // NB. it is safe because of the explicit discriminants
             // given above.
-            ::mem::transmute::<_, Ordering>(-(self as i8))
+            Ordering::from_i8_unchecked(-(self as i8))
         }
     }
 }
@@ -376,72 +381,6 @@ pub fn max<T: Ord>(v1: T, v2: T) -> T {
     if v2 >= v1 { v2 } else { v1 }
 }
 
-/// Compare and return the minimum of two values if there is one.
-///
-/// Returns the first argument if the comparison determines them to be equal.
-///
-/// # Examples
-///
-/// ```
-/// # #![feature(cmp_partial)]
-/// use std::cmp;
-///
-/// assert_eq!(Some(1), cmp::partial_min(1, 2));
-/// assert_eq!(Some(2), cmp::partial_min(2, 2));
-/// ```
-///
-/// When comparison is impossible:
-///
-/// ```
-/// # #![feature(cmp_partial)]
-/// use std::cmp;
-///
-/// let result = cmp::partial_min(std::f64::NAN, 1.0);
-/// assert_eq!(result, None);
-/// ```
-#[inline]
-#[unstable(feature = "cmp_partial")]
-pub fn partial_min<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
-    match v1.partial_cmp(&v2) {
-        Some(Less) | Some(Equal) => Some(v1),
-        Some(Greater) => Some(v2),
-        None => None
-    }
-}
-
-/// Compare and return the maximum of two values if there is one.
-///
-/// Returns the second argument if the comparison determines them to be equal.
-///
-/// # Examples
-///
-/// ```
-/// # #![feature(cmp_partial)]
-/// use std::cmp;
-///
-/// assert_eq!(Some(2), cmp::partial_max(1, 2));
-/// assert_eq!(Some(2), cmp::partial_max(2, 2));
-/// ```
-///
-/// When comparison is impossible:
-///
-/// ```
-/// # #![feature(cmp_partial)]
-/// use std::cmp;
-///
-/// let result = cmp::partial_max(std::f64::NAN, 1.0);
-/// assert_eq!(result, None);
-/// ```
-#[inline]
-#[unstable(feature = "cmp_partial")]
-pub fn partial_max<T: PartialOrd>(v1: T, v2: T) -> Option<T> {
-    match v1.partial_cmp(&v2) {
-        Some(Equal) | Some(Less) => Some(v2),
-        Some(Greater) => Some(v1),
-        None => None
-    }
-}
-
 // Implementation of PartialEq, Eq, PartialOrd and Ord for primitive types
 mod impls {
     use cmp::{PartialOrd, Ord, PartialEq, Eq, Ordering};
@@ -524,17 +463,33 @@ mod impls {
         }
     }
 
-    partial_ord_impl! { char usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+    partial_ord_impl! { f32 f64 }
 
     macro_rules! ord_impl {
         ($($t:ty)*) => ($(
             #[stable(feature = "rust1", since = "1.0.0")]
+            impl PartialOrd for $t {
+                #[inline]
+                fn partial_cmp(&self, other: &$t) -> Option<Ordering> {
+                    Some(self.cmp(other))
+                }
+                #[inline]
+                fn lt(&self, other: &$t) -> bool { (*self) < (*other) }
+                #[inline]
+                fn le(&self, other: &$t) -> bool { (*self) <= (*other) }
+                #[inline]
+                fn ge(&self, other: &$t) -> bool { (*self) >= (*other) }
+                #[inline]
+                fn gt(&self, other: &$t) -> bool { (*self) > (*other) }
+            }
+
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl Ord for $t {
                 #[inline]
                 fn cmp(&self, other: &$t) -> Ordering {
-                    if *self < *other { Less }
-                    else if *self > *other { Greater }
-                    else { Equal }
+                    if *self == *other { Equal }
+                    else if *self < *other { Less }
+                    else { Greater }
                 }
             }
         )*)

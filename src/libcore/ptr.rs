@@ -16,13 +16,14 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use mem;
 use clone::Clone;
 use intrinsics;
 use ops::Deref;
-use core::fmt;
+use fmt;
+use hash;
 use option::Option::{self, Some, None};
 use marker::{PhantomData, Send, Sized, Sync};
+use mem;
 use nonzero::NonZero;
 
 use cmp::{PartialEq, Eq, Ord, PartialOrd};
@@ -51,7 +52,7 @@ pub use intrinsics::write_bytes;
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
-pub fn null<T>() -> *const T { 0 as *const T }
+pub const fn null<T>() -> *const T { 0 as *const T }
 
 /// Creates a null mutable raw pointer.
 ///
@@ -65,7 +66,7 @@ pub fn null<T>() -> *const T { 0 as *const T }
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
-pub fn null_mut<T>() -> *mut T { 0 as *mut T }
+pub const fn null_mut<T>() -> *mut T { 0 as *mut T }
 
 /// Swaps the values at two mutable locations of the same type, without
 /// deinitialising either. They may overlap, unlike `mem::swap` which is
@@ -100,7 +101,7 @@ pub unsafe fn swap<T>(x: *mut T, y: *mut T) {
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn replace<T>(dest: *mut T, mut src: T) -> T {
-    mem::swap(mem::transmute(dest), &mut src); // cannot overlap
+    mem::swap(&mut *dest, &mut src); // cannot overlap
     src
 }
 
@@ -123,29 +124,12 @@ pub unsafe fn read<T>(src: *const T) -> T {
     tmp
 }
 
-/// Reads the value from `src` and nulls it out without dropping it.
-///
-/// # Safety
-///
-/// This is unsafe for the same reasons that `read` is unsafe.
-#[inline(always)]
-#[unstable(feature = "read_and_zero",
-           reason = "may play a larger role in std::ptr future extensions")]
-pub unsafe fn read_and_zero<T>(dest: *mut T) -> T {
-    // Copy the data out from `dest`:
-    let tmp = read(&*dest);
-
-    // Now zero out `dest`:
-    write_bytes(dest, 0, 1);
-
-    tmp
-}
-
 /// Variant of read_and_zero that writes the specific drop-flag byte
 /// (which may be more appropriate than zero).
 #[inline(always)]
 #[unstable(feature = "filling_drop",
-           reason = "may play a larger role in std::ptr future extensions")]
+           reason = "may play a larger role in std::ptr future extensions",
+           issue = "5016")]
 pub unsafe fn read_and_drop<T>(dest: *mut T) -> T {
     // Copy the data out from `dest`:
     let tmp = read(&*dest);
@@ -180,7 +164,7 @@ impl<T: ?Sized> *const T {
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
     pub fn is_null(self) -> bool where T: Sized {
-        self == 0 as *const T
+        self == null()
     }
 
     /// Returns `None` if the pointer is null, or else returns a reference to
@@ -195,7 +179,8 @@ impl<T: ?Sized> *const T {
     #[unstable(feature = "ptr_as_ref",
                reason = "Option is not clearly the right return type, and we \
                          may want to tie the return lifetime to a borrow of \
-                         the raw pointer")]
+                         the raw pointer",
+               issue = "27780")]
     #[inline]
     pub unsafe fn as_ref<'a>(&self) -> Option<&'a T> where T: Sized {
         if self.is_null() {
@@ -228,7 +213,7 @@ impl<T: ?Sized> *mut T {
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
     pub fn is_null(self) -> bool where T: Sized {
-        self == 0 as *mut T
+        self == null_mut()
     }
 
     /// Returns `None` if the pointer is null, or else returns a reference to
@@ -243,7 +228,8 @@ impl<T: ?Sized> *mut T {
     #[unstable(feature = "ptr_as_ref",
                reason = "Option is not clearly the right return type, and we \
                          may want to tie the return lifetime to a borrow of \
-                         the raw pointer")]
+                         the raw pointer",
+               issue = "27780")]
     #[inline]
     pub unsafe fn as_ref<'a>(&self) -> Option<&'a T> where T: Sized {
         if self.is_null() {
@@ -276,7 +262,8 @@ impl<T: ?Sized> *mut T {
     /// of the returned pointer.
     #[unstable(feature = "ptr_as_ref",
                reason = "return value does not necessarily convey all possible \
-                         information")]
+                         information",
+               issue = "27780")]
     #[inline]
     pub unsafe fn as_mut<'a>(&self) -> Option<&'a mut T> where T: Sized {
         if self.is_null() {
@@ -322,40 +309,82 @@ impl<T: ?Sized> Clone for *mut T {
     }
 }
 
-// Equality for extern "C" fn pointers
-mod externfnpointers {
-    use mem;
-    use cmp::PartialEq;
-
-    #[stable(feature = "rust1", since = "1.0.0")]
-    impl<_R> PartialEq for extern "C" fn() -> _R {
-        #[inline]
-        fn eq(&self, other: &extern "C" fn() -> _R) -> bool {
-            let self_: *const () = unsafe { mem::transmute(*self) };
-            let other_: *const () = unsafe { mem::transmute(*other) };
-            self_ == other_
+// Impls for function pointers
+macro_rules! fnptr_impls_safety_abi {
+    ($FnTy: ty, $($Arg: ident),*) => {
+        #[stable(feature = "rust1", since = "1.0.0")]
+        impl<Ret, $($Arg),*> Clone for $FnTy {
+            #[inline]
+            fn clone(&self) -> Self {
+                *self
+            }
         }
-    }
-    macro_rules! fnptreq {
-        ($($p:ident),*) => {
-            #[stable(feature = "rust1", since = "1.0.0")]
-            impl<_R,$($p),*> PartialEq for extern "C" fn($($p),*) -> _R {
-                #[inline]
-                fn eq(&self, other: &extern "C" fn($($p),*) -> _R) -> bool {
-                    let self_: *const () = unsafe { mem::transmute(*self) };
 
-                    let other_: *const () = unsafe { mem::transmute(*other) };
-                    self_ == other_
-                }
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> PartialEq for $FnTy {
+            #[inline]
+            fn eq(&self, other: &Self) -> bool {
+                *self as usize == *other as usize
+            }
+        }
+
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> Eq for $FnTy {}
+
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> PartialOrd for $FnTy {
+            #[inline]
+            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+                (*self as usize).partial_cmp(&(*other as usize))
+            }
+        }
+
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> Ord for $FnTy {
+            #[inline]
+            fn cmp(&self, other: &Self) -> Ordering {
+                (*self as usize).cmp(&(*other as usize))
+            }
+        }
+
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> hash::Hash for $FnTy {
+            fn hash<HH: hash::Hasher>(&self, state: &mut HH) {
+                state.write_usize(*self as usize)
+            }
+        }
+
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> fmt::Pointer for $FnTy {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                fmt::Pointer::fmt(&(*self as *const ()), f)
+            }
+        }
+
+        #[stable(feature = "fnptr_impls", since = "1.4.0")]
+        impl<Ret, $($Arg),*> fmt::Debug for $FnTy {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                fmt::Pointer::fmt(&(*self as *const ()), f)
             }
         }
     }
-    fnptreq! { A }
-    fnptreq! { A,B }
-    fnptreq! { A,B,C }
-    fnptreq! { A,B,C,D }
-    fnptreq! { A,B,C,D,E }
 }
+
+macro_rules! fnptr_impls_args {
+    ($($Arg: ident),*) => {
+        fnptr_impls_safety_abi! { extern "Rust" fn($($Arg),*) -> Ret, $($Arg),* }
+        fnptr_impls_safety_abi! { extern "C" fn($($Arg),*) -> Ret, $($Arg),* }
+        fnptr_impls_safety_abi! { unsafe extern "Rust" fn($($Arg),*) -> Ret, $($Arg),* }
+        fnptr_impls_safety_abi! { unsafe extern "C" fn($($Arg),*) -> Ret, $($Arg),* }
+    }
+}
+
+fnptr_impls_args! { }
+fnptr_impls_args! { A }
+fnptr_impls_args! { A, B }
+fnptr_impls_args! { A, B, C }
+fnptr_impls_args! { A, B, C, D }
+fnptr_impls_args! { A, B, C, D, E }
 
 // Comparison for pointers
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -434,7 +463,8 @@ impl<T: ?Sized> PartialOrd for *mut T {
 /// modified without a unique path to the `Unique` reference. Useful
 /// for building abstractions like `Vec<T>` or `Box<T>`, which
 /// internally use raw pointers to manage the memory that they own.
-#[unstable(feature = "unique", reason = "needs an RFC to flesh out design")]
+#[unstable(feature = "unique", reason = "needs an RFC to flesh out design",
+           issue = "27730")]
 pub struct Unique<T: ?Sized> {
     pointer: NonZero<*const T>,
     // NOTE: this marker has no consequences for variance, but is necessary
@@ -449,17 +479,17 @@ pub struct Unique<T: ?Sized> {
 /// reference is unaliased. Note that this aliasing invariant is
 /// unenforced by the type system; the abstraction using the
 /// `Unique` must enforce it.
-#[unstable(feature = "unique")]
+#[unstable(feature = "unique", issue = "27730")]
 unsafe impl<T: Send + ?Sized> Send for Unique<T> { }
 
 /// `Unique` pointers are `Sync` if `T` is `Sync` because the data they
 /// reference is unaliased. Note that this aliasing invariant is
 /// unenforced by the type system; the abstraction using the
 /// `Unique` must enforce it.
-#[unstable(feature = "unique")]
+#[unstable(feature = "unique", issue = "27730")]
 unsafe impl<T: Sync + ?Sized> Sync for Unique<T> { }
 
-#[unstable(feature = "unique")]
+#[unstable(feature = "unique", issue = "27730")]
 impl<T: ?Sized> Unique<T> {
     /// Creates a new `Unique`.
     pub unsafe fn new(ptr: *mut T) -> Unique<T> {
@@ -477,12 +507,12 @@ impl<T: ?Sized> Unique<T> {
     }
 }
 
-#[unstable(feature = "unique")]
+#[unstable(feature = "unique", issue= "27730")]
 impl<T:?Sized> Deref for Unique<T> {
     type Target = *mut T;
 
     #[inline]
-    fn deref<'a>(&'a self) -> &'a *mut T {
+    fn deref(&self) -> &*mut T {
         unsafe { mem::transmute(&*self.pointer) }
     }
 }

@@ -15,7 +15,7 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use prelude::*;
+use prelude::v1::*;
 
 use intrinsics;
 use mem;
@@ -79,12 +79,6 @@ pub mod consts {
     /// Archimedes' constant
     #[stable(feature = "rust1", since = "1.0.0")]
     pub const PI: f64 = 3.14159265358979323846264338327950288_f64;
-
-    /// pi * 2.0
-    #[unstable(feature = "float_consts",
-               reason = "unclear naming convention/usefulness")]
-    #[deprecated(since = "1.2.0", reason = "unclear on usefulness")]
-    pub const PI_2: f64 = 6.28318530717958647692528676655900576_f64;
 
     /// pi/2.0
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -222,39 +216,6 @@ impl Float for f64 {
         (mantissa, exponent, sign)
     }
 
-    /// Rounds towards minus infinity.
-    #[inline]
-    fn floor(self) -> f64 {
-        unsafe { intrinsics::floorf64(self) }
-    }
-
-    /// Rounds towards plus infinity.
-    #[inline]
-    fn ceil(self) -> f64 {
-        unsafe { intrinsics::ceilf64(self) }
-    }
-
-    /// Rounds to nearest integer. Rounds half-way cases away from zero.
-    #[inline]
-    fn round(self) -> f64 {
-        unsafe { intrinsics::roundf64(self) }
-    }
-
-    /// Returns the integer part of the number (rounds towards zero).
-    #[inline]
-    fn trunc(self) -> f64 {
-        unsafe { intrinsics::truncf64(self) }
-    }
-
-    /// The fractional part of the number, satisfying:
-    ///
-    /// ```
-    /// let x = 1.65f64;
-    /// assert!(x == x.trunc() + x.fract())
-    /// ```
-    #[inline]
-    fn fract(self) -> f64 { self - self.trunc() }
-
     /// Computes the absolute value of `self`. Returns `Float::nan()` if the
     /// number is `Float::nan()`.
     #[inline]
@@ -290,72 +251,13 @@ impl Float for f64 {
         self < 0.0 || (1.0 / self) == Float::neg_infinity()
     }
 
-    /// Fused multiply-add. Computes `(self * a) + b` with only one rounding
-    /// error. This produces a more accurate result with better performance than
-    /// a separate multiplication operation followed by an add.
-    #[inline]
-    fn mul_add(self, a: f64, b: f64) -> f64 {
-        unsafe { intrinsics::fmaf64(self, a, b) }
-    }
-
     /// Returns the reciprocal (multiplicative inverse) of the number.
     #[inline]
     fn recip(self) -> f64 { 1.0 / self }
 
     #[inline]
-    fn powf(self, n: f64) -> f64 {
-        unsafe { intrinsics::powf64(self, n) }
-    }
-
-    #[inline]
     fn powi(self, n: i32) -> f64 {
         unsafe { intrinsics::powif64(self, n) }
-    }
-
-    #[inline]
-    fn sqrt(self) -> f64 {
-        if self < 0.0 {
-            NAN
-        } else {
-            unsafe { intrinsics::sqrtf64(self) }
-        }
-    }
-
-    #[inline]
-    fn rsqrt(self) -> f64 { self.sqrt().recip() }
-
-    /// Returns the exponential of the number.
-    #[inline]
-    fn exp(self) -> f64 {
-        unsafe { intrinsics::expf64(self) }
-    }
-
-    /// Returns 2 raised to the power of the number.
-    #[inline]
-    fn exp2(self) -> f64 {
-        unsafe { intrinsics::exp2f64(self) }
-    }
-
-    /// Returns the natural logarithm of the number.
-    #[inline]
-    fn ln(self) -> f64 {
-        unsafe { intrinsics::logf64(self) }
-    }
-
-    /// Returns the logarithm of the number with respect to an arbitrary base.
-    #[inline]
-    fn log(self, base: f64) -> f64 { self.ln() / base.ln() }
-
-    /// Returns the base 2 logarithm of the number.
-    #[inline]
-    fn log2(self) -> f64 {
-        unsafe { intrinsics::log2f64(self) }
-    }
-
-    /// Returns the base 10 logarithm of the number.
-    #[inline]
-    fn log10(self) -> f64 {
-        unsafe { intrinsics::log10f64(self) }
     }
 
     /// Converts to degrees, assuming the number is in radians.

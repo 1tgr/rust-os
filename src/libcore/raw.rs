@@ -9,7 +9,7 @@
 // except according to those terms.
 
 #![allow(missing_docs)]
-#![unstable(feature = "raw")]
+#![unstable(feature = "raw", issue = "27751")]
 
 //! Contains struct definitions for the layout of compiler built-in types.
 //!
@@ -49,7 +49,8 @@ use mem;
 /// # Examples
 ///
 /// ```
-/// # #![feature(raw)]
+/// #![feature(raw)]
+///
 /// use std::raw::{self, Repr};
 ///
 /// let slice: &[u16] = &[1, 2, 3, 4];
@@ -98,7 +99,8 @@ impl<T> Clone for Slice<T> {
 /// # Examples
 ///
 /// ```
-/// # #![feature(raw)]
+/// #![feature(raw)]
+///
 /// use std::mem;
 /// use std::raw;
 ///

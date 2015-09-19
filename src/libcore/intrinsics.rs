@@ -42,7 +42,8 @@
 #![unstable(feature = "core_intrinsics",
             reason = "intrinsics are unlikely to ever be stabilized, instead \
                       they should be used through stabilized interfaces \
-                      in the rest of the standard library")]
+                      in the rest of the standard library",
+            issue = "0")]
 #![allow(missing_docs)]
 
 use marker::Sized;
@@ -184,18 +185,10 @@ extern "rust-intrinsic" {
     /// elements.
     pub fn size_of<T>() -> usize;
 
-    #[cfg(not(stage0))]
     /// Moves a value to an uninitialized memory location.
     ///
     /// Drop glue is not run on the destination.
     pub fn move_val_init<T>(dst: *mut T, src: T);
-
-    // SNAP d4432b3
-    #[cfg(stage0)]
-    /// Moves a value to an uninitialized memory location.
-    ///
-    /// Drop glue is not run on the destination.
-    pub fn move_val_init<T>(dst: &mut T, src: T);
 
     pub fn min_align_of<T>() -> usize;
     pub fn pref_align_of<T>() -> usize;
@@ -254,11 +247,11 @@ extern "rust-intrinsic" {
     /// ```
     /// use std::mem;
     ///
-    /// let v: &[u8] = unsafe { mem::transmute("L") };
-    /// assert!(v == [76]);
+    /// let array: &[u8] = unsafe { mem::transmute("Rust") };
+    /// assert_eq!(array, [82, 117, 115, 116]);
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn transmute<T,U>(e: T) -> U;
+    pub fn transmute<T, U>(e: T) -> U;
 
     /// Gives the address for the return value of the enclosing function.
     ///
@@ -614,6 +607,5 @@ extern "rust-intrinsic" {
     /// Rust's "try catch" construct which invokes the function pointer `f` with
     /// the data pointer `data`, returning the exception payload if an exception
     /// is thrown (aka the thread panics).
-    #[cfg(not(stage0))]
     pub fn try(f: fn(*mut u8), data: *mut u8) -> *mut u8;
 }

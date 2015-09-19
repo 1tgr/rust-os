@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use prelude::*;
+use prelude::v1::*;
 use fmt::{self, Write, FlagV1};
 
 struct PadAdapter<'a, 'b: 'a> {
@@ -177,7 +177,8 @@ impl<'a, 'b: 'a> DebugTuple<'a, 'b> {
     }
 
     /// Returns the wrapped `Formatter`.
-    #[unstable(feature = "debug_builder_formatter", reason = "recently added")]
+    #[unstable(feature = "debug_builder_formatter", reason = "recently added",
+               issue = "27782")]
     pub fn formatter(&mut self) -> &mut fmt::Formatter<'b> {
         &mut self.fmt
     }

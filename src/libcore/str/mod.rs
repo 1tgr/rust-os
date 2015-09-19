@@ -17,14 +17,15 @@
 use self::pattern::Pattern;
 use self::pattern::{Searcher, ReverseSearcher, DoubleEndedSearcher};
 
-use char::CharExt;
+use char::{self, CharExt};
 use clone::Clone;
 use cmp::Eq;
 use convert::AsRef;
 use default::Default;
 use fmt;
 use iter::ExactSizeIterator;
-use iter::{Map, Iterator, DoubleEndedIterator};
+use iter::{Map, Cloned, Iterator, DoubleEndedIterator};
+use marker::Sized;
 use mem;
 use ops::{Fn, FnMut, FnOnce};
 use option::Option::{self, None, Some};
@@ -37,7 +38,7 @@ pub mod pattern;
 /// A trait to abstract the idea of creating a new instance of a type from a
 /// string.
 #[stable(feature = "rust1", since = "1.0.0")]
-pub trait FromStr {
+pub trait FromStr: Sized {
     /// The associated error which can be returned from parsing.
     #[stable(feature = "rust1", since = "1.0.0")]
     type Err;
@@ -116,20 +117,21 @@ impl Utf8Error {
     ///
     /// Starting at the index provided, but not necessarily at it precisely, an
     /// invalid UTF-8 encoding sequence was found.
-    #[unstable(feature = "utf8_error", reason = "method just added")]
+    #[unstable(feature = "utf8_error", reason = "method just added",
+               issue = "27734")]
     pub fn valid_up_to(&self) -> usize { self.valid_up_to }
 }
 
 /// Converts a slice of bytes to a string slice without performing any
 /// allocations.
 ///
-/// Once the slice has been validated as utf-8, it is transmuted in-place and
+/// Once the slice has been validated as UTF-8, it is transmuted in-place and
 /// returned as a '&str' instead of a '&[u8]'
 ///
 /// # Failure
 ///
-/// Returns `Err` if the slice is not utf-8 with a description as to why the
-/// provided slice is not utf-8.
+/// Returns `Err` if the slice is not UTF-8 with a description as to why the
+/// provided slice is not UTF-8.
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn from_utf8(v: &[u8]) -> Result<&str, Utf8Error> {
     try!(run_utf8_validation_iterator(&mut v.iter()));
@@ -140,7 +142,7 @@ pub fn from_utf8(v: &[u8]) -> Result<&str, Utf8Error> {
 /// that the string contains valid UTF-8.
 #[inline(always)]
 #[stable(feature = "rust1", since = "1.0.0")]
-pub unsafe fn from_utf8_unchecked<'a>(v: &'a [u8]) -> &'a str {
+pub unsafe fn from_utf8_unchecked(v: &[u8]) -> &str {
     mem::transmute(v)
 }
 
@@ -189,7 +191,7 @@ fn unwrap_or_0(opt: Option<&u8>) -> u8 {
 
 /// Reads the next code point out of a byte iterator (assuming a
 /// UTF-8-like encoding).
-#[unstable(feature = "str_internals")]
+#[unstable(feature = "str_internals", issue = "0")]
 #[inline]
 pub fn next_code_point(bytes: &mut slice::Iter<u8>) -> Option<u32> {
     // Decode UTF-8
@@ -262,7 +264,7 @@ impl<'a> Iterator for Chars<'a> {
         next_code_point(&mut self.iter).map(|ch| {
             // str invariant says `ch` is a valid Unicode Scalar Value
             unsafe {
-                mem::transmute(ch)
+                char::from_u32_unchecked(ch)
             }
         })
     }
@@ -284,9 +286,21 @@ impl<'a> DoubleEndedIterator for Chars<'a> {
         next_code_point_reverse(&mut self.iter).map(|ch| {
             // str invariant says `ch` is a valid Unicode Scalar Value
             unsafe {
-                mem::transmute(ch)
+                char::from_u32_unchecked(ch)
             }
         })
+    }
+}
+
+impl<'a> Chars<'a> {
+    /// View the underlying data as a subslice of the original data.
+    ///
+    /// This has the same lifetime as the original slice, and so the
+    /// iterator can continue to be used while this exists.
+    #[stable(feature = "iter_to_slice", since = "1.4.0")]
+    #[inline]
+    pub fn as_str(&self) -> &'a str {
+        unsafe { from_utf8_unchecked(self.iter.as_slice()) }
     }
 }
 
@@ -337,40 +351,25 @@ impl<'a> DoubleEndedIterator for CharIndices<'a> {
     }
 }
 
+impl<'a> CharIndices<'a> {
+    /// View the underlying data as a subslice of the original data.
+    ///
+    /// This has the same lifetime as the original slice, and so the
+    /// iterator can continue to be used while this exists.
+    #[stable(feature = "iter_to_slice", since = "1.4.0")]
+    #[inline]
+    pub fn as_str(&self) -> &'a str {
+        self.iter.as_str()
+    }
+}
+
 /// External iterator for a string's bytes.
 /// Use with the `std::iter` module.
 ///
 /// Created with the method `.bytes()`.
 #[stable(feature = "rust1", since = "1.0.0")]
 #[derive(Clone)]
-pub struct Bytes<'a>(Map<slice::Iter<'a, u8>, BytesDeref>);
-
-/// A nameable, clonable fn type
-#[derive(Clone)]
-struct BytesDeref;
-
-impl<'a> Fn<(&'a u8,)> for BytesDeref {
-    #[inline]
-    extern "rust-call" fn call(&self, (ptr,): (&'a u8,)) -> u8 {
-        *ptr
-    }
-}
-
-impl<'a> FnMut<(&'a u8,)> for BytesDeref {
-    #[inline]
-    extern "rust-call" fn call_mut(&mut self, (ptr,): (&'a u8,)) -> u8 {
-        Fn::call(&*self, (ptr,))
-    }
-}
-
-impl<'a> FnOnce<(&'a u8,)> for BytesDeref {
-    type Output = u8;
-
-    #[inline]
-    extern "rust-call" fn call_once(self, (ptr,): (&'a u8,)) -> u8 {
-        Fn::call(&self, (ptr,))
-    }
-}
+pub struct Bytes<'a>(Cloned<slice::Iter<'a, u8>>);
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a> Iterator for Bytes<'a> {
@@ -384,6 +383,21 @@ impl<'a> Iterator for Bytes<'a> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.0.count()
+    }
+
+    #[inline]
+    fn last(self) -> Option<Self::Item> {
+        self.0.last()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth(n)
     }
 }
 
@@ -736,7 +750,8 @@ generate_pattern_iterators! {
         struct RMatchIndices;
     stability:
         #[unstable(feature = "str_match_indices",
-                   reason = "type may be removed or have its iterator impl changed")]
+                   reason = "type may be removed or have its iterator impl changed",
+                   issue = "27743")]
     internal:
         MatchIndicesInternal yielding ((usize, usize));
     delegate double ended;
@@ -785,7 +800,7 @@ generate_pattern_iterators! {
 /// Created with the method `.lines()`.
 #[stable(feature = "rust1", since = "1.0.0")]
 #[derive(Clone)]
-pub struct Lines<'a>(SplitTerminator<'a, char>);
+pub struct Lines<'a>(Map<SplitTerminator<'a, char>, LinesAnyMap>);
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a> Iterator for Lines<'a> {
@@ -812,8 +827,10 @@ impl<'a> DoubleEndedIterator for Lines<'a> {
 
 /// Created with the method `.lines_any()`.
 #[stable(feature = "rust1", since = "1.0.0")]
+#[deprecated(since = "1.4.0", reason = "use lines()/Lines instead now")]
 #[derive(Clone)]
-pub struct LinesAny<'a>(Map<Lines<'a>, LinesAnyMap>);
+#[allow(deprecated)]
+pub struct LinesAny<'a>(Lines<'a>);
 
 /// A nameable, clonable fn type
 #[derive(Clone)]
@@ -845,6 +862,7 @@ impl<'a> FnOnce<(&'a str,)> for LinesAnyMap {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
+#[allow(deprecated)]
 impl<'a> Iterator for LinesAny<'a> {
     type Item = &'a str;
 
@@ -860,6 +878,7 @@ impl<'a> Iterator for LinesAny<'a> {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
+#[allow(deprecated)]
 impl<'a> DoubleEndedIterator for LinesAny<'a> {
     #[inline]
     fn next_back(&mut self) -> Option<&'a str> {
@@ -877,14 +896,18 @@ Section: Comparing strings
 #[lang = "str_eq"]
 #[inline]
 fn eq_slice(a: &str, b: &str) -> bool {
+    a.len() == b.len() && unsafe { cmp_slice(a, b, a.len()) == 0 }
+}
+
+/// Bytewise slice comparison.
+/// NOTE: This uses the system's memcmp, which is currently dramatically
+/// faster than comparing each byte in a loop.
+#[inline]
+unsafe fn cmp_slice(a: &str, b: &str, len: usize) -> i32 {
     // NOTE: In theory n should be libc::size_t and not usize, but libc is not available here
     #[allow(improper_ctypes)]
     extern { fn memcmp(s1: *const i8, s2: *const i8, n: usize) -> i32; }
-    a.len() == b.len() && unsafe {
-        memcmp(a.as_ptr() as *const i8,
-               b.as_ptr() as *const i8,
-               a.len()) == 0
-    }
+    memcmp(a.as_ptr() as *const i8, b.as_ptr() as *const i8, len)
 }
 
 /*
@@ -1001,7 +1024,8 @@ static UTF8_CHAR_WIDTH: [u8; 256] = [
 #[unstable(feature = "str_char",
            reason = "existence of this struct is uncertain as it is frequently \
                      able to be replaced with char.len_utf8() and/or \
-                     char/char_indices iterators")]
+                     char/char_indices iterators",
+           issue = "27754")]
 pub struct CharRange {
     /// Current `char`
     pub ch: char,
@@ -1019,8 +1043,8 @@ Section: Trait implementations
 */
 
 mod traits {
-    use cmp::{Ordering, Ord, PartialEq, PartialOrd, Eq};
-    use cmp::Ordering::{Less, Equal, Greater};
+    use cmp::{self, Ordering, Ord, PartialEq, PartialOrd, Eq};
+    use cmp::Ordering::{Less, Greater};
     use iter::Iterator;
     use option::Option;
     use option::Option::Some;
@@ -1031,15 +1055,16 @@ mod traits {
     impl Ord for str {
         #[inline]
         fn cmp(&self, other: &str) -> Ordering {
-            for (s_b, o_b) in self.bytes().zip(other.bytes()) {
-                match s_b.cmp(&o_b) {
-                    Greater => return Greater,
-                    Less => return Less,
-                    Equal => ()
-                }
+            let cmp = unsafe {
+                super::cmp_slice(self, other, cmp::min(self.len(), other.len()))
+            };
+            if cmp == 0 {
+                self.len().cmp(&other.len())
+            } else if cmp < 0 {
+                Less
+            } else {
+                Greater
             }
-
-            self.len().cmp(&other.len())
         }
     }
 
@@ -1219,16 +1244,17 @@ mod traits {
 #[allow(missing_docs)]
 #[doc(hidden)]
 #[unstable(feature = "core_str_ext",
-           reason = "stable interface provided by `impl str` in later crates")]
+           reason = "stable interface provided by `impl str` in later crates",
+           issue = "27701")]
 pub trait StrExt {
     // NB there are no docs here are they're all located on the StrExt trait in
     // libcollections, not here.
 
     fn contains<'a, P: Pattern<'a>>(&'a self, pat: P) -> bool;
     fn contains_char<'a, P: Pattern<'a>>(&'a self, pat: P) -> bool;
-    fn chars<'a>(&'a self) -> Chars<'a>;
-    fn bytes<'a>(&'a self) -> Bytes<'a>;
-    fn char_indices<'a>(&'a self) -> CharIndices<'a>;
+    fn chars(&self) -> Chars;
+    fn bytes(&self) -> Bytes;
+    fn char_indices(&self) -> CharIndices;
     fn split<'a, P: Pattern<'a>>(&'a self, pat: P) -> Split<'a, P>;
     fn rsplit<'a, P: Pattern<'a>>(&'a self, pat: P) -> RSplit<'a, P>
         where P::Searcher: ReverseSearcher<'a>;
@@ -1244,12 +1270,13 @@ pub trait StrExt {
     fn match_indices<'a, P: Pattern<'a>>(&'a self, pat: P) -> MatchIndices<'a, P>;
     fn rmatch_indices<'a, P: Pattern<'a>>(&'a self, pat: P) -> RMatchIndices<'a, P>
         where P::Searcher: ReverseSearcher<'a>;
-    fn lines<'a>(&'a self) -> Lines<'a>;
-    fn lines_any<'a>(&'a self) -> LinesAny<'a>;
+    fn lines(&self) -> Lines;
+    #[allow(deprecated)]
+    fn lines_any(&self) -> LinesAny;
     fn char_len(&self) -> usize;
-    fn slice_chars<'a>(&'a self, begin: usize, end: usize) -> &'a str;
-    unsafe fn slice_unchecked<'a>(&'a self, begin: usize, end: usize) -> &'a str;
-    unsafe fn slice_mut_unchecked<'a>(&'a mut self, begin: usize, end: usize) -> &'a mut str;
+    fn slice_chars(&self, begin: usize, end: usize) -> &str;
+    unsafe fn slice_unchecked(&self, begin: usize, end: usize) -> &str;
+    unsafe fn slice_mut_unchecked(&mut self, begin: usize, end: usize) -> &mut str;
     fn starts_with<'a, P: Pattern<'a>>(&'a self, pat: P) -> bool;
     fn ends_with<'a, P: Pattern<'a>>(&'a self, pat: P) -> bool
         where P::Searcher: ReverseSearcher<'a>;
@@ -1263,14 +1290,14 @@ pub trait StrExt {
     fn char_range_at_reverse(&self, start: usize) -> CharRange;
     fn char_at(&self, i: usize) -> char;
     fn char_at_reverse(&self, i: usize) -> char;
-    fn as_bytes<'a>(&'a self) -> &'a [u8];
+    fn as_bytes(&self) -> &[u8];
     fn find<'a, P: Pattern<'a>>(&'a self, pat: P) -> Option<usize>;
     fn rfind<'a, P: Pattern<'a>>(&'a self, pat: P) -> Option<usize>
         where P::Searcher: ReverseSearcher<'a>;
     fn find_str<'a, P: Pattern<'a>>(&'a self, pat: P) -> Option<usize>;
     fn split_at(&self, mid: usize) -> (&str, &str);
     fn split_at_mut(&mut self, mid: usize) -> (&mut str, &mut str);
-    fn slice_shift_char<'a>(&'a self) -> Option<(char, &'a str)>;
+    fn slice_shift_char(&self) -> Option<(char, &str)>;
     fn subslice_offset(&self, inner: &str) -> usize;
     fn as_ptr(&self) -> *const u8;
     fn len(&self) -> usize;
@@ -1303,7 +1330,7 @@ impl StrExt for str {
 
     #[inline]
     fn bytes(&self) -> Bytes {
-        Bytes(self.as_bytes().iter().map(BytesDeref))
+        Bytes(self.as_bytes().iter().cloned())
     }
 
     #[inline]
@@ -1384,12 +1411,13 @@ impl StrExt for str {
     }
     #[inline]
     fn lines(&self) -> Lines {
-        Lines(self.split_terminator('\n'))
+        Lines(self.split_terminator('\n').map(LinesAnyMap))
     }
 
     #[inline]
+    #[allow(deprecated)]
     fn lines_any(&self) -> LinesAny {
-        LinesAny(self.lines().map(LinesAnyMap))
+        LinesAny(self.lines())
     }
 
     #[inline]
@@ -1507,7 +1535,7 @@ impl StrExt for str {
     #[inline]
     fn char_range_at(&self, i: usize) -> CharRange {
         let (c, n) = char_range_at_raw(self.as_bytes(), i);
-        CharRange { ch: unsafe { mem::transmute(c) }, next: n }
+        CharRange { ch: unsafe { char::from_u32_unchecked(c) }, next: n }
     }
 
     #[inline]
@@ -1535,10 +1563,10 @@ impl StrExt for str {
             if w > 2 { val = utf8_acc_cont_byte(val, s.as_bytes()[i + 2]); }
             if w > 3 { val = utf8_acc_cont_byte(val, s.as_bytes()[i + 3]); }
 
-            return CharRange {ch: unsafe { mem::transmute(val) }, next: i};
+            CharRange {ch: unsafe { char::from_u32_unchecked(val) }, next: i}
         }
 
-        return multibyte_char_range_at_reverse(self, prev);
+        multibyte_char_range_at_reverse(self, prev)
     }
 
     #[inline]
@@ -1660,7 +1688,7 @@ fn char_range_at_raw(bytes: &[u8], i: usize) -> (u32, usize) {
         if w > 2 { val = utf8_acc_cont_byte(val, bytes[i + 2]); }
         if w > 3 { val = utf8_acc_cont_byte(val, bytes[i + 3]); }
 
-        return (val, i + w as usize);
+        (val, i + w as usize)
     }
 
     multibyte_char_range_at(bytes, i)
