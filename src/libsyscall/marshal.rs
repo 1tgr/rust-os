@@ -64,7 +64,7 @@ pub enum ErrNum {
 pub type FileHandle = usize;
 pub type PackedArgs = TupleDeque6<usize>;
 
-pub trait SyscallArgs {
+pub trait SyscallArgs : Sized {
     fn as_args(self, args: &mut PackedArgs);
     fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum>;
 }

@@ -5,7 +5,6 @@ use core::intrinsics;
 use core::marker::PhantomData;
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
-use prelude::*;
 use ptr::Align;
 
 bitflags! {

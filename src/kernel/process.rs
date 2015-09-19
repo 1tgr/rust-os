@@ -3,7 +3,6 @@ use arch::process::ArchProcess;
 use core::intrinsics;
 use core::slice;
 use phys_mem::{self,PhysicalBitmap};
-use prelude::*;
 use virt_mem::VirtualTree;
 
 pub struct Process {

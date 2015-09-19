@@ -2,7 +2,6 @@
 
 #![feature(alloc)]
 #![feature(allow_internal_unstable)]
-#![feature(box_raw)]
 #![feature(collections)]
 #![feature(collections_bound)]
 #![feature(const_fn)]
@@ -10,13 +9,14 @@
 #![feature(core_float)]
 #![feature(core_intrinsics)]
 #![feature(core_panic)]
+#![feature(core_slice_ext)]
 #![feature(int_error_internals)]
 #![feature(lang_items)]
 #![feature(macro_reexport)]
+#![feature(no_core)]
 #![feature(no_std)]
 #![feature(raw)]
 #![feature(reflect_marker)]
-#![feature(slice_position_elem)]
 #![feature(str_char)]
 #![feature(unicode)]
 #![feature(vec_push_all)]
@@ -26,7 +26,7 @@
 
 #[macro_use]
 #[macro_reexport(assert, assert_eq, try, write, writeln)]
-extern crate core;
+extern crate core as __core;
 
 #[macro_use]
 #[macro_reexport(vec, format)]
@@ -56,33 +56,6 @@ pub mod prelude {
         pub use vec::Vec;
     }
 }
-
-#[path = "num/float_macros.rs"]
-#[macro_use]
-mod float_macros;
-
-#[path = "num/int_macros.rs"]
-#[macro_use]
-mod int_macros;
-
-#[path = "num/uint_macros.rs"]
-#[macro_use]
-mod uint_macros;
-
-#[path = "num/isize.rs"]  pub mod isize;
-#[path = "num/i8.rs"]   pub mod i8;
-#[path = "num/i16.rs"]  pub mod i16;
-#[path = "num/i32.rs"]  pub mod i32;
-#[path = "num/i64.rs"]  pub mod i64;
-
-#[path = "num/usize.rs"] pub mod usize;
-#[path = "num/u8.rs"]   pub mod u8;
-#[path = "num/u16.rs"]  pub mod u16;
-#[path = "num/u32.rs"]  pub mod u32;
-#[path = "num/u64.rs"]  pub mod u64;
-
-#[path = "num/f32.rs"]   pub mod f32;
-#[path = "num/f64.rs"]   pub mod f64;
 
 pub mod num;
 
@@ -122,12 +95,27 @@ pub mod collections {
     pub use core_collections::VecDeque;
 }
 
+pub use core::isize;
+pub use core::i8;
+pub use core::i16;
+pub use core::i32;
+pub use core::i64;
+
+pub use core::usize;
+pub use core::u8;
+pub use core::u16;
+pub use core::u32;
+pub use core::u64;
+
+#[path = "num/f32.rs"]   pub mod f32;
+#[path = "num/f64.rs"]   pub mod f64;
+
 pub mod error;
 pub mod io;
 
 pub mod sync {
     pub use alloc::arc::{Arc, Weak};
-    pub use core::atomic;
+    pub use core::sync::atomic;
 }
 
 #[macro_export]

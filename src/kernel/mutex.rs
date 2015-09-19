@@ -1,8 +1,8 @@
 use arch;
-use core::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use core::cell::UnsafeCell;
 use core::marker::Sync;
 use core::ops::{Drop, Deref, DerefMut};
+use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 
 /// This type provides MUTual EXclusion based on spinning.
 ///

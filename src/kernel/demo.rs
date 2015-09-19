@@ -8,7 +8,6 @@ use core::str;
 use miniz_sys as mz;
 use multiboot::multiboot_module_t;
 use phys_mem::{self,PhysicalBitmap};
-use prelude::*;
 use process::Process;
 use syscall::{ErrNum,FileHandle,Handler};
 use thread::{self,Deferred};

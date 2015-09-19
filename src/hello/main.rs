@@ -1,7 +1,5 @@
-#![feature(core)]
 #![feature(lang_items)]
 
-#[macro_use] extern crate core;
 extern crate syscall;
 
 use std::cmp;

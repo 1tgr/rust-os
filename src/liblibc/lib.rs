@@ -3,11 +3,7 @@
 #![feature(no_std)]
 #![no_std]
 
-#![feature(core)]
-
 #![allow(non_camel_case_types)]
-
-extern crate core;
 
 pub use funcs::c95::stdlib::*;
 pub use types::common::c95::*;

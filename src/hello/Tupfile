@@ -1,8 +1,15 @@
 include_rules
 
-RUSTFLAGS += -L ../liballoc -L ../libcollections -L ../libcore -L ../liblibc -L ../librustc_unicode -L ../modules
+RUSTFLAGS += -L ../liballoc
+RUSTFLAGS += -L ../liballoc_system
+RUSTFLAGS += -L ../libcollections
+RUSTFLAGS += -L ../libcore
+RUSTFLAGS += -L ../liblibc
+RUSTFLAGS += -L ../librustc_unicode
+RUSTFLAGS += -L ../modules
 
 LIBS += ../liballoc/liballoc.rlib
+LIBS += ../liballoc_system/liballoc_system.rlib
 LIBS += ../libc/libc.a
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
@@ -17,4 +24,3 @@ RUSTFLAGS += --extern syscall=../libsyscall/libsyscall.rlib
 : {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> hello.elf
 : hello.elf |> $(OBJCOPY) -O binary %f %o |> hello.bin
 : hello.elf |> $(OBJDUMP) -d %f > %o |> hello.txt
-

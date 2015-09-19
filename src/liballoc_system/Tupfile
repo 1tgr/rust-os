@@ -1,9 +1,9 @@
 include_rules
 
-LIBS += ../liballoc_system/liballoc_system.rlib
 LIBS += ../libcore/libcore.rlib
+LIBS += ../liblibc/liblibc.rlib
 
-RUSTFLAGS += --extern alloc_system=../libcore/liballoc_system.rlib
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
+RUSTFLAGS += --extern libc=../liblibc/liblibc.rlib
 
 : lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> %d.rlib

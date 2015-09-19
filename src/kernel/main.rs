@@ -11,25 +11,20 @@
 #![crate_name = "kernel"]
 
 #![feature(alloc)]
-#![feature(append)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
-#![feature(box_raw)]
 #![feature(collections)]
 #![feature(const_fn)]
-#![feature(core)]
 #![feature(core_intrinsics)]
 #![feature(fnbox)]
 #![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
 #![feature(no_std)]
 #![feature(slice_bytes)]
-#![feature(split_off)]
 
 #![no_std]
 
 /// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use] extern crate collections;
-#[macro_use] extern crate core;
 
 #[macro_use] pub mod bitflags;
 #[macro_use] pub mod lazy_static;

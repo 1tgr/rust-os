@@ -1,7 +1,6 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code)]
 use core::mem;
-use prelude::*;
 
 pub type multiboot_uint8_t = ::libc::c_uchar;
 pub type multiboot_uint16_t = ::libc::c_ushort;

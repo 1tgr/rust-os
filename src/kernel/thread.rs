@@ -5,9 +5,9 @@ use arch::cpu;
 use arch::thread;
 use async::Promise;
 use collections::vec_deque::VecDeque;
-use core::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use core::mem;
 use core::slice;
+use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use libc::{self,jmp_buf};
 use mutex::{Mutex,MutexGuard};
 use phys_mem::PhysicalBitmap;
@@ -151,10 +151,10 @@ pub fn exit() -> ! {
 
 fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) {
     let stack_len = 4096;
-    let stack = unsafe { slice::from_raw_parts_mut(heap::allocate(stack_len, 16), stack_len) };
+    let stack_base_ptr = unsafe { heap::allocate(stack_len, 16) };
     let b: Box<FnBox() + 'a> = Box::new(start);
-    let jmp_buf = thread::new_jmp_buf(b, stack);
-    let thread = Thread::new(process, stack);
+    let jmp_buf = thread::new_jmp_buf(b, unsafe { stack_base_ptr.offset(stack_len as isize) });
+    let thread = Thread::new(process, unsafe { slice::from_raw_parts_mut(stack_base_ptr, stack_len) });
 
     {
         let mut state = lock_sched!();

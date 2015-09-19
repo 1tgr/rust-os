@@ -1,5 +1,5 @@
-use core::atomic::{AtomicPtr,Ordering};
 use core::mem;
+use core::sync::atomic::{AtomicPtr,Ordering};
 use prelude::*;
 
 pub struct Singleton<T> {

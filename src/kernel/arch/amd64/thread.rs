@@ -50,9 +50,9 @@ pub fn thread_entry(p: *mut u8) -> ! {
     unreachable!()
 }
 
-pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack: &'static mut [u8]) -> jmp_buf {
+pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack_ptr: *mut u8) -> jmp_buf {
     let pp = Box::new(p);
-    let rsp : *mut u8 = unsafe { stack.as_mut_ptr().offset(stack.len() as isize - 8) };
+    let rsp : *mut u8 = stack_ptr;
     let rip : *const u8 = &thread_entry_asm;
     let rbx : *const u8 = &*pp as *const _ as *const _;
     mem::forget(pp);

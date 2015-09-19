@@ -1,12 +1,10 @@
 #![crate_name = "syscall"]
 
 #![feature(asm)]
-#![feature(core)]
 #![feature(core_slice_ext)]
 #![feature(no_std)]
 #![no_std]
 
-#[macro_use] extern crate core;
 #[macro_use] mod macros;
 
 mod marshal;

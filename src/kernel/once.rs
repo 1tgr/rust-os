@@ -13,10 +13,10 @@
 //! This primitive is meant to be used to run one-time initialization. An
 //! example use case would be for initializing an FFI library.
 
-use core::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 use core::isize;
 use core::mem::drop;
 use core::ops::FnOnce;
+use core::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
 use mutex::{StaticMutex, STATIC_MUTEX_INIT};
 
 /// A synchronization primitive which can be used to run a one-time global

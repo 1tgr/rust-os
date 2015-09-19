@@ -1,6 +1,5 @@
 use arch::debug;
 use core::fmt::{Error,Write};
-use prelude::*;
 
 pub struct Writer;
 

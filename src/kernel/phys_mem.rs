@@ -4,7 +4,6 @@ use core::intrinsics;
 use libc::{c_int,c_void};
 use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
 use mutex::Mutex;
-use prelude::*;
 use ptr;
 
 extern {
