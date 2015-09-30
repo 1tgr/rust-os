@@ -1,7 +1,6 @@
 use alloc::arc::Arc;
 use arch::debug;
 use arch::keyboard::Keyboard;
-use async::Promise;
 use core::mem;
 use core::slice;
 use core::str;
@@ -14,7 +13,7 @@ use thread::{self,Deferred};
 use virt_mem::VirtualTree;
 
 struct TestSyscallHandler<'a> {
-    deferred: Arc<Deferred<i32>>,
+    deferred: Deferred<i32>,
     keyboard: Keyboard<'a>,
     process: Arc<Process>
 }
@@ -81,7 +80,7 @@ test! {
             log!("code_slice = {:p}, stack_slice = {:p}", code_slice.as_ptr(), stack_slice.as_ptr());
             log!("code_slice = {:?}", &code_slice[0..16]);
 
-            let deferred = Arc::new(Deferred::new());
+            let deferred = Deferred::new();
 
             let handler = TestSyscallHandler {
                 deferred: deferred.clone(),

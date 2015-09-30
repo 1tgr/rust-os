@@ -44,9 +44,9 @@ pub mod arch;
 #[path="arch/x86/mod.rs"]
 pub mod arch;
 
-pub mod async;
 pub mod bit_vec;
 pub mod device;
+pub mod io;
 pub mod logging;
 pub mod miniz_sys;
 pub mod multiboot;

@@ -2,13 +2,13 @@ use alloc::arc::Arc;
 use arch::cpu;
 use arch::debug;
 use arch::isr::{self,DropIrqHandler};
-use async::{AsyncRead,Promise};
 use collections::vec_deque::VecDeque;
 use core::char;
 use core::cmp;
 use core::mem;
 use core::slice::bytes;
 use device::ByteDevice;
+use io::{AsyncRead,Promise};
 use mutex::Mutex;
 use phys_mem::PhysicalBitmap;
 use prelude::*;
@@ -315,16 +315,20 @@ impl<'a> Keyboard<'a> {
     }
 
     pub fn read_key(&self) -> (keys::Bucky, u32) {
-        let d = self.read_async(vec![0; 4]);
+        let mut promise = self.read_async(vec![0; 4]);
         let c: u32;
         loop {
-            if let Some(result) = d.try_get() {
-                let (keys, _) = result.unwrap();
-                let p = keys[0..4].as_ptr() as *const u32;
-                c = unsafe { *p };
-                break;
-            } else {
-                unsafe { asm!("hlt") };
+            match promise.try_get() {
+                Ok(result) => {
+                    let (keys, _) = result.unwrap();
+                    let p = keys[0..4].as_ptr() as *const u32;
+                    c = unsafe { *p };
+                    break;
+                },
+                Err(p) => {
+                    promise = p;
+                    unsafe { asm!("hlt") };
+                }
             }
         }
 
@@ -366,7 +370,7 @@ impl<'a> Keyboard<'a> {
 }
 
 impl<'a> AsyncRead for Keyboard<'a> {
-    fn read_async(&self, buf: Vec<u8>) -> Box<Promise<Result<(Vec<u8>, usize), &'static str>>> {
+    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize), &'static str>> {
         let mut state = lock!(self.state);
         self.device.read_async(&mut state.queue, buf)
     }

@@ -1,6 +1,6 @@
-use async::Promise;
 use collections::vec_deque::VecDeque;
 use core::cmp;
+use io::Promise;
 use mutex::Mutex;
 use prelude::*;
 use thread::Deferred;
@@ -76,18 +76,18 @@ impl ByteDevice {
         lock!(self.requests).push_back(IoRequest::new(buf, d))
     }
 
-    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Box<Promise<Result<(Vec<u8>, usize), &'static str>>> {
+    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize), &'static str>> {
         let d = Deferred::new();
         self.queue(buf, d.clone());
         self.fulfil(queue);
-        Box::new(d)
+        Promise::new(d)
     }
 }
 
 fn test_read(queue: &mut VecDeque<u8>, device: &ByteDevice, expected: &[u8]) {
     let buf = vec![0; expected.len()];
     let d = device.read_async(queue, buf);
-    let (buf, len) = d.try_get().unwrap().unwrap();
+    let (buf, len) = d.try_get().unwrap_or_else(|_| panic!("didn't expect to block")).unwrap();
     assert_eq!(expected.len(), len);
 
     let mut v = Vec::<u8>::new();
@@ -128,6 +128,6 @@ test! {
 
         let device = ByteDevice::new();
         let d = device.read_async(&mut queue, vec![0; 10]);
-        assert_eq!(None, d.try_get());
+        assert!(d.try_get().is_err());
     }
 }

@@ -3,7 +3,6 @@ use alloc::boxed::FnBox;
 use alloc::heap;
 use arch::cpu;
 use arch::thread;
-use async::Promise;
 use collections::vec_deque::VecDeque;
 use core::mem;
 use core::slice;
@@ -229,10 +228,8 @@ impl<A> Deferred<A> {
             state.threads.append(&mut waiters);
         }
     }
-}
 
-impl<A> Promise<A> for Deferred<A> {
-    fn get(&self) -> A {
+    pub fn get(self) -> A {
         loop {
             assert_no_lock();
 
@@ -270,8 +267,13 @@ impl<A> Promise<A> for Deferred<A> {
         }
     }
 
-    fn try_get(&self) -> Option<A> {
-        mem::replace(&mut lock!(self.state).result, None)
+    pub fn try_get(self) -> Result<A, Self> {
+        let opt = {
+            let mut state = lock!(self.state);
+            mem::replace(&mut state.result, None)
+        };
+
+        opt.ok_or(self)
     }
 }
 
