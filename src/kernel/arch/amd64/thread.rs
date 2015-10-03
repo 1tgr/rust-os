@@ -30,13 +30,10 @@ pub unsafe fn syscall_entry(regs: &Regs) -> isize {
     }
 }
 
-pub type DropSyscallHandler<'a> = DropSingleton<'a, Box<Dispatch>>;
+pub type DropSyscallHandler = DropSingleton<Box<Dispatch>>;
 
-pub fn register_syscall_handler<'a, T>(handler: T) -> DropSyscallHandler<'a> where T : Handler + 'a {
-    let b: Box<Dispatcher<T>> = Box::new(Dispatcher::new(handler));
-    let b: Box<Dispatch + 'a> = b;
-    let b: Box<Dispatch + 'static> = unsafe { mem::transmute(b) };
-    SYSCALL_DISPATCH.register(b)
+pub fn register_syscall_handler<T: Handler+'static>(handler: T) -> DropSyscallHandler {
+    SYSCALL_DISPATCH.register(Box::new(Dispatcher::new(handler)))
 }
 
 #[no_mangle]

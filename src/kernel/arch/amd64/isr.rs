@@ -38,13 +38,11 @@ const PIC1_DATA: u16 = PIC1 + 1;
 const PIC2_COMMAND: u16 = PIC2;
 const PIC2_DATA: u16 = PIC2 + 1;
 
-pub type DropIrqHandler<'a> = DropSingleton<'a, Box<Fn()>>;
+pub type DropIrqHandler = DropSingleton<Box<Fn()>>;
 
-pub fn register_irq_handler<'a, T>(irq: usize, handler: T) -> DropIrqHandler<'a> where T : Fn() + 'a {
+pub fn register_irq_handler<T: Fn() + 'static>(irq: usize, handler: T) -> DropIrqHandler  {
     if let Some(singleton) = IRQ_HANDLERS.get(irq) {
-        let b: Box<Fn() + 'a> = Box::new(handler);
-        let b: Box<Fn() + 'static> = unsafe { mem::transmute(b) };
-        singleton.register(b)
+        singleton.register(Box::new(handler))
     } else {
         panic!("irq must be between 0 and {}", IRQ_HANDLERS.len())
     }

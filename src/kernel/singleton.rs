@@ -24,7 +24,7 @@ impl<T> Singleton<T> {
         }
     }
 
-    pub fn register(&self, value: T) -> DropSingleton<T> {
+    pub fn register(&'static self, value: T) -> DropSingleton<T> {
         let b: Box<T> = Box::new(value);
         let p: *mut T = Box::into_raw(b);
         DropSingleton {
@@ -34,12 +34,12 @@ impl<T> Singleton<T> {
     }
 }
 
-pub struct DropSingleton<'a, T> where T : 'a {
-    cell: &'a AtomicPtr<T>,
+pub struct DropSingleton<T: 'static> {
+    cell: &'static AtomicPtr<T>,
     old: *mut T
 }
 
-impl<'a, T> Drop for DropSingleton<'a, T> {
+impl<T> Drop for DropSingleton<T> {
     fn drop(&mut self) {
         let b: Box<T> = unsafe {
             let p: *mut T = self.cell.swap(self.old, Ordering::Relaxed);

@@ -12,13 +12,13 @@ use syscall::{ErrNum,FileHandle,Handler};
 use thread::{self,Deferred};
 use virt_mem::VirtualTree;
 
-struct TestSyscallHandler<'a> {
+struct TestSyscallHandler {
     deferred: Deferred<i32>,
-    keyboard: Keyboard<'a>,
+    keyboard: Keyboard,
     process: Arc<Process>
 }
 
-impl<'a> Handler for TestSyscallHandler<'a> {
+impl Handler for TestSyscallHandler {
     fn exit_thread(&self, code: i32) -> Result<(), ErrNum> {
         self.deferred.resolve(code);
         thread::exit()

@@ -285,13 +285,13 @@ impl KeyboardState {
 
 mod british;
 
-pub struct Keyboard<'a> {
-    _drop_irq_handler: DropIrqHandler<'a>,
+pub struct Keyboard {
+    _drop_irq_handler: DropIrqHandler,
     state: Arc<Mutex<KeyboardState>>,
     device: Arc<ByteDevice>
 }
 
-impl<'a> Keyboard<'a> {
+impl Keyboard {
     pub fn new() -> Self {
         let state = Arc::new(Mutex::new(KeyboardState::new()));
         let device = Arc::new(ByteDevice::new());
@@ -369,7 +369,7 @@ impl<'a> Keyboard<'a> {
     }
 }
 
-impl<'a> AsyncRead for Keyboard<'a> {
+impl AsyncRead for Keyboard {
     fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize), &'static str>> {
         let mut state = lock!(self.state);
         self.device.read_async(&mut state.queue, buf)
