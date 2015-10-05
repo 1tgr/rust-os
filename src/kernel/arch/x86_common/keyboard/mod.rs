@@ -4,11 +4,11 @@ use arch::debug;
 use arch::isr::{self,DropIrqHandler};
 use collections::vec_deque::VecDeque;
 use core::char;
-use core::cmp;
 use core::mem;
+use core::ops::Deref;
 use core::str;
 use device::ByteDevice;
-use io::{AsyncRead,Promise,Read};
+use io::{AsyncRead,Promise,Read,Pipe};
 use mutex::Mutex;
 use prelude::*;
 use process::KObj;
@@ -320,95 +320,43 @@ impl AsyncRead for Keyboard {
     }
 }
 
-struct StateMachine {
-    keyboard: Arc<Keyboard>,
-    chars: Arc<Mutex<VecDeque<u8>>>,
-    buf: Vec<u8>,
-    current: usize
-}
-
-impl StateMachine {
-    fn read_async(mut self) -> Promise<Result<(Vec<u8>, usize)>> {
-        {
-            let mut chars = lock!(self.chars);
-            let end = cmp::min(self.buf.len(), self.current + chars.len());
-            while self.current < end {
-                let c = chars.pop_front().unwrap();
-                if c == 10 {
-                    return Promise::resolved(Ok((self.buf, self.current)));
-                }
-
-                self.buf[self.current] = c;
-                self.current += 1;
-            }
-        }
-
-        if self.current  == self.buf.len() {
-            return Promise::resolved(Ok((self.buf, self.current)));
-        }
-
-        self.keyboard
-            .read_async(vec![0; 4])
-            .then(move |result| {
-                if let Ok((keys, _)) = result {
-                    let c = unsafe { *(keys[0..4].as_ptr() as *const u32) };
-                    let keys = keys::Bucky::from_bits_truncate(c);
-                    let c = c & !keys.bits();
-                    if !keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
-                        if let Some(c) = char::from_u32(c) {
-                            let mut chars = lock!(self.chars);
-                            let mut bytes = vec![0; 4];
-                            let len = char::encode_utf8(c, &mut bytes).unwrap();
-                            debug::puts(unsafe { str::from_utf8_unchecked(&bytes[..len]) });
-                            for i in 0..len {
-                                chars.push_back(bytes[i]);
-                            }
-                        }
-                    }
-
-                    self.read_async()
-                }
-                else {
-                    Promise::resolved(result)
-                }
-            })
-        .unwrap()
-    }
-}
-
-pub struct KeyboardFile {
-    keyboard: Arc<Keyboard>,
-    chars: Arc<Mutex<VecDeque<u8>>>
-}
+pub struct KeyboardFile(Pipe<Keyboard, Vec<u8>>);
 
 impl KeyboardFile {
     pub fn new(keyboard: Arc<Keyboard>) -> Self {
-        KeyboardFile {
-            keyboard: keyboard,
-            chars: Arc::new(Mutex::new(VecDeque::new()))
-        }
+        KeyboardFile(Pipe::new(keyboard, 4, |keys| {
+            let c = unsafe { *(keys[0..4].as_ptr() as *const u32) };
+            let keys = keys::Bucky::from_bits_truncate(c);
+            let c = c & !keys.bits();
+            if keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
+                Vec::new()
+            } else if let Some(c) = char::from_u32(c) {
+                let mut bytes = vec![0; 4];
+                let len = char::encode_utf8(c, &mut bytes).unwrap();
+                bytes.truncate(len);
+                debug::puts(unsafe { str::from_utf8_unchecked(&bytes[..]) });
+                bytes
+            } else {
+                Vec::new()
+            }
+        }))
     }
 }
 
-impl AsyncRead for KeyboardFile {
-    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>> {
-        let machine = StateMachine {
-            keyboard: self.keyboard.clone(),
-            chars: self.chars.clone(),
-            buf: buf,
-            current: 0
-        };
+impl Deref for KeyboardFile {
+    type Target = Pipe<Keyboard, Vec<u8>>;
 
-        machine.read_async()
+    fn deref<'a>(&'a self) -> &'a Self::Target {
+        &self.0
     }
 }
 
 impl KObj for KeyboardFile {
     fn read(&self) -> Option<&Read> {
-        Some(self)
+        Some(&self.0)
     }
 
     fn async_read(&self) -> Option<&AsyncRead> {
-        Some(self)
+        Some(&self.0)
     }
 }

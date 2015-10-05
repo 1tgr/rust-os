@@ -1,4 +1,5 @@
 mod nodes;
+mod pipe;
 
 use core::result;
 use core::slice::bytes;
@@ -6,6 +7,8 @@ use io::nodes::PromiseNode;
 use prelude::*;
 use syscall::Result;
 use thread::Deferred;
+
+pub use self::pipe::Pipe;
 
 pub trait Read {
     fn read(&self, buf: &mut [u8]) -> Result<usize>;
