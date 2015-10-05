@@ -13,51 +13,6 @@ pub struct Pipe<T, U> {
     f: Arc<Fn(Vec<u8>) -> U>
 }
 
-struct State<T, U> {
-    pipe: Pipe<T, U>,
-    buf: Vec<u8>,
-    current: usize
-}
-
-impl<T: AsyncRead + 'static, U: IntoIterator<Item=u8> + 'static> State<T, U> {
-    fn read_async(mut self) -> Promise<Result<Vec<u8>>> {
-        {
-            let mut queue = lock!(self.pipe.queue);
-            let end = cmp::min(self.buf.len(), self.current + queue.len());
-            while self.current < end {
-                let b = queue.pop_front().unwrap();
-                self.buf[self.current] = b;
-                self.current += 1;
-            }
-        }
-
-        if self.current  == self.buf.len() {
-            return Promise::resolved(Ok(self.buf));
-        }
-
-        self.pipe.input
-            .read_async(vec![0; self.pipe.buf_len])
-            .then(move |result| {
-                if let Ok(data) = result {
-                    let output = (self.pipe.f)(data);
-
-                    {
-                        let mut queue = lock!(self.pipe.queue);
-                        for b in output {
-                            queue.push_back(b);
-                        }
-                    }
-
-                    self.read_async()
-                }
-                else {
-                    Promise::resolved(result)
-                }
-            })
-        .unwrap()
-    }
-}
-
 impl<T, U> Pipe<T, U> {
     pub fn new<F: Fn(Vec<u8>) -> U + 'static>(input: Arc<T>, buf_len: usize, f: F) -> Self {
         Pipe {
@@ -69,19 +24,47 @@ impl<T, U> Pipe<T, U> {
     }
 }
 
+impl<T: AsyncRead + 'static, U: IntoIterator<Item=u8> + 'static> Pipe<T, U> {
+    fn read_async_inner(self, mut buf: Vec<u8>, mut current: usize) -> Promise<Result<Vec<u8>>> {
+        {
+            let mut queue = lock!(self.queue);
+            let end = cmp::min(buf.len(), current + queue.len());
+            while current < end {
+                let b = queue.pop_front().unwrap();
+                buf[current] = b;
+                current += 1;
+            }
+        }
+
+        if current  == buf.len() {
+            return Promise::resolved(Ok(buf));
+        }
+
+        self.input
+            .read_async(vec![0; self.buf_len])
+            .then(move |result| {
+                if let Ok(data) = result {
+                    let output = (self.f)(data);
+                    lock!(self.queue).extend(output);
+                    self.read_async_inner(buf, current)
+                }
+                else {
+                    Promise::resolved(result)
+                }
+            })
+        .unwrap()
+    }
+}
+
 impl<T: AsyncRead + 'static, U: IntoIterator<Item=u8> + 'static> AsyncRead for Pipe<T, U> {
     fn read_async(&self, buf: Vec<u8>) -> Promise<Result<Vec<u8>>> {
-        let state = State {
-            pipe: Pipe {
-                input: self.input.clone(),
-                queue: self.queue.clone(),
-                buf_len: self.buf_len,
-                f: self.f.clone()
-            },
-            buf: buf,
-            current: 0
+        let pipe = Pipe {
+            input: self.input.clone(),
+            queue: self.queue.clone(),
+            buf_len: self.buf_len,
+            f: self.f.clone()
         };
 
-        state.read_async()
+        pipe.read_async_inner(buf, 0)
     }
 }
