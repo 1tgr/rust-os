@@ -339,6 +339,8 @@ impl KeyboardFile {
             } else {
                 Vec::new()
             }
+        }, |left| {
+            left.iter().position(|b| *b == 10).map(|index| left.split_off(index))
         }))
     }
 }
