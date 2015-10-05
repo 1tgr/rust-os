@@ -1,8 +1,7 @@
-use core::default::Default;
 use core::mem;
-use core::option::Option::{self,Some,None};
-use core::result::Result::{self,Ok,Err};
-use core::slice::{self,SliceExt};
+use core::result;
+use core::str::{self,StrExt};
+use core::slice;
 
 struct TupleDeque6<T> {
     tuple: (T, T, T, T, T, T),
@@ -56,17 +55,23 @@ impl<T> TupleDeque6<T> {
 }
 
 #[repr(usize)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ErrNum {
     Utf8Error = 1,
-    OutOfMemory = 2
+    OutOfMemory = 2,
+    InvalidHandle = 3,
+    NotSupported = 4,
+    FileNotFound = 5,
 }
 
-pub type FileHandle = usize;
+pub type Handle = usize;
+pub type FileHandle = Handle;
 pub type PackedArgs = TupleDeque6<usize>;
+pub type Result<T> = result::Result<T, ErrNum>;
 
 pub trait SyscallArgs : Sized {
     fn as_args(self, args: &mut PackedArgs);
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum>;
+    fn from_args(args: &mut PackedArgs) -> Result<Self>;
 }
 
 pub trait SyscallResult {
@@ -78,7 +83,7 @@ impl SyscallArgs for () {
     fn as_args(self, _args: &mut PackedArgs) {
     }
 
-    fn from_args(_args: &mut PackedArgs) -> Result<Self, ErrNum >{
+    fn from_args(_args: &mut PackedArgs) -> Result<Self> {
         Ok(())
     }
 }
@@ -88,7 +93,7 @@ impl SyscallArgs for i32 {
         args.push_back(self as usize);
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         Ok(args.pop_front().unwrap() as Self)
     }
 }
@@ -98,7 +103,7 @@ impl SyscallArgs for usize {
         args.push_back(self);
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         Ok(args.pop_front().unwrap())
     }
 }
@@ -108,7 +113,7 @@ impl<T> SyscallArgs for *const T {
         args.push_back(self as usize)
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         Ok(args.pop_front().unwrap() as Self)
     }
 }
@@ -118,7 +123,7 @@ impl<T> SyscallArgs for *mut T {
         args.push_back(self as usize)
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         Ok(args.pop_front().unwrap() as Self)
     }
 }
@@ -128,7 +133,7 @@ impl<'a, T> SyscallArgs for &'a [T] {
         (self.as_ptr(), self.len()).as_args(args);
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         let (ptr, len) = try!(SyscallArgs::from_args(args));
         Ok(unsafe { slice::from_raw_parts(ptr, len) })
     }
@@ -139,9 +144,23 @@ impl<'a, T> SyscallArgs for &'a mut [T] {
         (self.as_mut_ptr(), self.len()).as_args(args)
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         let (ptr, len) = try!(SyscallArgs::from_args(args));
         Ok(unsafe { slice::from_raw_parts_mut(ptr, len) })
+    }
+}
+
+impl<'a> SyscallArgs for &'a str {
+    fn as_args(self, args: &mut PackedArgs) {
+        self.as_bytes().as_args(args)
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        let bytes = try!(SyscallArgs::from_args(args));
+        match str::from_utf8(bytes) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(ErrNum::Utf8Error)
+        }
     }
 }
 
@@ -150,7 +169,7 @@ impl<T: SyscallArgs> SyscallArgs for (T,) {
         self.0.as_args(args)
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         Ok((try!(SyscallArgs::from_args(args)),))
     }
 }
@@ -161,14 +180,14 @@ impl<T: SyscallArgs, U: SyscallArgs> SyscallArgs for (T, U) {
         self.1.as_args(args);
     }
 
-    fn from_args(args: &mut PackedArgs) -> Result<Self, ErrNum> {
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
         let a = try!(SyscallArgs::from_args(args));
         let b = try!(SyscallArgs::from_args(args));
         Ok((a, b))
     }
 }
 
-impl<T: SyscallResult> SyscallResult for Result<T, ErrNum> {
+impl<T: SyscallResult> SyscallResult for Result<T> {
     fn as_result(self) -> isize {
         match self {
             Ok(x) => x.as_result(),
@@ -176,7 +195,7 @@ impl<T: SyscallResult> SyscallResult for Result<T, ErrNum> {
         }
     }
 
-    fn from_result(value: isize) -> Result<T, ErrNum> {
+    fn from_result(value: isize) -> Result<T> {
         if value < 0 {
             Err(unsafe { mem::transmute(-value) })
         } else {

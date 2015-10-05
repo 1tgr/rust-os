@@ -3,9 +3,11 @@ use arch::cpu;
 use core::fmt::{Debug,Error,Formatter};
 use core::intrinsics;
 use core::marker::PhantomData;
+use core::result;
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use ptr::Align;
+use syscall::Result;
 
 bitflags! {
     flags PageFlags: usize {
@@ -54,7 +56,7 @@ impl<T> PageEntry<T> {
         self.as_mut_ref()
     }
 
-    pub fn ensure_present(&mut self, bitmap: &PhysicalBitmap) -> Result<(), &'static str> {
+    pub fn ensure_present(&mut self, bitmap: &PhysicalBitmap) -> Result<()> {
         let mut flags = self.flags();
         if !flags.contains(PAGE_PRESENT) {
             flags.insert(PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
@@ -95,7 +97,7 @@ impl<T> PageEntry<T> {
 }
 
 impl<T> Debug for PageEntry<T> {
-    fn fmt(&self, fmt: &mut Formatter) -> Result<(), Error> {
+    fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), Error> {
         let (addr, flags) = self.entry();
         try!(write!(fmt, "{{ addr = {:-16x}, flags = ", addr));
 
@@ -177,7 +179,7 @@ pub struct AddressSpace {
 }
 
 impl AddressSpace {
-    pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace, &'static str> {
+    pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace> {
         let pml4_addr = try!(bitmap.alloc_page());
         let kernel_base_ptr = &KERNEL_BASE as *const u8;
         let four_meg = 4 * 1024 * 1024;
@@ -208,7 +210,7 @@ impl AddressSpace {
         unsafe { cpu::write_cr3(self.cr3) };
     }
 
-    pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<(), &'static str> {
+    pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
         let _x = lock!(self.mutex);
         assert_eq!(self.cr3, recursive_pml4_addr());
 

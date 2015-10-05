@@ -1,49 +1,70 @@
 use alloc::arc::Arc;
 use arch::debug;
-use arch::keyboard::Keyboard;
+use arch::keyboard::{Keyboard,KeyboardFile};
 use core::mem;
 use core::slice;
 use core::str;
+use io::Read;
 use miniz_sys as mz;
 use multiboot::multiboot_module_t;
 use phys_mem::{self,PhysicalBitmap};
-use process::Process;
-use syscall::{ErrNum,FileHandle,Handler};
+use process::{KObj,Process};
+use syscall::{ErrNum,Handle,FileHandle,Handler,Result};
 use thread::{self,Deferred};
 use virt_mem::VirtualTree;
 
 struct TestSyscallHandler {
+    keyboard: Arc<Keyboard>,
     deferred: Deferred<i32>,
-    keyboard: Keyboard,
     process: Arc<Process>
 }
 
 impl Handler for TestSyscallHandler {
-    fn exit_thread(&self, code: i32) -> Result<(), ErrNum> {
+    fn exit_thread(&self, code: i32) -> Result<()> {
         self.deferred.resolve(code);
         thread::exit()
     }
 
-    fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<(), ErrNum> {
+    fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<()> {
         match str::from_utf8(bytes) {
             Ok(s) => Ok(debug::puts(s)),
             Err(_) => Err(ErrNum::Utf8Error)
         }
     }
 
-    fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize, ErrNum> {
-        Ok(self.keyboard.read_line(buf))
+    fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize> {
+        let kobj = try!(self.process.resolve_handle(file).ok_or(ErrNum::InvalidHandle));
+        let file: &Read = try!(kobj.read().ok_or(ErrNum::NotSupported));
+        file.read(buf)
     }
 
-    fn alloc_pages(&self, len: usize) -> Result<*mut u8, ErrNum> {
+    fn alloc_pages(&self, len: usize) -> Result<*mut u8> {
         match self.process.alloc(len, true, true) {
             Ok(slice) => Ok(slice.as_mut_ptr()),
             Err(_) => Err(ErrNum::OutOfMemory)
         }
     }
 
-    fn free_pages(&self, p: *mut u8) -> Result<bool, ErrNum> {
+    fn free_pages(&self, p: *mut u8) -> Result<bool> {
         Ok(self.process.free(p))
+    }
+
+    fn open(&self, filename: &str) -> Result<FileHandle> {
+        let file: Arc<KObj> =
+            match filename {
+                "stdin" => Arc::new(KeyboardFile::new(self.keyboard.clone())),
+                _ => { return Err(ErrNum::FileNotFound) }
+            };
+
+        Ok(self.process.make_handle(file))
+    }
+
+    fn close(&self, handle: Handle) -> Result<()> {
+        if !self.process.close_handle(handle) {
+            return Err(ErrNum::InvalidHandle)
+        }
+
+        Ok(())
     }
 }
 
@@ -53,7 +74,6 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::for_kernel());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         thread::with_scheduler(p.clone(), || {
-            let keyboard = Keyboard::new();
             p.switch();
 
             let mut code_slice;
@@ -80,18 +100,32 @@ test! {
             log!("code_slice = {:p}, stack_slice = {:p}", code_slice.as_ptr(), stack_slice.as_ptr());
             log!("code_slice = {:?}", &code_slice[0..16]);
 
-            let deferred = Deferred::new();
+            let mut deferred = Deferred::new();
 
             let handler = TestSyscallHandler {
+                keyboard: Arc::new(Keyboard::new()),
                 deferred: deferred.clone(),
-                keyboard: keyboard,
                 process: p.clone()
             };
 
             let _x = ::arch::thread::register_syscall_handler(handler);
             thread::spawn_user_mode(code_slice.as_ptr(), stack_slice);
 
-            assert_eq!(0x1234, deferred.get());
+            let code;
+            loop {
+                match deferred.try_get() {
+                    Ok(n) => {
+                        code = n;
+                        break;
+                    },
+                    Err(d) => {
+                        deferred = d;
+                        thread::schedule();
+                    }
+                }
+            }
+
+            assert_eq!(0x1234, code);
         });
     }
 }

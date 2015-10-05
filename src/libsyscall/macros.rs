@@ -5,7 +5,6 @@ macro_rules! syscalls {
             $num:expr => $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty
         ),+
     ) => {
-        use core::result::Result;
         use $crate::marshal::ErrNum;
 
         #[allow(non_camel_case_types)]
@@ -32,7 +31,6 @@ macro_rules! syscalls {
     ) => {
         use $crate::kernel::Dispatch;
         use $crate::marshal::{ErrNum,PackedArgs,SyscallArgs,SyscallResult};
-        use core::result::Result::{self,Ok,Err};
 
         pub trait Handler {
             $(

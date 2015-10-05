@@ -3,16 +3,17 @@ use core::cmp;
 use io::Promise;
 use mutex::Mutex;
 use prelude::*;
+use syscall::Result;
 use thread::Deferred;
 
 struct IoRequest {
     buf: Vec<u8>,
-    d: Deferred<Result<(Vec<u8>, usize), &'static str>>,
+    d: Deferred<Result<(Vec<u8>, usize)>>,
     current: usize
 }
 
 impl IoRequest {
-    pub fn new(buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize), &'static str>>) -> Self {
+    pub fn new(buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize)>>) -> Self {
         IoRequest {
             buf: buf,
             d: d,
@@ -53,13 +54,13 @@ impl ByteDevice {
         }
     }
 
-    pub fn fulfil(&self, data: &mut VecDeque<u8>) {
+    pub fn fulfil(&self, data: &mut VecDeque<u8>) -> bool {
         loop {
             let mut requests = lock!(self.requests);
             let request: IoRequest =
                 match requests.pop_front() {
                     Some(request) => request,
-                    None => { return; }
+                    None => { return false; }
                 };
 
             if let Some(request) = request.fulfil(data) {
@@ -67,16 +68,16 @@ impl ByteDevice {
             }
 
             if data.len() == 0 {
-                return;
+                return !requests.is_empty();
             }
         }
     }
 
-    pub fn queue(&self, buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize), &'static str>>) {
+    pub fn queue(&self, buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize)>>) {
         lock!(self.requests).push_back(IoRequest::new(buf, d))
     }
 
-    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize), &'static str>> {
+    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>> {
         let d = Deferred::new();
         self.queue(buf, d.clone());
         self.fulfil(queue);

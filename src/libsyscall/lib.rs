@@ -2,6 +2,7 @@
 
 #![feature(asm)]
 #![feature(core_slice_ext)]
+#![feature(core_str_ext)]
 #![feature(no_std)]
 #![no_std]
 
@@ -16,13 +17,11 @@ mod user;
 #[cfg(feature = "kernel")]
 pub mod kernel;
 
-pub use marshal::{ErrNum,FileHandle};
+pub use marshal::{ErrNum,Handle,FileHandle,Result};
 pub use table::*;
 
 #[cfg(not(feature = "kernel"))]
 pub mod libc {
-    use core::result::Result::{Ok,Err};
-
     static mut ERRNO: u32 = 0;
 
     #[no_mangle]

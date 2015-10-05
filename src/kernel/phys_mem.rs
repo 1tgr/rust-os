@@ -5,6 +5,7 @@ use libc::{c_int,c_void};
 use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
 use mutex::Mutex;
 use ptr;
+use syscall::{ErrNum,Result};
 
 extern {
     static mut KERNEL_BASE: u8;
@@ -88,7 +89,7 @@ impl PhysicalBitmap {
         free_count * PAGE_SIZE
     }
 
-    pub fn alloc_page(&self) -> Result<usize, &'static str> {
+    pub fn alloc_page(&self) -> Result<usize> {
         let addr = {
             let mut free = lock!(self.free);
             match free.iter().position(|x| x) {
@@ -97,7 +98,7 @@ impl PhysicalBitmap {
                     i * PAGE_SIZE
                 }
 
-                None => { return Err("out of memory"); }
+                None => { return Err(ErrNum::OutOfMemory); }
             }
         };
 
@@ -155,7 +156,7 @@ test! {
         bitmap.alloc_page().unwrap();
 
         let err = bitmap.alloc_page().unwrap_err();
-        assert_eq!(err, "out of memory");
+        assert_eq!(err, ErrNum::OutOfMemory);
     }
 
     fn can_parse_multiboot() {

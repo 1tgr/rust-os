@@ -20,6 +20,7 @@
 #![feature(lang_items)]	//< unwind needs to define lang items
 #![feature(no_std)]
 #![feature(slice_bytes)]
+#![feature(unicode)]
 
 #![no_std]
 
@@ -89,7 +90,6 @@ const TEST_FIXTURES: &'static [Fixture] = &[
     ptr::TESTS,
 
     arch::isr::TESTS,
-    arch::keyboard::TESTS,
     arch::mmu::TESTS,
     device::TESTS,
     phys_mem::TESTS,

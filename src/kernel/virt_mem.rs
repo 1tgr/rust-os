@@ -5,6 +5,7 @@ use mutex::Mutex;
 use phys_mem;
 use prelude::*;
 use ptr::{self,Align};
+use syscall::{ErrNum,Result};
 
 extern {
     static kernel_end: u8;
@@ -21,14 +22,14 @@ struct VirtualState {
 }
 
 impl VirtualState {
-    pub fn alloc(&mut self, len: usize) -> Result<&'static mut [u8], &'static str> {
+    pub fn alloc(&mut self, len: usize) -> Result<&'static mut [u8]> {
         let unaligned_len = len;
         let len = Align::up(len, phys_mem::PAGE_SIZE);
 
         let pos =
             match self.blocks.iter().position(|block| block.free && block.len >= len) {
                 Some(pos) => pos,
-                None => { return Err("out of memory") }
+                None => { return Err(ErrNum::OutOfMemory) }
             };
 
         let (orig_len, orig_ptr) = {
@@ -132,7 +133,7 @@ impl VirtualTree {
         lock!(self.state).blocks.len()
     }
 
-    pub fn alloc(&self, len: usize) -> Result<&mut [u8], &'static str> {
+    pub fn alloc(&self, len: usize) -> Result<&mut [u8]> {
         let slice: &'static mut [u8] = try!(lock!(self.state).alloc(len));
         let slice: &mut [u8] = unsafe { mem::transmute(slice) };
         Ok(slice)

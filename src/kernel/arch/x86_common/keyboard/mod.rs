@@ -6,15 +6,13 @@ use collections::vec_deque::VecDeque;
 use core::char;
 use core::cmp;
 use core::mem;
-use core::slice::bytes;
+use core::str;
 use device::ByteDevice;
-use io::{AsyncRead,Promise};
+use io::{AsyncRead,Promise,Read};
 use mutex::Mutex;
-use phys_mem::PhysicalBitmap;
 use prelude::*;
-use process::Process;
-use thread;
-use virt_mem::VirtualTree;
+use process::KObj;
+use syscall::Result;
 
 //                  S    C    C+S  AGr  AGr+S
 pub struct Key(u32, u32, u32, u32, u32, u32);
@@ -313,78 +311,104 @@ impl Keyboard {
             device: device
         }
     }
-
-    pub fn read_key(&self) -> (keys::Bucky, u32) {
-        let mut promise = self.read_async(vec![0; 4]);
-        let c: u32;
-        loop {
-            match promise.try_get() {
-                Ok(result) => {
-                    let (keys, _) = result.unwrap();
-                    let p = keys[0..4].as_ptr() as *const u32;
-                    c = unsafe { *p };
-                    break;
-                },
-                Err(p) => {
-                    promise = p;
-                    unsafe { asm!("hlt") };
-                }
-            }
-        }
-
-        let keys = keys::Bucky::from_bits_truncate(c);
-        (keys, c & !keys.bits())
-    }
-
-    pub fn read_char(&self) -> char {
-        loop {
-            let (keys, c) = self.read_key();
-            if !keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
-                if let Some(c) = char::from_u32(c) {
-                    return c;
-                }
-            }
-        }
-    }
-
-    pub fn read_line(&self, bytes: &mut [u8]) -> usize {
-        let mut buf = String::new();
-
-        loop {
-            match self.read_char() {
-                '\n' => { break; },
-                c => {
-                    let mut s = String::new();
-                    s.push(c);
-                    debug::puts(&s);
-                    buf.push(c);
-                }
-            }
-        }
-
-        let buf = buf.as_bytes();
-        let buf = &buf[0 .. cmp::min(buf.len(), bytes.len())];
-        bytes::copy_memory(buf, bytes);
-        buf.len()
-    }
 }
 
 impl AsyncRead for Keyboard {
-    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize), &'static str>> {
+    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>> {
         let mut state = lock!(self.state);
         self.device.read_async(&mut state.queue, buf)
     }
 }
 
-test! {
-    fn can_read_key() {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        thread::with_scheduler(p, || {
-            let _keyboard = Keyboard::new();
-            //log!("Press any key to continue");
-            //_keyboard.read_key();
-        });
+struct StateMachine {
+    keyboard: Arc<Keyboard>,
+    chars: Arc<Mutex<VecDeque<u8>>>,
+    buf: Vec<u8>,
+    current: usize
+}
+
+impl StateMachine {
+    fn read_async(mut self) -> Promise<Result<(Vec<u8>, usize)>> {
+        {
+            let mut chars = lock!(self.chars);
+            let end = cmp::min(self.buf.len(), self.current + chars.len());
+            while self.current < end {
+                let c = chars.pop_front().unwrap();
+                if c == 10 {
+                    return Promise::resolved(Ok((self.buf, self.current)));
+                }
+
+                self.buf[self.current] = c;
+                self.current += 1;
+            }
+        }
+
+        if self.current  == self.buf.len() {
+            return Promise::resolved(Ok((self.buf, self.current)));
+        }
+
+        self.keyboard
+            .read_async(vec![0; 4])
+            .then(move |result| {
+                if let Ok((keys, _)) = result {
+                    let c = unsafe { *(keys[0..4].as_ptr() as *const u32) };
+                    let keys = keys::Bucky::from_bits_truncate(c);
+                    let c = c & !keys.bits();
+                    if !keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
+                        if let Some(c) = char::from_u32(c) {
+                            let mut chars = lock!(self.chars);
+                            let mut bytes = vec![0; 4];
+                            let len = char::encode_utf8(c, &mut bytes).unwrap();
+                            debug::puts(unsafe { str::from_utf8_unchecked(&bytes[..len]) });
+                            for i in 0..len {
+                                chars.push_back(bytes[i]);
+                            }
+                        }
+                    }
+
+                    self.read_async()
+                }
+                else {
+                    Promise::resolved(result)
+                }
+            })
+        .unwrap()
+    }
+}
+
+pub struct KeyboardFile {
+    keyboard: Arc<Keyboard>,
+    chars: Arc<Mutex<VecDeque<u8>>>
+}
+
+impl KeyboardFile {
+    pub fn new(keyboard: Arc<Keyboard>) -> Self {
+        KeyboardFile {
+            keyboard: keyboard,
+            chars: Arc::new(Mutex::new(VecDeque::new()))
+        }
+    }
+}
+
+impl AsyncRead for KeyboardFile {
+    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>> {
+        let machine = StateMachine {
+            keyboard: self.keyboard.clone(),
+            chars: self.chars.clone(),
+            buf: buf,
+            current: 0
+        };
+
+        machine.read_async()
+    }
+}
+
+impl KObj for KeyboardFile {
+    fn read(&self) -> Option<&Read> {
+        Some(self)
+    }
+
+    fn async_read(&self) -> Option<&AsyncRead> {
+        Some(self)
     }
 }
