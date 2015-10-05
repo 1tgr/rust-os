@@ -45,14 +45,14 @@ impl<A: 'static> Promise<Promise<A>> {
 }
 
 pub trait AsyncRead {
-    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>>;
+    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<Vec<u8>>>;
 }
 
 impl<T: AsyncRead> Read for T {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let p = self.read_async(vec![0; buf.len()]);
-        let (v, len) = try!(p.get());
+        let v = try!(p.get());
         bytes::copy_memory(&v[..], buf);
-        Ok(len)
+        Ok(v.len())
     }
 }

@@ -314,7 +314,7 @@ impl Keyboard {
 }
 
 impl AsyncRead for Keyboard {
-    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>> {
+    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<Vec<u8>>> {
         let mut state = lock!(self.state);
         self.device.read_async(&mut state.queue, buf)
     }

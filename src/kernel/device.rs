@@ -8,12 +8,12 @@ use thread::Deferred;
 
 struct IoRequest {
     buf: Vec<u8>,
-    d: Deferred<Result<(Vec<u8>, usize)>>,
+    d: Deferred<Result<Vec<u8>>>,
     current: usize
 }
 
 impl IoRequest {
-    pub fn new(buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize)>>) -> Self {
+    pub fn new(buf: Vec<u8>, d: Deferred<Result<Vec<u8>>>) -> Self {
         IoRequest {
             buf: buf,
             d: d,
@@ -35,7 +35,7 @@ impl IoRequest {
         }
 
         if self.current >= self.buf.len() {
-            self.d.resolve(Ok((self.buf, self.current)));
+            self.d.resolve(Ok(self.buf));
             None
         } else {
             Some(self)
@@ -73,11 +73,11 @@ impl ByteDevice {
         }
     }
 
-    pub fn queue(&self, buf: Vec<u8>, d: Deferred<Result<(Vec<u8>, usize)>>) {
+    pub fn queue(&self, buf: Vec<u8>, d: Deferred<Result<Vec<u8>>>) {
         lock!(self.requests).push_back(IoRequest::new(buf, d))
     }
 
-    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Promise<Result<(Vec<u8>, usize)>> {
+    pub fn read_async(&self, queue: &mut VecDeque<u8>, buf: Vec<u8>) -> Promise<Result<Vec<u8>>> {
         let d = Deferred::new();
         self.queue(buf, d.clone());
         self.fulfil(queue);
@@ -88,9 +88,7 @@ impl ByteDevice {
 fn test_read(queue: &mut VecDeque<u8>, device: &ByteDevice, expected: &[u8]) {
     let buf = vec![0; expected.len()];
     let d = device.read_async(queue, buf);
-    let (buf, len) = d.try_get().unwrap_or_else(|_| panic!("didn't expect to block")).unwrap();
-    assert_eq!(expected.len(), len);
-
+    let buf = d.try_get().unwrap_or_else(|_| panic!("didn't expect to block")).unwrap();
     let mut v = Vec::<u8>::new();
     v.extend(expected);
     assert_eq!(v, buf);
