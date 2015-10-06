@@ -14,6 +14,10 @@ pub trait Read {
     fn read(&self, buf: &mut [u8]) -> Result<usize>;
 }
 
+pub trait Write {
+    fn write(&self, buf: &[u8]) -> Result<usize>;
+}
+
 pub struct Promise<A>(Box<PromiseNode<A>>);
 
 impl<A: 'static> Promise<A> {

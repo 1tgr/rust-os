@@ -1,10 +1,9 @@
 use alloc::arc::Arc;
-use arch::debug;
 use arch::keyboard::{Keyboard,KeyboardFile};
+use arch::vga::Vga;
 use core::mem;
 use core::slice;
-use core::str;
-use io::Read;
+use io::{Read,Write};
 use miniz_sys as mz;
 use multiboot::multiboot_module_t;
 use phys_mem::{self,PhysicalBitmap};
@@ -15,6 +14,7 @@ use virt_mem::VirtualTree;
 
 struct TestSyscallHandler {
     keyboard: Arc<Keyboard>,
+    vga: Arc<Vga>,
     deferred: Deferred<i32>,
     process: Arc<Process>
 }
@@ -25,11 +25,10 @@ impl Handler for TestSyscallHandler {
         thread::exit()
     }
 
-    fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<()> {
-        match str::from_utf8(bytes) {
-            Ok(s) => Ok(debug::puts(s)),
-            Err(_) => Err(ErrNum::Utf8Error)
-        }
+    fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<usize> {
+        let kobj = try!(self.process.resolve_handle(file).ok_or(ErrNum::InvalidHandle));
+        let file: &Write = try!(kobj.write().ok_or(ErrNum::NotSupported));
+        file.write(bytes)
     }
 
     fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize> {
@@ -53,6 +52,7 @@ impl Handler for TestSyscallHandler {
         let file: Arc<KObj> =
             match filename {
                 "stdin" => Arc::new(KeyboardFile::new(self.keyboard.clone())),
+                "stdout" => self.vga.clone(),
                 _ => { return Err(ErrNum::FileNotFound) }
             };
 
@@ -104,6 +104,7 @@ test! {
 
             let handler = TestSyscallHandler {
                 keyboard: Arc::new(Keyboard::new()),
+                vga: Arc::new(Vga::new()),
                 deferred: deferred.clone(),
                 process: p.clone()
             };

@@ -2,7 +2,7 @@ use alloc::arc::Arc;
 use arch::process::ArchProcess;
 use core::intrinsics;
 use core::slice;
-use io::{AsyncRead,Read};
+use io::{AsyncRead,Read,Write};
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use prelude::*;
@@ -12,6 +12,7 @@ use virt_mem::VirtualTree;
 pub trait KObj {
     fn async_read(&self) -> Option<&AsyncRead> { None }
     fn read(&self) -> Option<&Read> { None }
+    fn write(&self) -> Option<&Write> { None }
 }
 
 struct ProcessState {

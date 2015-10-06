@@ -1,8 +1,10 @@
 use arch::cpu;
 use core::intrinsics;
-use libc::c_char;
+use io::Write;
 use mutex::Mutex;
 use phys_mem;
+use process::KObj;
+use syscall::Result;
 
 struct VgaState {
     base_ptr: *mut u16,
@@ -69,7 +71,7 @@ impl VgaState {
         }
     }
 
-    pub fn putb(&mut self, b: u8) {
+    fn putb(&mut self, b: u8) {
         match b {
             10 => self.newline(),
             _ => {
@@ -85,28 +87,33 @@ impl VgaState {
             }
         }
     }
-}
 
-lazy_static! {
-    static noalloc STATE: Mutex<VgaState> = Mutex::new(VgaState::new());
-}
+    pub fn write(&mut self, buf: &[u8]) {
+        for b in buf {
+            self.putb(*b);
+        }
 
-pub fn puts(s: &str) {
-    let mut state = lock!(STATE);
-    for b in s.bytes() {
-        state.putb(b);
+        self.update_cursor();
     }
-
-    state.update_cursor();
 }
 
-pub unsafe fn put_cstr(s: *const c_char) {
-    let mut state = lock!(STATE);
-    let mut s = s;
-    while *s != 0 {
-        state.putb(*s as u8);
-        s = s.offset(1);
-    }
+pub struct Vga(Mutex<VgaState>);
 
-    state.update_cursor();
+impl Vga {
+    pub fn new() -> Self {
+        Vga(Mutex::new(VgaState::new()))
+    }
+}
+
+impl Write for Vga {
+    fn write(&self, buf: &[u8]) -> Result<usize> {
+        lock!(self.0).write(buf);
+        Ok(buf.len())
+    }
+}
+
+impl KObj for Vga {
+    fn write(&self) -> Option<&Write> {
+        Some(self)
+    }
 }

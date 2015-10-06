@@ -17,7 +17,7 @@ struct Writer;
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         match syscall::write(unsafe { stdout }, s.as_bytes()) {
-            Ok(()) => Ok(()),
+            Ok(_) => Ok(()),
             Err(_) => Err(std::fmt::Error)
         }
     }
@@ -57,7 +57,7 @@ fn main() -> i32 {
 fn init() -> Result<()> {
     unsafe {
         stdin = try!(syscall::open("stdin"));
-        //stdout = try!(syscall::open("stdout"));
+        stdout = try!(syscall::open("stdout"));
     }
 
     Ok(())
