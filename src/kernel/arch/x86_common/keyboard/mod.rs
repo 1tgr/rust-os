@@ -1,17 +1,13 @@
 use alloc::arc::Arc;
 use arch::cpu;
-use arch::debug;
 use arch::isr::{self,DropIrqHandler};
 use collections::vec_deque::VecDeque;
 use core::char;
 use core::mem;
-use core::ops::Deref;
-use core::str;
 use device::ByteDevice;
-use io::{AsyncRead,Promise,Read,Pipe};
+use io::{AsyncRead,Promise};
 use mutex::Mutex;
 use prelude::*;
-use process::KObj;
 use syscall::Result;
 
 //                  S    C    C+S  AGr  AGr+S
@@ -317,48 +313,5 @@ impl AsyncRead for Keyboard {
     fn read_async(&self, buf: Vec<u8>) -> Promise<Result<Vec<u8>>> {
         let mut state = lock!(self.state);
         self.device.read_async(&mut state.queue, buf)
-    }
-}
-
-pub struct KeyboardFile(Pipe<Keyboard, Vec<u8>>);
-
-impl KeyboardFile {
-    pub fn new(keyboard: Arc<Keyboard>) -> Self {
-        KeyboardFile(Pipe::new(keyboard, 4, |keys| {
-            let c = unsafe { *(keys[0..4].as_ptr() as *const u32) };
-            let keys = keys::Bucky::from_bits_truncate(c);
-            let c = c & !keys.bits();
-            if keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
-                Vec::new()
-            } else if let Some(c) = char::from_u32(c) {
-                let mut bytes = vec![0; 4];
-                let len = char::encode_utf8(c, &mut bytes).unwrap();
-                bytes.truncate(len);
-                debug::puts(unsafe { str::from_utf8_unchecked(&bytes[..]) });
-                bytes
-            } else {
-                Vec::new()
-            }
-        }, |left| {
-            left.iter().position(|b| *b == 10).map(|index| left.split_off(index))
-        }))
-    }
-}
-
-impl Deref for KeyboardFile {
-    type Target = Pipe<Keyboard, Vec<u8>>;
-
-    fn deref<'a>(&'a self) -> &'a Self::Target {
-        &self.0
-    }
-}
-
-impl KObj for KeyboardFile {
-    fn read(&self) -> Option<&Read> {
-        Some(&self.0)
-    }
-
-    fn async_read(&self) -> Option<&AsyncRead> {
-        Some(&self.0)
     }
 }

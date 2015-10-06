@@ -46,6 +46,7 @@ pub mod arch;
 pub mod arch;
 
 pub mod bit_vec;
+pub mod console;
 pub mod device;
 pub mod io;
 pub mod logging;

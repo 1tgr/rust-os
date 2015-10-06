@@ -1,6 +1,7 @@
 use alloc::arc::Arc;
-use arch::keyboard::{Keyboard,KeyboardFile};
+use arch::keyboard::Keyboard;
 use arch::vga::Vga;
+use console::Console;
 use core::mem;
 use core::slice;
 use io::{Read,Write};
@@ -13,8 +14,7 @@ use thread::{self,Deferred};
 use virt_mem::VirtualTree;
 
 struct TestSyscallHandler {
-    keyboard: Arc<Keyboard>,
-    vga: Arc<Vga>,
+    console: Arc<Console>,
     deferred: Deferred<i32>,
     process: Arc<Process>
 }
@@ -51,8 +51,8 @@ impl Handler for TestSyscallHandler {
     fn open(&self, filename: &str) -> Result<FileHandle> {
         let file: Arc<KObj> =
             match filename {
-                "stdin" => Arc::new(KeyboardFile::new(self.keyboard.clone())),
-                "stdout" => self.vga.clone(),
+                "stdin" => self.console.clone(),
+                "stdout" => self.console.clone(),
                 _ => { return Err(ErrNum::FileNotFound) }
             };
 
@@ -113,8 +113,7 @@ test! {
             let mut deferred = Deferred::new();
 
             let handler = TestSyscallHandler {
-                keyboard: Arc::new(Keyboard::new()),
-                vga: Arc::new(Vga::new()),
+                console: Arc::new(Console::new(Arc::new(Keyboard::new()), Arc::new(Vga::new()))),
                 deferred: deferred.clone(),
                 process: p.clone()
             };
