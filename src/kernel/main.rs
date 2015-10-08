@@ -97,6 +97,7 @@ const TEST_FIXTURES: &'static [Fixture] = &[
     process::TESTS,
     thread::TESTS,
     virt_mem::TESTS,
+    arch::vga_bochs::TESTS,
 
     demo::TESTS
 ];

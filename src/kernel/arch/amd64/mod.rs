@@ -13,7 +13,7 @@
 #[path = "../x86_common/mod.rs"]
 mod x86_common;
 
-pub use self::x86_common::{debug,keyboard,vga};
+pub use self::x86_common::*;
 
 pub mod cpu;
 pub mod isr;

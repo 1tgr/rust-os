@@ -1,6 +1,7 @@
 use alloc::arc::Arc;
 use arch::process::ArchProcess;
 use core::intrinsics;
+use core::mem;
 use core::slice;
 use io::{AsyncRead,Read,Write};
 use mutex::Mutex;
@@ -73,19 +74,31 @@ impl Process {
         self.arch.switch();
     }
 
-    pub fn alloc(&self, len: usize, user: bool, writable: bool) -> Result<&mut [u8]> {
+    unsafe fn alloc_inner<F: Fn(usize) -> Result<usize>>(&self, phys: F, len: usize, user: bool, writable: bool) -> Result<*mut u8> {
         let virt = if user { &self.user_virt } else { &*self.kernel_virt };
-        let slice = try!(virt.alloc(len));
+        let ptr = try!(virt.alloc(len)).as_mut_ptr();
         let mut offset = 0;
         while offset < len  {
-            let ptr = unsafe { slice.as_ptr().offset(offset as isize) };
-            let addr = try!(self.phys.alloc_page());
-            log!("alloc({}): map {:p} -> {:x}", len, ptr, addr);
+            let ptr = ptr.offset(offset as isize);
+            let addr = try!(phys(offset));
+            //log!("alloc({}): map {:p} -> {:x}", len, ptr, addr);
             try!(self.arch.map(ptr, addr, user, writable));
             offset += phys_mem::PAGE_SIZE;
         }
 
-        Ok(slice)
+        Ok(ptr)
+    }
+
+    pub fn alloc<T>(&self, len: usize, user: bool, writable: bool) -> Result<&mut [T]> {
+        unsafe {
+            let ptr = try!(self.alloc_inner(|_| self.phys.alloc_page(), len * mem::size_of::<T>(), user, writable));
+            Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
+        }
+    }
+
+    pub unsafe fn map_phys<T>(&self, addr: usize, len: usize, user: bool, writable: bool) -> Result<&mut [T]> {
+        let ptr = try!(self.alloc_inner(|offset| Ok(addr + offset), len * mem::size_of::<T>(), user, writable));
+        Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
     }
 
     pub fn free(&self, p: *mut u8) -> bool {
@@ -112,18 +125,15 @@ test!{
         let p = Process::new(phys, kernel_virt).unwrap();
         p.switch();
 
-        let len = 8192;
-        let slice = p.alloc(8192, false, true).unwrap();
+        let len = 4096;
+        let slice = p.alloc::<u16>(len, false, true).unwrap();
         let sentinel = 0xaa55;
-        let mut i = 0;
-        while i < len {
+        for i in 0..len {
+            let ptr = &mut slice[i] as *mut u16;
             unsafe {
-                let ptr = slice.as_mut_ptr().offset(i as isize) as *mut u16;
                 intrinsics::volatile_store(ptr, sentinel);
                 assert_eq!(sentinel, intrinsics::volatile_load(ptr));
             }
-
-            i += phys_mem::PAGE_SIZE;
         }
     }
 }

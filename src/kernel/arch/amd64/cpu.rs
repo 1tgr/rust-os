@@ -127,7 +127,7 @@ pub unsafe fn sti() {
 }
 
 pub fn interrupts_enabled() -> bool {
-    let rflags : usize;
+    let rflags: usize;
     unsafe { asm!("pushfq ; pop $0" : "=r"(rflags)) };
     (rflags & (1 << 9)) != 0
 }
@@ -143,7 +143,27 @@ pub unsafe fn outb(port: u16, val: u8) {
 }
 
 pub unsafe fn inb(port: u16) -> u8 {
-	let ret : u8;
+	let ret;
 	asm!("inb %dx, %al" : "={al}" (ret) : "{dx}" (port) : : "volatile");
-	return ret;
+	ret
+}
+
+pub unsafe fn outw(port: u16, val: u16) {
+    asm!("outw %ax, %dx" : : "{dx}" (port), "{ax}" (val) : : "volatile");
+}
+
+pub unsafe fn inw(port: u16) -> u16 {
+	let ret;
+	asm!("inw %dx, %ax" : "={ax}" (ret) : "{dx}" (port) : : "volatile");
+	ret
+}
+
+pub unsafe fn inl(port: u16) -> u32 {
+	let ret;
+	asm!("inl %dx, %eax" : "={eax}" (ret) : "{dx}" (port) : : "volatile");
+	ret
+}
+
+pub unsafe fn outl(port: u16, val: u32) {
+    asm!("outl %eax, %dx" : : "{dx}" (port), "{eax}" (val) : : "volatile");
 }
