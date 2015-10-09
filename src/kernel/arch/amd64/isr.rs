@@ -177,22 +177,7 @@ pub extern fn exception(num: u8, regs: &Regs) {
              if (regs.error & 4) != 0 { "user" } else { "kernel" });
 
         log!("cr3 = {:x}", cpu::read_cr3());
-
-        let pml4_entry = mmu::pml4_entry(cr2);
-        log!("PML4 = {:?}", pml4_entry);
-        if pml4_entry.present() {
-            let pdpt_entry = mmu::pdpt_entry(cr2);
-            log!("PDPT = {:?}", pdpt_entry);
-            if pdpt_entry.present() {
-                let pd_entry = mmu::pd_entry(cr2);
-                log!("  PD = {:?}", pd_entry);
-                if pd_entry.present() {
-                    let pt_entry = mmu::pt_entry(cr2);
-                    log!("  PT = {:?}", pt_entry);
-                }
-            }
-        }
-
+        mmu::print_mapping(cr2);
         log!("");
     }
 

@@ -3,6 +3,7 @@ use arch::cpu;
 use core::fmt::{Debug,Error,Formatter};
 use core::intrinsics;
 use core::marker::PhantomData;
+use core::mem;
 use core::result;
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
@@ -18,7 +19,7 @@ bitflags! {
         const PAGE_NOCACHE = 0x010,
         const PAGE_ACCESSED = 0x020,
         const PAGE_DIRTY = 0x040, // PTE only
-        const PAGE_FOURMEG = 0x080, // PDE only
+        const PAGE_BIG = 0x080, // PDE only
         const PAGE_GLOBAL = 0x100 // PTE only
     }
 }
@@ -58,7 +59,10 @@ impl<T> PageEntry<T> {
 
     pub fn ensure_present(&mut self, bitmap: &PhysicalBitmap) -> Result<()> {
         let mut flags = self.flags();
-        if !flags.contains(PAGE_PRESENT) {
+        if flags.contains(PAGE_PRESENT) {
+            assert!(self.addr() != 0);
+        } else {
+            assert!(self.addr() == 0);
             flags.insert(PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
 
             let addr = try!(bitmap.alloc_page());
@@ -91,8 +95,8 @@ impl<T> PageEntry<T> {
         self.flags().contains(PAGE_PRESENT)
     }
 
-    pub fn four_meg(&self) -> bool {
-        self.flags().contains(PAGE_FOURMEG)
+    pub fn big(&self) -> bool {
+        self.flags().contains(PAGE_BIG)
     }
 }
 
@@ -103,7 +107,7 @@ impl<T> Debug for PageEntry<T> {
 
         static ALL_FLAGS: &'static [(&'static str, PageFlags)] = &[
             ("G", PAGE_GLOBAL),
-            ("4", PAGE_FOURMEG),
+            ("B", PAGE_BIG),
             ("D", PAGE_DIRTY),
             ("A", PAGE_ACCESSED),
             ("C", PAGE_NOCACHE),
@@ -118,7 +122,7 @@ impl<T> Debug for PageEntry<T> {
             try!(fmt.write_str(s));
         }
 
-        fmt.write_str(" }")
+        write!(fmt, " }} @ {:p}", &self.entry)
     }
 }
 
@@ -158,13 +162,30 @@ fn pdpt_index<T>(ptr: *const T) -> usize { (ptr as usize >> 30) & 511 }
 fn pd_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 21) & 511 }
 fn pt_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 12) & 511 }
 
-pub fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
-pub fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
-pub fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
-pub fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
+fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
+fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
+fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
+fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
 
 fn recursive_pml4_addr() -> usize {
     pml4()[MMU_RECURSIVE_SLOT].addr()
+}
+
+pub fn print_mapping<T>(ptr: *const T) {
+    let pml4_entry = pml4_entry(ptr);
+    log!("[{:p}] PML4 = {:?}", ptr, pml4_entry);
+    if pml4_entry.present() {
+        let pdpt_entry = pdpt_entry(ptr);
+        log!("[{:p}] PDPT = {:?}", ptr, pdpt_entry);
+        if pdpt_entry.present() {
+            let pd_entry = pd_entry(ptr);
+            log!("[{:p}]   PD = {:?}", ptr, pd_entry);
+            if pd_entry.present() && !pd_entry.big() {
+                let pt_entry = pt_entry(ptr);
+                log!("[{:p}]   PT = {:?}", ptr, pt_entry);
+            }
+        }
+    }
 }
 
 extern {
@@ -182,18 +203,25 @@ impl AddressSpace {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace> {
         let pml4_addr = try!(bitmap.alloc_page());
         let kernel_base_ptr = &KERNEL_BASE as *const u8;
-        let four_meg = 4 * 1024 * 1024;
+        let two_meg = 2 * 1024 * 1024;
+        let pml4_index = pml4_index(kernel_base_ptr);
+        let pdpt_index = pdpt_index(kernel_base_ptr);
+        let pd_index = pd_index(kernel_base_ptr);
 
         unsafe {
             let pml4: &mut PML4 = &mut phys_mem::phys2virt(pml4_addr);
             pml4[MMU_RECURSIVE_SLOT].map(pml4_addr, false, true);
 
-            let pdpt_identity_entry: &mut PageEntry<PDPT> = &mut pml4[pml4_index(kernel_base_ptr)];
-            try!(pdpt_identity_entry.ensure_present(&bitmap));
+            let pml4_entry = &mut pml4[pml4_index];
+            try!(pml4_entry.ensure_present(&bitmap));
 
-            let pdpt_identity: &mut PDPT = pdpt_identity_entry.as_mut_ref();
+            let pdpt_entry = &mut pml4_entry.as_mut_ref()[pdpt_index];
+            try!(pdpt_entry.ensure_present(&bitmap));
+
             for i in 0..2 {
-                pdpt_identity[pdpt_index(kernel_base_ptr) + i].entry = join(i * four_meg, PAGE_PRESENT | PAGE_WRITABLE | PAGE_FOURMEG);
+                let pd_index = pd_index + i;
+                let pd_entry = &mut pdpt_entry.as_mut_ref()[pd_index];
+                pd_entry.entry = join(i * two_meg, PAGE_PRESENT | PAGE_WRITABLE | PAGE_BIG);
             }
         }
 
@@ -212,18 +240,15 @@ impl AddressSpace {
 
     pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
         let _x = lock!(self.mutex);
-        assert_eq!(self.cr3, recursive_pml4_addr());
-
-        try!(pml4_entry(ptr).ensure_present(&self.bitmap));
-        try!(pdpt_entry(ptr).ensure_present(&self.bitmap));
-
+        let pml4_entry = pml4_entry(ptr);
+        let pdpt_entry = pdpt_entry(ptr);
         let pd_entry = pd_entry(ptr);
-        if pd_entry.four_meg() {
-            panic!("didn't expect to map a page in the 4M region");
-        }
-
+        let pt_entry = pt_entry(ptr);
+        try!(pml4_entry.ensure_present(&self.bitmap));
+        try!(pdpt_entry.ensure_present(&self.bitmap));
+        assert!(!pd_entry.big());
         try!(pd_entry.ensure_present(&self.bitmap));
-        pt_entry(ptr).map(addr, user, writable);
+        pt_entry.map(addr, user, writable);
         cpu::invlpg(ptr);
         Ok(())
     }
@@ -241,6 +266,10 @@ impl Drop for AddressSpace {
     }
 }
 
+extern {
+    static kernel_end: u8;
+}
+
 test! {
     fn check_pml4() {
         let entry = pml4_entry(0 as *const u8);
@@ -256,7 +285,7 @@ test! {
 
         let pde = pd_entry(ptr);
         assert!(pde.present());
-        assert!(pde.four_meg());
+        assert!(pde.big());
         assert_eq!(two_meg, pde.addr());
     }
 
@@ -266,9 +295,27 @@ test! {
         address_space.switch();
     }
 
-    fn can_map() {
+    fn can_map_user() {
         let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
         let ptr1 = 0x1000 as *mut u16;
+        let addr = bitmap.alloc_page().unwrap();
+        let address_space = AddressSpace::new(bitmap).unwrap();
+        address_space.switch();
+        address_space.map(ptr1, addr, false, true).unwrap();
+
+        let ptr2 = unsafe { phys_mem::phys2virt(addr) };
+        let sentinel = 0x55aa;
+        unsafe {
+            intrinsics::volatile_store(ptr1, sentinel);
+            assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
+        }
+    }
+
+    fn can_map_kernel() {
+        let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+        let two_meg = 2 * 1024 * 1024;
+        let ptr1 = Align::up(&kernel_end as *const u8, 2 * two_meg);
+        let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
         let addr = bitmap.alloc_page().unwrap();
         let address_space = AddressSpace::new(bitmap).unwrap();
         address_space.switch();

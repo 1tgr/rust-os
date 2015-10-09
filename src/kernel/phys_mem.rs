@@ -42,6 +42,7 @@ impl PhysicalBitmap {
         let kernel_len = ptr::bytes_between(&kernel_start, &kernel_end);
         let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
         let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
+        bitmap.reserve_pages(0, 1);
         bitmap.reserve_ptr(&kernel_start, kernel_len as usize);
 
         {

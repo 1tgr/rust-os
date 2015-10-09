@@ -79,11 +79,21 @@ test! {
             let mut code_slice;
             unsafe {
                 let info = phys_mem::multiboot_info();
-                let mods: &[multiboot_module_t] = slice::from_raw_parts(phys_mem::phys2virt(info.mods_addr as usize), info.mods_count as usize);
+
+                let mods: &[multiboot_module_t] = slice::from_raw_parts(
+                    phys_mem::phys2virt(info.mods_addr as usize),
+                    info.mods_count as usize * mem::size_of::<multiboot_module_t>());
+
                 assert!(mods.len() >= 1);
 
+                let mod_data: &[u8] = slice::from_raw_parts(
+                    phys_mem::phys2virt(mods[0].mod_start as usize),
+                    (mods[0].mod_end - mods[0].mod_start) as usize);
+
+                assert_eq!(('P', 'K'), (mod_data[0] as char, mod_data[1] as char));
+
                 let mut zip = mem::zeroed();
-                assert!(mz::mz_zip_reader_init_mem(&mut zip, phys_mem::phys2virt::<u8>(mods[0].mod_start as usize) as *const u8 as *const _, (mods[0].mod_end - mods[0].mod_start) as u64, 0));
+                assert!(mz::mz_zip_reader_init_mem(&mut zip, mod_data.as_ptr() as *const _, mod_data.len() as u64, 0));
 
                 let index = mz::mz_zip_reader_locate_file(&mut zip, b"hello.bin\0" as *const _, 0 as *const _, 0);
                 assert!(index >= 0);

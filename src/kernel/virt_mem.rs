@@ -122,8 +122,8 @@ impl VirtualTree {
 
     pub fn for_kernel() -> VirtualTree {
         let tree = VirtualTree::new();
-        let four_meg = 4 * 1024 * 1024;
-        let kernel_end_ptr = Align::up(&kernel_end as *const u8, four_meg);
+        let two_meg = 2 * 1024 * 1024;
+        let kernel_end_ptr = Align::up(&kernel_end as *const u8, 2 * two_meg);
         let identity = unsafe { slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize) };
         tree.reserve(identity);
         tree
