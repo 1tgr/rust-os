@@ -148,31 +148,37 @@ impl VirtualTree {
     }
 }
 
-test! {
-   fn can_alloc_free() {
-       let tree = VirtualTree::new();
-       assert_eq!(1, tree.block_count());
+#[cfg(feature = "test")]
+pub mod test {
+    use core::slice;
+    use super::*;
 
-       let slice = tree.alloc(4096).unwrap();
-       assert_eq!(0 as *const u8, slice.as_ptr());
-       assert_eq!(2, tree.block_count());
+    test! {
+       fn can_alloc_free() {
+           let tree = VirtualTree::new();
+           assert_eq!(1, tree.block_count());
 
-       assert!(tree.free(slice.as_mut_ptr()));
-       assert_eq!(1, tree.block_count());
-   }
+           let slice = tree.alloc(4096).unwrap();
+           assert_eq!(0 as *const u8, slice.as_ptr());
+           assert_eq!(2, tree.block_count());
 
-   fn can_reserve_alloc_free() {
-       let tree = VirtualTree::new();
-       assert_eq!(1, tree.block_count());
+           assert!(tree.free(slice.as_mut_ptr()));
+           assert_eq!(1, tree.block_count());
+       }
 
-       assert!(tree.reserve(unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) }));
-       assert_eq!(3, tree.block_count());
+       fn can_reserve_alloc_free() {
+           let tree = VirtualTree::new();
+           assert_eq!(1, tree.block_count());
 
-       let slice = tree.alloc(4096).unwrap();
-       assert_eq!(4, tree.block_count());
-       assert_eq!(4096 as *const u8, slice.as_ptr());
+           assert!(tree.reserve(unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) }));
+           assert_eq!(3, tree.block_count());
 
-       assert!(tree.free(slice.as_mut_ptr()));
-       assert_eq!(3, tree.block_count());
-   }
+           let slice = tree.alloc(4096).unwrap();
+           assert_eq!(4, tree.block_count());
+           assert_eq!(4096 as *const u8, slice.as_ptr());
+
+           assert!(tree.free(slice.as_mut_ptr()));
+           assert_eq!(3, tree.block_count());
+       }
+    }
 }

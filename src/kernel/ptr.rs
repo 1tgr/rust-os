@@ -85,27 +85,32 @@ impl<T> Align for *mut T {
     }
 }
 
-test! {
-    fn can_align_down() {
-        let ptr = 0x1234 as *const u8;
-        let expected_ptr = 0x1000 as *const u8;
-        assert_eq!(expected_ptr, Align::down(ptr, 0x1000));
-        assert_eq!(expected_ptr, Align::down(expected_ptr, 0x1000));
-    }
+#[cfg(feature = "test")]
+pub mod test {
+    use super::*;
 
-    fn can_align_up() {
-        let ptr = 0x1234 as *const u8;
-        let expected_ptr = 0x2000 as *const u8;
-        assert_eq!(expected_ptr, Align::up(ptr, 0x1000));
-        assert_eq!(expected_ptr, Align::up(expected_ptr, 0x1000));
-    }
+    test! {
+        fn can_align_down() {
+            let ptr = 0x1234 as *const u8;
+            let expected_ptr = 0x1000 as *const u8;
+            assert_eq!(expected_ptr, Align::down(ptr, 0x1000));
+            assert_eq!(expected_ptr, Align::down(expected_ptr, 0x1000));
+        }
 
-    fn can_align_range() {
-        let base = 0x1234 as *const u8;
-        let len = 0x5678;
-        let expected_base = 0x1000 as *const u8;
-        let expected_len = 0x6000;
-        assert_eq!((expected_base, expected_len), Align::range(base, len, 0x1000));
-        assert_eq!((expected_base, expected_len), Align::range(expected_base, expected_len, 0x1000));
+        fn can_align_up() {
+            let ptr = 0x1234 as *const u8;
+            let expected_ptr = 0x2000 as *const u8;
+            assert_eq!(expected_ptr, Align::up(ptr, 0x1000));
+            assert_eq!(expected_ptr, Align::up(expected_ptr, 0x1000));
+        }
+
+        fn can_align_range() {
+            let base = 0x1234 as *const u8;
+            let len = 0x5678;
+            let expected_base = 0x1000 as *const u8;
+            let expected_len = 0x6000;
+            assert_eq!((expected_base, expected_len), Align::range(base, len, 0x1000));
+            assert_eq!((expected_base, expected_len), Align::range(expected_base, expected_len, 0x1000));
+        }
     }
 }

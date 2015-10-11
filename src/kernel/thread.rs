@@ -9,11 +9,9 @@ use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use libc::{self,jmp_buf};
 use mutex::{Mutex,MutexGuard};
-use phys_mem::PhysicalBitmap;
 use prelude::*;
 use process::Process;
 use singleton::Singleton;
-use virt_mem::VirtualTree;
 
 static SCHEDULER: Singleton<Mutex<SchedulerState>> = Singleton::new();
 
@@ -277,56 +275,66 @@ impl<A> Deferred<A> {
     }
 }
 
-test! {
-    fn can_spawn_exit_thread() {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        with_scheduler(p, || {
-            let d = spawn(|| 123);
-            assert_eq!(123, d.get());
-        });
-    }
+#[cfg(feature = "test")]
+pub mod test {
+    use alloc::arc::Arc;
+    use phys_mem::PhysicalBitmap;
+    use prelude::*;
+    use process::Process;
+    use super::*;
+    use virt_mem::VirtualTree;
 
-    fn can_spawn_exit_two_threads() {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        with_scheduler(p, || {
-            let d1 = spawn(|| 456);
-            let d2 = spawn(|| 789);
-            assert_eq!(456, d1.get());
-            assert_eq!(789, d2.get());
-        });
-    }
+    test! {
+        fn can_spawn_exit_thread() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::new());
+            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
+            with_scheduler(p, || {
+                let d = spawn(|| 123);
+                assert_eq!(123, d.get());
+            });
+        }
 
-    fn can_closure() {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        with_scheduler(p, || {
-            let s = String::from("hello");
-            let d = spawn(move || s + &" world");
-            assert_eq!("hello world", d.get());
-        });
-    }
+        fn can_spawn_exit_two_threads() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::new());
+            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
+            with_scheduler(p, || {
+                let d1 = spawn(|| 456);
+                let d2 = spawn(|| 789);
+                assert_eq!(456, d1.get());
+                assert_eq!(789, d2.get());
+            });
+        }
 
-    fn threads_can_spawn_more_threads() {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::new());
-        let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-        with_scheduler(p, || {
-            let thread2_fn = || 1234;
+        fn can_closure() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::new());
+            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
+            with_scheduler(p, || {
+                let s = String::from("hello");
+                let d = spawn(move || s + &" world");
+                assert_eq!("hello world", d.get());
+            });
+        }
 
-            let thread1_fn = {
-                || {
-                    let d = spawn(thread2_fn);
-                    d.get() * 2
-                }
-            };
+        fn threads_can_spawn_more_threads() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::new());
+            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
+            with_scheduler(p, || {
+                let thread2_fn = || 1234;
 
-            let d = spawn(thread1_fn);
-            assert_eq!(1234 * 2, d.get());
-        });
+                let thread1_fn = {
+                    || {
+                        let d = spawn(thread2_fn);
+                        d.get() * 2
+                    }
+                };
+
+                let d = spawn(thread1_fn);
+                assert_eq!(1234 * 2, d.get());
+            });
+        }
     }
 }

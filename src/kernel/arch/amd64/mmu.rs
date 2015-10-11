@@ -1,9 +1,7 @@
 use alloc::arc::Arc;
 use arch::cpu;
 use core::fmt::{Debug,Error,Formatter};
-use core::intrinsics;
 use core::marker::PhantomData;
-use core::mem;
 use core::result;
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
@@ -162,10 +160,10 @@ fn pdpt_index<T>(ptr: *const T) -> usize { (ptr as usize >> 30) & 511 }
 fn pd_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 21) & 511 }
 fn pt_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 12) & 511 }
 
-fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
-fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
-fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
-fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
+pub fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
+pub fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
+pub fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
+pub fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
 
 fn recursive_pml4_addr() -> usize {
     pml4()[MMU_RECURSIVE_SLOT].addr()
@@ -266,66 +264,76 @@ impl Drop for AddressSpace {
     }
 }
 
-extern {
-    static kernel_end: u8;
-}
+#[cfg(feature = "test")]
+pub mod test {
+    use alloc::arc::Arc;
+    use core::intrinsics;
+    use core::mem;
+    use phys_mem::{self,PhysicalBitmap};
+    use ptr::Align;
+    use super::*;
 
-test! {
-    fn check_pml4() {
-        let entry = pml4_entry(0 as *const u8);
-        assert!(!entry.present());
-        assert_eq!(0, entry.addr());
+    extern {
+        static kernel_end: u8;
     }
 
-    fn check_identity_mapping() {
-        let two_meg = 2 * 1024 * 1024;
-        let ptr: *const u8 = unsafe { phys_mem::phys2virt(two_meg) };
-        assert!(pml4_entry(ptr).present());
-        assert!(pdpt_entry(ptr).present());
-
-        let pde = pd_entry(ptr);
-        assert!(pde.present());
-        assert!(pde.big());
-        assert_eq!(two_meg, pde.addr());
-    }
-
-    fn can_switch() {
-        let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
-        let address_space = AddressSpace::new(bitmap).unwrap();
-        address_space.switch();
-    }
-
-    fn can_map_user() {
-        let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
-        let ptr1 = 0x1000 as *mut u16;
-        let addr = bitmap.alloc_page().unwrap();
-        let address_space = AddressSpace::new(bitmap).unwrap();
-        address_space.switch();
-        address_space.map(ptr1, addr, false, true).unwrap();
-
-        let ptr2 = unsafe { phys_mem::phys2virt(addr) };
-        let sentinel = 0x55aa;
-        unsafe {
-            intrinsics::volatile_store(ptr1, sentinel);
-            assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
+    test! {
+        fn check_pml4() {
+            let entry = pml4_entry(0 as *const u8);
+            assert!(!entry.present());
+            assert_eq!(0, entry.addr());
         }
-    }
 
-    fn can_map_kernel() {
-        let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
-        let two_meg = 2 * 1024 * 1024;
-        let ptr1 = Align::up(&kernel_end as *const u8, 2 * two_meg);
-        let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
-        let addr = bitmap.alloc_page().unwrap();
-        let address_space = AddressSpace::new(bitmap).unwrap();
-        address_space.switch();
-        address_space.map(ptr1, addr, false, true).unwrap();
+        fn check_identity_mapping() {
+            let two_meg = 2 * 1024 * 1024;
+            let ptr: *const u8 = unsafe { phys_mem::phys2virt(two_meg) };
+            assert!(pml4_entry(ptr).present());
+            assert!(pdpt_entry(ptr).present());
 
-        let ptr2 = unsafe { phys_mem::phys2virt(addr) };
-        let sentinel = 0x55aa;
-        unsafe {
-            intrinsics::volatile_store(ptr1, sentinel);
-            assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
+            let pde = pd_entry(ptr);
+            assert!(pde.present());
+            assert!(pde.big());
+            assert_eq!(two_meg, pde.addr());
+        }
+
+        fn can_switch() {
+            let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+            let address_space = AddressSpace::new(bitmap).unwrap();
+            address_space.switch();
+        }
+
+        fn can_map_user() {
+            let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+            let ptr1 = 0x1000 as *mut u16;
+            let addr = bitmap.alloc_page().unwrap();
+            let address_space = AddressSpace::new(bitmap).unwrap();
+            address_space.switch();
+            address_space.map(ptr1, addr, false, true).unwrap();
+
+            let ptr2 = unsafe { phys_mem::phys2virt(addr) };
+            let sentinel = 0x55aa;
+            unsafe {
+                intrinsics::volatile_store(ptr1, sentinel);
+                assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
+            }
+        }
+
+        fn can_map_kernel() {
+            let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+            let two_meg = 2 * 1024 * 1024;
+            let ptr1 = Align::up(&kernel_end as *const u8, 2 * two_meg);
+            let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
+            let addr = bitmap.alloc_page().unwrap();
+            let address_space = AddressSpace::new(bitmap).unwrap();
+            address_space.switch();
+            address_space.map(ptr1, addr, false, true).unwrap();
+
+            let ptr2 = unsafe { phys_mem::phys2virt(addr) };
+            let sentinel = 0x55aa;
+            unsafe {
+                intrinsics::volatile_store(ptr1, sentinel);
+                assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
+            }
         }
     }
 }

@@ -62,13 +62,13 @@ pub mod thread;
 pub mod unwind;
 pub mod virt_mem;
 
+#[cfg(feature = "test")]
 mod demo;
 
 use core::fmt::Write;
 use core::mem;
 use libc::{c_char,c_int};
 use logging::Writer;
-use test::Fixture;
 
 static mut errno: c_int = 0;
 
@@ -87,26 +87,24 @@ pub unsafe extern fn __assert(file: *const c_char, line: c_int, msg: *const c_ch
     panic!("assertion failed in C code");
 }
 
-const TEST_FIXTURES: &'static [Fixture] = &[
-    ptr::TESTS,
+#[cfg(feature = "test")]
+fn run_tests() {
+    use test::Fixture;
 
-    arch::isr::TESTS,
-    arch::mmu::TESTS,
-    device::TESTS,
-    phys_mem::TESTS,
-    process::TESTS,
-    thread::TESTS,
-    virt_mem::TESTS,
-    arch::vga_bochs::TESTS,
+    const TEST_FIXTURES: &'static [Fixture] = &[
+        ptr::test::TESTS,
 
-    demo::TESTS
-];
+        arch::isr::test::TESTS,
+        arch::mmu::test::TESTS,
+        device::test::TESTS,
+        phys_mem::test::TESTS,
+        process::test::TESTS,
+        thread::test::TESTS,
+        virt_mem::test::TESTS,
+        arch::vga_bochs::test::TESTS,
 
-// Kernel entrypoint
-#[lang="start"]
-#[no_mangle]
-pub fn kmain() -> ! {
-    arch::isr::init_once();
+        demo::TESTS
+    ];
 
     log!("begin kmain");
 
@@ -119,5 +117,17 @@ pub fn kmain() -> ! {
     }
 
     log!("end kmain");
+}
+
+#[cfg(not(feature = "test"))]
+fn run_tests() {
+}
+
+// Kernel entrypoint
+#[lang="start"]
+#[no_mangle]
+pub fn kmain() -> ! {
+    arch::isr::init_once();
+    run_tests();
     loop { }
 }

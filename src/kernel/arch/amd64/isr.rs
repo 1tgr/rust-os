@@ -194,8 +194,13 @@ pub extern fn interrupt(num: u8, regs: &Regs) {
     }
 }
 
-test! {
-    fn can_interrupt() {
-        unsafe { cpu::int(48) }
+#[cfg(feature = "test")]
+pub mod test {
+    use arch::cpu;
+
+    test! {
+        fn can_interrupt() {
+            unsafe { cpu::int(48) }
+        }
     }
 }

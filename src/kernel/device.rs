@@ -85,48 +85,55 @@ impl ByteDevice {
     }
 }
 
-fn test_read(queue: &mut VecDeque<u8>, device: &ByteDevice, expected: &[u8]) {
-    let buf = vec![0; expected.len()];
-    let d = device.read_async(queue, buf);
-    let buf = d.try_get().unwrap_or_else(|_| panic!("didn't expect to block")).unwrap();
-    let mut v = Vec::<u8>::new();
-    v.extend(expected);
-    assert_eq!(v, buf);
-}
+#[cfg(feature = "test")]
+pub mod test {
+    use collections::vec_deque::VecDeque;
+    use prelude::*;
+    use super::*;
 
-test! {
-    fn can_read_nothing() {
-        let mut queue = VecDeque::new();
-        let device = ByteDevice::new();
-        test_read(&mut queue, &device, b"");
+    fn test_read(queue: &mut VecDeque<u8>, device: &ByteDevice, expected: &[u8]) {
+        let buf = vec![0; expected.len()];
+        let d = device.read_async(queue, buf);
+        let buf = d.try_get().unwrap_or_else(|_| panic!("didn't expect to block")).unwrap();
+        let mut v = Vec::<u8>::new();
+        v.extend(expected);
+        assert_eq!(v, buf);
     }
 
-    fn can_read_chunks() {
-        let mut queue = VecDeque::new();
-        queue.extend(b"hello");
+    test! {
+        fn can_read_nothing() {
+            let mut queue = VecDeque::new();
+            let device = ByteDevice::new();
+            test_read(&mut queue, &device, b"");
+        }
 
-        let device = ByteDevice::new();
-        test_read(&mut queue, &device, b"h");
-        test_read(&mut queue, &device, b"ell");
-        test_read(&mut queue, &device, b"o");
-        assert_eq!(0, queue.len());
-    }
+        fn can_read_chunks() {
+            let mut queue = VecDeque::new();
+            queue.extend(b"hello");
 
-    fn can_read_everything() {
-        let mut queue = VecDeque::new();
-        queue.extend(b"hello");
+            let device = ByteDevice::new();
+            test_read(&mut queue, &device, b"h");
+            test_read(&mut queue, &device, b"ell");
+            test_read(&mut queue, &device, b"o");
+            assert_eq!(0, queue.len());
+        }
 
-        let device = ByteDevice::new();
-        test_read(&mut queue, &device, b"hello");
-        assert_eq!(0, queue.len());
-    }
+        fn can_read_everything() {
+            let mut queue = VecDeque::new();
+            queue.extend(b"hello");
 
-    fn blocks_when_out_of_data() {
-        let mut queue = VecDeque::new();
-        queue.extend(b"hello");
+            let device = ByteDevice::new();
+            test_read(&mut queue, &device, b"hello");
+            assert_eq!(0, queue.len());
+        }
 
-        let device = ByteDevice::new();
-        let d = device.read_async(&mut queue, vec![0; 10]);
-        assert!(d.try_get().is_err());
+        fn blocks_when_out_of_data() {
+            let mut queue = VecDeque::new();
+            queue.extend(b"hello");
+
+            let device = ByteDevice::new();
+            let d = device.read_async(&mut queue, vec![0; 10]);
+            assert!(d.try_get().is_err());
+        }
     }
 }

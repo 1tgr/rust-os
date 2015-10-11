@@ -23,6 +23,8 @@ RUSTFLAGS += --extern core=../libcore/libcore.rlib
 RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
+RUSTFLAGS += --cfg feature=\"test\"
+
 : ../hello/hello.bin |> zip -j %o %f |> initrd.zip
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}

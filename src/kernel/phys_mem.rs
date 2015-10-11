@@ -134,45 +134,51 @@ pub fn multiboot_info() -> &'static multiboot_info_t {
     unsafe { phys2virt(mboot_ptr as usize) }
 }
 
-test! {
-    fn can_alloc_two_pages() {
-        let bitmap = PhysicalBitmap::new(640 * 1024);
-        let addr1 = bitmap.alloc_page().unwrap();
-        let addr2 = bitmap.alloc_page().unwrap();
-        assert!(addr1 != addr2);
-    }
+#[cfg(feature = "test")]
+pub mod test {
+    use super::*;
+    use syscall::ErrNum;
 
-    fn can_alloc_free_realloc() {
-        let bitmap = PhysicalBitmap::new(640 * 1024);
-        let addr1 = bitmap.alloc_page().unwrap();
-        bitmap.free_page(addr1);
+    test! {
+        fn can_alloc_two_pages() {
+            let bitmap = PhysicalBitmap::new(640 * 1024);
+            let addr1 = bitmap.alloc_page().unwrap();
+            let addr2 = bitmap.alloc_page().unwrap();
+            assert!(addr1 != addr2);
+        }
 
-        let addr2 = bitmap.alloc_page().unwrap();
-        assert_eq!(addr1, addr2);
-    }
+        fn can_alloc_free_realloc() {
+            let bitmap = PhysicalBitmap::new(640 * 1024);
+            let addr1 = bitmap.alloc_page().unwrap();
+            bitmap.free_page(addr1);
 
-    fn can_handle_out_of_memory() {
-        let bitmap = PhysicalBitmap::new(2 * PAGE_SIZE);
-        bitmap.alloc_page().unwrap();
-        bitmap.alloc_page().unwrap();
+            let addr2 = bitmap.alloc_page().unwrap();
+            assert_eq!(addr1, addr2);
+        }
 
-        let err = bitmap.alloc_page().unwrap_err();
-        assert_eq!(err, ErrNum::OutOfMemory);
-    }
+        fn can_handle_out_of_memory() {
+            let bitmap = PhysicalBitmap::new(2 * PAGE_SIZE);
+            bitmap.alloc_page().unwrap();
+            bitmap.alloc_page().unwrap();
 
-    fn can_parse_multiboot() {
-        let bitmap = PhysicalBitmap::parse_multiboot();
-        let total_bytes = bitmap.total_bytes();
-        let free_bytes = bitmap.free_bytes();
-        assert!(total_bytes > 0);
-        assert!(free_bytes > 0);
-        assert!(free_bytes < total_bytes);
-    }
+            let err = bitmap.alloc_page().unwrap_err();
+            assert_eq!(err, ErrNum::OutOfMemory);
+        }
 
-    fn alloc_returns_zeroed_memory() {
-        let bitmap = PhysicalBitmap::parse_multiboot();
-        let addr = bitmap.alloc_page().unwrap();
-        let ptr: &[u8; PAGE_SIZE] = unsafe { phys2virt(addr) };
-        assert!(ptr.iter().all(|&b| b == 0));
+        fn can_parse_multiboot() {
+            let bitmap = PhysicalBitmap::parse_multiboot();
+            let total_bytes = bitmap.total_bytes();
+            let free_bytes = bitmap.free_bytes();
+            assert!(total_bytes > 0);
+            assert!(free_bytes > 0);
+            assert!(free_bytes < total_bytes);
+        }
+
+        fn alloc_returns_zeroed_memory() {
+            let bitmap = PhysicalBitmap::parse_multiboot();
+            let addr = bitmap.alloc_page().unwrap();
+            let ptr: &[u8; PAGE_SIZE] = unsafe { phys2virt(addr) };
+            assert!(ptr.iter().all(|&b| b == 0));
+        }
     }
 }

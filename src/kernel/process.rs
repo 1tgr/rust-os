@@ -1,6 +1,5 @@
 use alloc::arc::Arc;
 use arch::process::ArchProcess;
-use core::intrinsics;
 use core::mem;
 use core::slice;
 use io::{AsyncRead,Read,Write};
@@ -118,21 +117,30 @@ impl Process {
     }
 }
 
-test!{
-    fn can_alloc() {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-        let kernel_virt = Arc::new(VirtualTree::for_kernel());
-        let p = Process::new(phys, kernel_virt).unwrap();
-        p.switch();
+#[cfg(feature = "test")]
+pub mod test {
+    use alloc::arc::Arc;
+    use core::intrinsics;
+    use phys_mem::PhysicalBitmap;
+    use super::*;
+    use virt_mem::VirtualTree;
 
-        let len = 4096;
-        let slice = p.alloc::<u16>(len, false, true).unwrap();
-        let sentinel = 0xaa55;
-        for i in 0..len {
-            let ptr = &mut slice[i] as *mut u16;
-            unsafe {
-                intrinsics::volatile_store(ptr, sentinel);
-                assert_eq!(sentinel, intrinsics::volatile_load(ptr));
+    test!{
+        fn can_alloc() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::for_kernel());
+            let p = Process::new(phys, kernel_virt).unwrap();
+            p.switch();
+
+            let len = 4096;
+            let slice = p.alloc::<u16>(len, false, true).unwrap();
+            let sentinel = 0xaa55;
+            for i in 0..len {
+                let ptr = &mut slice[i] as *mut u16;
+                unsafe {
+                    intrinsics::volatile_store(ptr, sentinel);
+                    assert_eq!(sentinel, intrinsics::volatile_load(ptr));
+                }
             }
         }
     }
