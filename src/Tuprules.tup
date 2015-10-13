@@ -31,7 +31,7 @@ RUSTCFLAGS += -O -C debug-assertions
 CCFLAGS += -O
 endif
 
-RUSTFLAGS += -g
+RUSTCFLAGS += -g
 CCFLAGS += -g -nostdinc -I$(TUP_CWD)/include
 
 ifeq (@(ARCH),amd64)

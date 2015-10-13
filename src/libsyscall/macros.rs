@@ -2,7 +2,8 @@
 macro_rules! syscalls {
     (
         $(
-            $num:expr => $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty
+            $(#[$attrs:meta])*
+            fn $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty => $num:expr
         ),+
     ) => {
         use $crate::marshal::ErrNum;
@@ -15,6 +16,7 @@ macro_rules! syscalls {
         }
 
         $(
+            $(#[$attrs])*
             pub fn $name<'a>($($arg_name: $arg_ty),+) -> Result<$result, ErrNum> {
                 unsafe { $crate::user::syscall(Num::$name as u32, ($($arg_name,)+)) }
             }
@@ -26,7 +28,8 @@ macro_rules! syscalls {
 macro_rules! syscalls {
     (
         $(
-            $num:expr => $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty
+            $(#[$attrs:meta])*
+            fn $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty => $num:expr
         ),+
     ) => {
         use $crate::kernel::Dispatch;

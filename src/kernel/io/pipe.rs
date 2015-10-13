@@ -6,6 +6,7 @@ use mutex::Mutex;
 use prelude::*;
 use syscall::Result;
 
+/// An adaptor which will modify the data produced by a reader.
 pub struct Pipe<T, U> {
     input: Arc<T>,
     queue: Arc<Mutex<VecDeque<u8>>>,

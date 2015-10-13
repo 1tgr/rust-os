@@ -23,7 +23,7 @@ RUSTFLAGS += --extern core=../libcore/libcore.rlib
 RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
-RUSTFLAGS += --cfg feature=\"test\"
+RUSTCFLAGS += --cfg feature=\"test\"
 
 : ../hello/hello.bin |> zip -j %o %f |> initrd.zip
 

@@ -1,3 +1,5 @@
+//! Input and output.
+
 mod nodes;
 mod pipe;
 
@@ -10,44 +12,57 @@ use thread::Deferred;
 
 pub use self::pipe::Pipe;
 
+/// Allows for reading bytes from a source.
 pub trait Read {
     fn read(&self, buf: &mut [u8]) -> Result<usize>;
 }
 
+/// A trait for objects which are byte-oriented sinks.
 pub trait Write {
     fn write(&self, buf: &[u8]) -> Result<usize>;
 }
 
-pub struct Promise<A>(Box<PromiseNode<A>>);
+/// A computation that might eventually resolve to a value of type `T`.
+pub struct Promise<T>(Box<PromiseNode<T>>);
 
-impl<A: 'static> Promise<A> {
-    pub fn new(d: Deferred<A>) -> Self {
+impl<T: 'static> Promise<T> {
+    /// Creates a promise from a kernel `Deferred` object. The promise is resolved once the deferred is resolved.
+    pub fn new(d: Deferred<T>) -> Self {
         Promise(Box::new(nodes::deferred(d)))
     }
 
-    pub fn resolved(value: A) -> Self {
+    /// Creates a promise from a constant value. The promise is resolved immediately.
+    pub fn resolved(value: T) -> Self {
         Promise(Box::new(nodes::resolved(value)))
     }
 
-    pub fn get(self) -> A {
+    /// Blocks until the promise is resolved, then returns the value within.
+    pub fn get(self) -> T {
         self.0.get()
     }
 
-    pub fn try_get(self) -> result::Result<A, Self> {
+    /// Attempts to get the value inside the promise.
+    ///
+    /// If the promise is resolved, consumes the promise and returns `Some(value)`. Otherwise,
+    /// returns `Err` containing the original promise.
+    pub fn try_get(self) -> result::Result<T, Self> {
         self.0.try_get().map_err(|node| Promise(node))
     }
 
-    pub fn then<B, F: FnOnce(A) -> B + 'static>(self, f: F) -> Promise<B> {
+    /// Returns a new promise that applies a function to the value inside the promise.
+    pub fn then<U, F: FnOnce(T) -> U + 'static>(self, f: F) -> Promise<U> {
         Promise(Box::new(self.0.map(f)))
     }
 }
 
-impl<A: 'static> Promise<Promise<A>> {
-    pub fn unwrap(self) -> Promise<A> {
+impl<T: 'static> Promise<Promise<T>> {
+    /// Given a promise that resolves to `Promise<T>`, returns a promise that resolves to `T`.
+    pub fn unwrap(self) -> Promise<T> {
         Promise(Box::new(self.0.unwrap()))
     }
 }
 
+/// Allows for reading bytes asynchronously from a source.
 pub trait AsyncRead {
     fn read_async(&self, buf: Vec<u8>) -> Promise<Result<Vec<u8>>>;
 }
