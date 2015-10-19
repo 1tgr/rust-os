@@ -4,6 +4,7 @@ use core::mem;
 use libc::jmp_buf;
 use once::{self,Once};
 use prelude::*;
+use ptr::Align;
 use singleton::{DropSingleton,Singleton};
 use syscall::kernel::{Dispatch,PackedArgs};
 use syscall::{Dispatcher,Handler};
@@ -48,6 +49,8 @@ pub fn thread_entry(p: *mut u8) -> ! {
 }
 
 pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack_ptr: *mut u8) -> jmp_buf {
+    assert!(Align::is_aligned(stack_ptr, 16));
+
     let pp = Box::new(p);
     let rsp : *mut u8 = stack_ptr;
     let rip : *const u8 = &thread_entry_asm;
@@ -56,13 +59,17 @@ pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack_ptr: *mut u8) -> jmp_buf {
 
     jmp_buf {
         rbp: 0, r12: 0, r13: 0, r14: 0, r15: 0,
-        rsp: rsp as i64,
+        rsp: rsp as i64 - 8, // compensate for setjmp misaligning rsp
         rip: rip as i64,
         rbx: rbx as i64
     }
 }
 
-pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *const u8) -> ! {
+pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *mut u8) -> ! {
+    assert!(Align::is_aligned(rsp, 16));
+    let rsp = (rsp as *mut usize).offset(-1); // fake return address
+    *rsp = 0;
+
     static INIT: Once = once::ONCE_INIT;
     INIT.call_once(|| {
         const KERNEL_CS: u16 = 0x08;  // KERNEL_SS = 0x10 (+8)

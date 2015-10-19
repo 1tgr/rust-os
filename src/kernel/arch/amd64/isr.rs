@@ -4,7 +4,7 @@ use arch::mmu;
 use core::mem;
 use once::{self,Once};
 use prelude::*;
-use ptr;
+use ptr::{self,Align};
 use singleton::{DropSingleton,Singleton};
 
 extern {
@@ -89,7 +89,7 @@ pub fn init_once() {
         GDT_TSS.limit_high_and_flags = 0x10;
 
         TSS = Default::default();
-        TSS.rsp0 = (&syscall_stack as *const _ as usize + mem::size_of_val(&syscall_stack)) as u64;
+        TSS.rsp0 = Align::down(&syscall_stack as *const _ as usize + mem::size_of_val(&syscall_stack), 16) as u64;
         TSS.iopm_len = mem::size_of::<Tss>() as u16;
 
         cpu::ltr(tss_selector);

@@ -3,6 +3,7 @@ use arch::mmu;
 use arch::pci;
 use core::mem;
 use process::Process;
+use syscall::{ErrNum,Result};
 
 const VBE_DISPI_IOPORT_INDEX: u16 = 0x1ce;
 const VBE_DISPI_IOPORT_DATA: u16 = 0x1cf;
@@ -25,8 +26,12 @@ unsafe fn vbe_write(index: u16, value: u16) {
    cpu::outw(VBE_DISPI_IOPORT_DATA, value);
 }
 
-pub unsafe fn init<T>(p: &Process, xres: u16, yres: u16, bpp: u16) -> &mut [T] {
-    let bus_slot = pci::find(0x1234, 0x1111).unwrap();
+pub unsafe fn init<T>(p: &Process, xres: u16, yres: u16, bpp: u16) -> Result<&mut [T]> {
+    let bus_slot =
+        try!(pci::find(0x1234, 0x1111)              // QEmu
+            .or_else(|| pci::find(0x80EE, 0xBEEF))  // VirtualBox
+            .ok_or(ErrNum::NotSupported));
+
     log!("Bochs VBE:");
     log!("  bus_slot = {:?}", bus_slot);
 
@@ -44,7 +49,7 @@ pub unsafe fn init<T>(p: &Process, xres: u16, yres: u16, bpp: u16) -> &mut [T] {
     let lfb = p.map_phys::<T>(base_address as usize, len, false, true).unwrap();
     mmu::print_mapping(lfb.as_ptr());
     log!("  base address is {:x} phys, {:p} virt", base_address, lfb.as_ptr());
-    lfb
+    Ok(lfb)
 }
 
 #[cfg(feature = "test")]
@@ -62,7 +67,7 @@ pub mod test {
             let p = Process::new(phys, kernel_virt).unwrap();
             p.switch();
 
-            let lfb = unsafe { init(&p, 800, 600, 32) };
+            let lfb = unsafe { init(&p, 800, 600, 32).unwrap() };
             for d in lfb {
                 *d = 0xffffff;
             }
