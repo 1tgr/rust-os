@@ -1,0 +1,9 @@
+default 0
+timeout 2
+
+#title Boot from hard disk
+#chainloader (hd0)+1
+
+title My kernel
+kernel /kernel.bin
+module /initrd.zip

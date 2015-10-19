@@ -25,6 +25,11 @@ RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 RUSTCFLAGS += --cfg feature=\"test\"
 
+ISO += initrd.zip
+ISO += kernel.bin
+ISO += menu.lst
+ISO += stage2_eltorito
+
 : ../hello/hello.bin |> zip -j %o %f |> initrd.zip
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
@@ -42,3 +47,5 @@ else
 : {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
 # : kernel.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
 endif
+
+: $(ISO) |> cp stage2_eltorito stage2_eltorito_temp && genisoimage -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -graft-points -o %o kernel.bin initrd.zip boot/grub/menu.lst=menu.lst boot/grub/stage2_eltorito=stage2_eltorito_temp && rm stage2_eltorito_temp |> bootable.iso
