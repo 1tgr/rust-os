@@ -1,8 +1,10 @@
 use bit_vec::BitVec;
 use core::cmp;
 use core::intrinsics;
+use core::mem;
+use core::slice;
 use libc::{c_int,c_void};
-use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_uint32_t};
+use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_module_t,multiboot_uint32_t};
 use mutex::Mutex;
 use ptr;
 use syscall::{ErrNum,Result};
@@ -40,10 +42,14 @@ impl PhysicalBitmap {
     pub fn parse_multiboot() -> PhysicalBitmap {
         let info = multiboot_info();
         let kernel_len = ptr::bytes_between(&kernel_start, &kernel_end);
-        let total_kb = cmp::min(info.mem_lower, 1024) + info.mem_upper;
-        let bitmap = PhysicalBitmap::new(total_kb as usize * 1024);
+        let lower_bytes = info.mem_lower as usize * 1024;
+        let total_bytes = cmp::min(lower_bytes, 1024 * 1024) + (info.mem_upper as usize * 1024);
+        let bitmap = PhysicalBitmap::new(total_bytes);
         bitmap.reserve_pages(0, 1);
         bitmap.reserve_ptr(&kernel_start, kernel_len as usize);
+        bitmap.reserve_addr(lower_bytes, cmp::max(0, 1024 * 1024 - lower_bytes));
+        bitmap.reserve_addr(mboot_ptr as usize, mem::size_of::<multiboot_info_t>());
+        bitmap.reserve_addr(info.mods_addr as usize, info.mods_count as usize * mem::size_of::<multiboot_module_t>());
 
         {
             let mut mmap_offset = 0;
@@ -55,6 +61,16 @@ impl PhysicalBitmap {
 
                 mmap_offset += mmap.size + 4;
             }
+        }
+
+        let mods: &[multiboot_module_t] = unsafe { slice::from_raw_parts(
+            phys2virt(info.mods_addr as usize),
+            info.mods_count as usize) };
+
+        for module in mods {
+            let addr = module.mod_start;
+            let len = module.mod_end - module.mod_start;
+            bitmap.reserve_addr(addr as usize, len as usize);
         }
 
         bitmap

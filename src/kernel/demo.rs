@@ -76,15 +76,15 @@ test! {
         thread::with_scheduler(p.clone(), || {
             p.switch();
 
-            let mut code_slice;
+            let code_slice = p.alloc(2 * 1024 * 1024, true, true).unwrap();
             unsafe {
                 let info = phys_mem::multiboot_info();
 
                 let mods: &[multiboot_module_t] = slice::from_raw_parts(
                     phys_mem::phys2virt(info.mods_addr as usize),
-                    info.mods_count as usize * mem::size_of::<multiboot_module_t>());
+                    info.mods_count as usize);
 
-                assert!(mods.len() >= 1);
+                assert_eq!(1, mods.len());
 
                 let mod_data: &[u8] = slice::from_raw_parts(
                     phys_mem::phys2virt(mods[0].mod_start as usize),
@@ -101,8 +101,8 @@ test! {
                 let index = index as u32;
                 let mut stat = mem::zeroed();
                 assert!(mz::mz_zip_reader_file_stat(&mut zip, index, &mut stat));
-                code_slice = p.alloc(stat.uncomp_size as usize, true, true).unwrap();
-                assert!(mz::mz_zip_reader_extract_to_mem(&mut zip, index, code_slice.as_mut_ptr() as *mut _, code_slice.len() as u64, 0));
+                assert!(stat.uncomp_size as usize <= code_slice.len());
+                assert!(mz::mz_zip_reader_extract_to_mem(&mut zip, index, code_slice.as_mut_ptr() as *mut _, stat.uncomp_size as u64, 0));
                 mz::mz_zip_reader_end(&mut zip);
             }
 
