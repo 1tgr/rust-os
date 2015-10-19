@@ -1,6 +1,7 @@
 use alloc::arc::Arc;
 use arch::keyboard::Keyboard;
 use arch::vga::Vga;
+use arch::vga_bochs;
 use console::Console;
 use core::mem;
 use core::slice;
@@ -65,6 +66,11 @@ impl Handler for TestSyscallHandler {
         }
 
         Ok(())
+    }
+
+    fn init_video_mode(&self, width: u16, height: u16, bpp: u8) -> Result<*mut u8> {
+        let slice = try!(vga_bochs::init(&*self.process, width, height, bpp));
+        Ok(slice.as_mut_ptr())
     }
 }
 

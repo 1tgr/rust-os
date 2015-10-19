@@ -34,6 +34,7 @@ macro_rules! syscalls {
     ) => {
         use $crate::kernel::Dispatch;
         use $crate::marshal::{ErrNum,PackedArgs,SyscallArgs,SyscallResult};
+        use core::fmt::Write;
 
         pub trait Handler {
             $(
@@ -41,25 +42,34 @@ macro_rules! syscalls {
             )+
         }
 
-        pub struct Dispatcher<T> {
+        pub struct Dispatcher<W, T> {
+            writer: W,
             handler: T
         }
 
-        impl<T> Dispatcher<T> {
-            pub fn new(handler: T) -> Dispatcher<T> {
+        impl<W, T> Dispatcher<W, T> {
+            pub fn new(writer: W, handler: T) -> Dispatcher<W, T> {
                 Dispatcher {
+                    writer: writer,
                     handler: handler
                 }
             }
         }
 
-        impl<T> Dispatch for Dispatcher<T> where T : Handler {
+        impl<T: Handler, W: Clone + Write> Dispatch for Dispatcher<W, T> {
             fn dispatch(&self, num: usize, mut args: PackedArgs) -> isize {
                 match num {
                     $(
                         $num =>
                             (match SyscallArgs::from_args(&mut args) {
-                                Ok(($($arg_name,)+)) => self.handler.$name($($arg_name),+),
+                                Ok(tuple) => {
+                                    let mut writer = self.writer.clone();
+                                    let _ = write!(writer, concat!(stringify!($name), "{:?}"), tuple);
+                                    let ($($arg_name,)+) = tuple;
+                                    let result = self.handler.$name($($arg_name),+);
+                                    let _ = writeln!(writer, " => {:?}", result);
+                                    result
+                                },
                                 Err(num) => Err(num)
                             }).as_result(),
                     )+

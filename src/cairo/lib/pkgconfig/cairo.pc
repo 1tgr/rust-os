@@ -1,0 +1,13 @@
+prefix=/home/tim/host/Git/rust-barebones-kernel/src/cairo
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: cairo
+Description: Multi-platform 2D graphics library
+Version: 1.14.2
+
+Requires.private:     pixman-1 >= 0.30.0 libpng 
+Libs: -L${libdir} -lcairo
+Libs.private:       
+Cflags: -I${includedir}/cairo

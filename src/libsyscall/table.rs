@@ -20,5 +20,7 @@ syscalls! {
     fn write(file: FileHandle, buf: &'a [u8]) -> usize => 5,
 
     /// Reads from a file.
-    fn read(file: FileHandle, buf: &'a mut [u8]) -> usize => 6
+    fn read(file: FileHandle, buf: &'a mut [u8]) -> usize => 6,
+
+    fn init_video_mode(width: u16, height: u16, bpp: u8) -> *mut u8 => 7
 }

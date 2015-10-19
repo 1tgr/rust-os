@@ -18,6 +18,7 @@
 #![feature(fnbox)]
 #![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
+#![feature(libc)]
 #![feature(no_std)]
 #![feature(slice_bytes)]
 #![feature(unicode)]
@@ -49,6 +50,7 @@ pub mod bit_vec;
 pub mod console;
 pub mod device;
 pub mod io;
+pub mod libc_helpers;
 pub mod logging;
 pub mod miniz_sys;
 pub mod multiboot;
@@ -65,28 +67,6 @@ pub mod virt_mem;
 #[cfg(feature = "test")]
 mod demo;
 
-use core::fmt::Write;
-use core::mem;
-use libc::{c_char,c_int};
-use logging::Writer;
-
-static mut errno: c_int = 0;
-
-#[no_mangle]
-pub unsafe extern fn __error() -> &'static mut c_int {
-    &mut errno
-}
-
-#[no_mangle]
-pub unsafe extern fn __assert(file: *const c_char, line: c_int, msg: *const c_char) -> ! {
-    let mut writer = Writer::get(module_path!());
-    arch::debug::put_cstr(file);
-    let _ = write!(&mut writer, "({}): ", line);
-    arch::debug::put_cstr(msg);
-    mem::drop(writer);
-    panic!("assertion failed in C code");
-}
-
 #[cfg(feature = "test")]
 fn run_tests() {
     use test::Fixture;
@@ -101,7 +81,6 @@ fn run_tests() {
         process::test::TESTS,
         thread::test::TESTS,
         virt_mem::test::TESTS,
-        arch::vga_bochs::test::TESTS,
 
         demo::TESTS
     ];
@@ -126,8 +105,9 @@ fn run_tests() {
 // Kernel entrypoint
 #[lang="start"]
 #[no_mangle]
-pub fn kmain() -> ! {
+pub unsafe fn kmain() -> ! {
     arch::isr::init_once();
+    libc_helpers::init();
     run_tests();
     loop { }
 }

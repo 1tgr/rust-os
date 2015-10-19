@@ -1,6 +1,7 @@
 use arch::debug;
 use core::fmt::{Error,Write};
 
+#[derive(Clone)]
 pub struct Writer;
 
 impl Writer {

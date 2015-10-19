@@ -88,6 +88,56 @@ impl SyscallArgs for () {
     }
 }
 
+impl SyscallArgs for u8 {
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        Ok(args.pop_front().unwrap() as Self)
+    }
+}
+
+impl SyscallArgs for u16 {
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        Ok(args.pop_front().unwrap() as Self)
+    }
+}
+
+impl SyscallArgs for u32 {
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        Ok(args.pop_front().unwrap() as Self)
+    }
+}
+
+impl SyscallArgs for i8 {
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        Ok(args.pop_front().unwrap() as Self)
+    }
+}
+
+impl SyscallArgs for i16 {
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(self as usize);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        Ok(args.pop_front().unwrap() as Self)
+    }
+}
+
 impl SyscallArgs for i32 {
     fn as_args(self, args: &mut PackedArgs) {
         args.push_back(self as usize);
@@ -174,7 +224,7 @@ impl<T: SyscallArgs> SyscallArgs for (T,) {
     }
 }
 
-impl<T: SyscallArgs, U: SyscallArgs> SyscallArgs for (T, U) {
+impl<T1: SyscallArgs, T2: SyscallArgs> SyscallArgs for (T1, T2) {
     fn as_args(self, args: &mut PackedArgs) {
         self.0.as_args(args);
         self.1.as_args(args);
@@ -184,6 +234,21 @@ impl<T: SyscallArgs, U: SyscallArgs> SyscallArgs for (T, U) {
         let a = try!(SyscallArgs::from_args(args));
         let b = try!(SyscallArgs::from_args(args));
         Ok((a, b))
+    }
+}
+
+impl<T1: SyscallArgs, T2: SyscallArgs, T3: SyscallArgs> SyscallArgs for (T1, T2, T3) {
+    fn as_args(self, args: &mut PackedArgs) {
+        self.0.as_args(args);
+        self.1.as_args(args);
+        self.2.as_args(args);
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        let a = try!(SyscallArgs::from_args(args));
+        let b = try!(SyscallArgs::from_args(args));
+        let c = try!(SyscallArgs::from_args(args));
+        Ok((a, b, c))
     }
 }
 

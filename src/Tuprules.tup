@@ -4,21 +4,24 @@ RUSTC = $(TUP_CWD)/rust rustc
 RUSTDOC = $(TUP_CWD)/rust rustdoc
 
 ifeq (@(ARCH),amd64)
-    LD := x86_64-elf-ld
-    OBJDUMP := x86_64-elf-objdump
-    OBJCOPY := x86_64-elf-objcopy
-    AR := x86_64-elf-ar
-	CC := clang -target x86_64-unknown-linux-gnu
+    TARGET := x86_64-elf
+    ASFLAGS += -m64
+    CCFLAGS += -m64
 else
     ifeq (@(ARCH),x86)
-        LD := i586-elf-ld
-        OBJDUMP := i586-elf-objdump
-        AR := i586-elf-ar
-        CC := clang -target i586-elf
+        TARGET := i586-elf
+        ASFLAGS += -m32
+        CCFLAGS += -m32
     else
         error Unknown architecture @(ARCH)
     endif
 endif
+
+CC := gcc
+LD := $(TARGET)-ld
+OBJDUMP := $(TARGET)-objdump
+OBJCOPY := $(TARGET)-objcopy
+AR := $(TARGET)-ar
 
 TARGETSPEC := $(TUP_CWD)/Kernel/arch/@(ARCH)/target.json
 RUSTFLAGS += --cfg arch__@(ARCH) --target=$(TARGETSPEC)
@@ -32,21 +35,20 @@ CCFLAGS += -O
 endif
 
 RUSTCFLAGS += -g
-CCFLAGS += -g -nostdinc -I$(TUP_CWD)/include
+CCFLAGS += -g -ffreestanding -I $(TUP_CWD)/newlib/$(TARGET)/include
 
 ifeq (@(ARCH),amd64)
-RUSTCFLAGS += -C soft-float
-CCFLAGS += -fPIC -mno-red-zone
+CCFLAGS += -mcmodel=kernel -mno-red-zone
 endif
 
 ARFLAGS += crus
-ASFLAGS += -g -I $(TUP_CWD)/include
+ASFLAGS += -g -I $(TUP_CWD)/newlib/$(TARGET)/include
 LINKFLAGS += --gc-sections -z max-page-size=0x1000
 
 !AR = |> $(AR) $(ARFLAGS) -o %o %f |>
 !AS = |> $(CC) $(ASFLAGS) -c -o %o %f |>
 !CC = |> $(CC) $(CCFLAGS) -c -o %o %f |>
-!LD = |> $(LD) $(LINKFLAGS) -o %o %f |>
+!LD = |> $(LD) $(LINKFLAGS) -o %o %f `$(CC) $(CCFLAGS) -print-libgcc-file-name` |>
 !RUSTC_BIN = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type bin %f |>
 !RUSTC_LIB = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --crate-type=lib --emit=link %f |>
 !RUSTC_OBJ = |> $(RUSTC) $(RUSTFLAGS) $(RUSTCFLAGS) -o %o --emit=obj %f |>

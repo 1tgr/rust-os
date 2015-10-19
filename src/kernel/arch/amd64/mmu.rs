@@ -216,7 +216,7 @@ impl AddressSpace {
             let pdpt_entry = &mut pml4_entry.as_mut_ref()[pdpt_index];
             try!(pdpt_entry.ensure_present(&bitmap));
 
-            for i in 0..2 {
+            for i in 0..4 {
                 let pd_index = pd_index + i;
                 let pd_entry = &mut pdpt_entry.as_mut_ref()[pd_index];
                 pd_entry.entry = join(i * two_meg, PAGE_PRESENT | PAGE_WRITABLE | PAGE_BIG);
@@ -321,7 +321,7 @@ pub mod test {
         fn can_map_kernel() {
             let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
             let two_meg = 2 * 1024 * 1024;
-            let ptr1 = Align::up(&kernel_end as *const u8, 2 * two_meg);
+            let ptr1 = Align::up(&kernel_end as *const u8, 4 * two_meg);
             let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
             let addr = bitmap.alloc_page().unwrap();
             let address_space = AddressSpace::new(bitmap).unwrap();

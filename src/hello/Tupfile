@@ -10,17 +10,24 @@ RUSTFLAGS += -L ../modules
 
 LIBS += ../liballoc/liballoc.rlib
 LIBS += ../liballoc_system/liballoc_system.rlib
-LIBS += ../libc/libc.a
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
 LIBS += ../libstd/libstd.rlib
 LIBS += ../libsyscall/libsyscall.rlib
 
+LIBS += ../cairo/lib/libcairo.a
+LIBS += ../cairo/lib/libpixman-1.a
+LIBS += ../cairo/lib/libpng16.a
+LIBS += ../cairo/lib/libz.a
+LIBS += ../newlib/$(TARGET)/lib/libc.a
+LIBS += ../newlib/$(TARGET)/lib/libm.a
+
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
+RUSTFLAGS += --extern libc=../liblibc/liblibc.rlib
 RUSTFLAGS += --extern std=../libstd/libstd.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall.rlib
 
 : main.rs | $(LIBS) |> !RUSTC_OBJ |> hello.o {objs}
 : {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> hello.elf
-: hello.elf |> $(OBJCOPY) -O binary %f %o |> hello.bin
+: hello.elf |> $(OBJCOPY) -SO binary %f %o |> hello.bin
 : hello.elf |> $(OBJDUMP) -d %f > %o |> hello.txt

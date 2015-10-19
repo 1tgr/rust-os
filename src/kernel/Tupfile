@@ -15,7 +15,7 @@ LIBS += ../liblibc/liblibc.rlib
 LIBS += ../librustc_unicode/librustc_unicode.rlib
 LIBS += ../libsyscall/libsyscall_kernel.rlib
 
-LIBS += ../libc/libc.a
+LIBS += ../newlib/$(TARGET)/lib/libc.a
 
 RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib
 RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
@@ -41,8 +41,8 @@ ISO += stage2_eltorito
 
 ifeq (@(ARCH),amd64)
 : {objs} $(LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
-: kernel.amd64.bin |> $(OBJCOPY) -F elf32-i386 %f %o |> kernel.bin
-: kernel.amd64.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
+: kernel.amd64.bin |> $(OBJCOPY) -SF elf32-i386 %f %o |> kernel.bin
+: kernel.amd64.bin |> $(OBJDUMP) -d %f > %o |> kernel.txt
 else
 : {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
 # : kernel.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt

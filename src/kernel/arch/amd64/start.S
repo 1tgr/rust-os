@@ -1,6 +1,6 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * arcm/amd64/start.S
  * - AMD64 Entrypoint
@@ -43,11 +43,11 @@ mboot:
 .code32
 start:
 	/* The kernel starts in protected mode (32-bit mode, we want to switch to long mode) */
-	
+
 	/* 1. Save multiboot state */
 	mov %eax, mboot_sig - KERNEL_BASE
 	mov %ebx, mboot_ptr - KERNEL_BASE
-	
+
 	/* 2. Ensure that the CPU support long mode */
 	mov $0x80000000, %eax
 	cpuid
@@ -59,7 +59,7 @@ start:
 	cpuid
 	test $0x20000000, %edx /* bit 29 = */
 	jz not64bitCapable
-	
+
 	/* 3. Set up state for long mode */
 	/* Enable:
 	    PGE (Page Global Enable)
@@ -101,7 +101,7 @@ not64bitCapable:
 	movw $0x100|'6', 0xb8006
 	mov $'4', %al ; outb %al, %dx
 	movw $0x100|'4', 0xb8008
-	
+
 not64bitCapable.loop:
 	hlt
 	jmp not64bitCapable.loop
@@ -120,7 +120,7 @@ start64_high:
 	/* and clear low-memory mapping */
 	mov $0, %rax
 	mov %rax, init_pml4 - KERNEL_BASE + 0
-	
+
 	/* Set up segment registers */
 	mov $0x10, %ax
 	mov %ax, %ss
@@ -128,7 +128,7 @@ start64_high:
 	mov %ax, %es
 	mov %ax, %fs
 	mov %ax, %gs
-	
+
 	/* Set up stack pointer */
 	mov $init_stack, %rsp
 
@@ -243,8 +243,8 @@ irq_##n: \
 	ISR_ASM(0x##n, irq) ;\
     iretq ;\
 	.align 16
-	
-#undef interrupt	
+
+#undef interrupt
 #define interrupt(n) \
 	.globl	interrupt_##n ;\
 	\
@@ -286,11 +286,13 @@ init_pdpt:	/* covers the top 512GB, 1GB each entry */
 	.quad 0
 init_pd:
 	/* 0x80 = Page size extension */
-	.quad 0x000000 + 0x80 + 3	/* Map 2MB, enough for a 1MB kernel */
-	.quad 0x200000 + 0x80 + 3	/* - give it another 2MB, just in case */
-	.rept 512 - 2
+	.quad 0x000000 + 0x80 + 3
+	.quad 0x200000 + 0x80 + 3
+	.quad 0x400000 + 0x80 + 3
+	.quad 0x600000 + 0x80 + 3
+	.rept 512 - 4
 		.quad 0
-	.endr 
+	.endr
 init_stack_base:
 	.rept 0x1000 * 2
 		.byte 0
