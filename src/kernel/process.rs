@@ -6,7 +6,7 @@ use io::{AsyncRead,Read,Write};
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use prelude::*;
-use syscall::{Handle,Result};
+use syscall::{ErrNum,Handle,Result};
 use virt_mem::VirtualTree;
 
 pub trait KObj {
@@ -73,9 +73,22 @@ impl Process {
         self.arch.switch();
     }
 
-    unsafe fn alloc_inner<F: Fn(usize) -> Result<usize>>(&self, phys: F, len: usize, user: bool, writable: bool) -> Result<*mut u8> {
+    unsafe fn alloc_inner<F: Fn(usize) -> Result<usize>>(&self, ptr_opt: Option<*mut u8>, phys: F, len: usize, user: bool, writable: bool) -> Result<*mut u8> {
         let virt = if user { &self.user_virt } else { &*self.kernel_virt };
-        let ptr = try!(virt.alloc(len)).as_mut_ptr();
+
+        let ptr =
+            match ptr_opt {
+                Some(ptr) => {
+                    if !virt.reserve(slice::from_raw_parts_mut(ptr, len)) {
+                        return Err(ErrNum::InvalidArgument);
+                    }
+
+                    ptr
+                }
+
+                None => try!(virt.alloc(len)).as_mut_ptr()
+            };
+
         let mut offset = 0;
         while offset < len  {
             let ptr = ptr.offset(offset as isize);
@@ -90,13 +103,19 @@ impl Process {
 
     pub fn alloc<T>(&self, len: usize, user: bool, writable: bool) -> Result<&mut [T]> {
         unsafe {
-            let ptr = try!(self.alloc_inner(|_| self.phys.alloc_page(), len * mem::size_of::<T>(), user, writable));
+            let ptr = try!(self.alloc_inner(None, |_| self.phys.alloc_page(), len * mem::size_of::<T>(), user, writable));
             Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
         }
     }
 
+    pub unsafe fn alloc_at<T>(&self, base: *mut T, len: usize, user: bool, writable: bool) -> Result<&mut [T]> {
+        let ptr = try!(self.alloc_inner(Some(base as *mut u8), |_| self.phys.alloc_page(), len * mem::size_of::<T>(), user, writable));
+        assert_eq!(base as *mut u8, ptr);
+        Ok(slice::from_raw_parts_mut(base, len))
+    }
+
     pub unsafe fn map_phys<T>(&self, addr: usize, len: usize, user: bool, writable: bool) -> Result<&mut [T]> {
-        let ptr = try!(self.alloc_inner(|offset| Ok(addr + offset), len * mem::size_of::<T>(), user, writable));
+        let ptr = try!(self.alloc_inner(None, |offset| Ok(addr + offset), len * mem::size_of::<T>(), user, writable));
         Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
     }
 

@@ -28,6 +28,6 @@ RUSTFLAGS += --extern std=../libstd/libstd.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall.rlib
 
 : main.rs | $(LIBS) |> !RUSTC_OBJ |> hello.o {objs}
-: {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> hello.elf
-: hello.elf |> $(OBJCOPY) -SO binary %f %o |> hello.bin
-: hello.elf |> $(OBJDUMP) -d %f > %o |> hello.txt
+: {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> hello-debug
+: hello-debug |> $(OBJCOPY) -S %f %o |> hello
+: hello-debug |> $(OBJDUMP) -d %f > %o |> hello.txt

@@ -180,7 +180,6 @@ unsafe fn init() -> Result<()> {
 }
 
 #[no_mangle]
-#[link_section=".init"]
 pub unsafe extern fn start() {
     let result = init().and_then(|()| main());
     let _ = syscall::close(stdin);

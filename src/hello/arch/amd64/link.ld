@@ -5,11 +5,10 @@ SECTIONS
 {
   .text phys : AT(phys) {
     code = .;
-    *(.init)
     *(.text .text.*)
     *(.rodata .rodata.*)
   }
-  .data : AT(phys + (data - code))
+  .data ALIGN(0x1000) : AT(ADDR(.data))
   {
     data = .;
     init_array_start = .;
@@ -17,7 +16,7 @@ SECTIONS
     init_array_end = .;
     *(.data .data.*)
   }
-  .bss : AT(phys + (bss - code))
+  .bss ALIGN(0x1000) : AT(ADDR(.bss))
   {
     bss = .;
     *(.bss .bss.*)

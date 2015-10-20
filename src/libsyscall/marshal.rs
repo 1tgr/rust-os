@@ -62,6 +62,7 @@ pub enum ErrNum {
     InvalidHandle = 3,
     NotSupported = 4,
     FileNotFound = 5,
+    InvalidArgument = 6,
 }
 
 pub type Handle = usize;

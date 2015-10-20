@@ -5,5 +5,5 @@ timeout 2
 #chainloader (hd0)+1
 
 title My kernel
-kernel /kernel.bin
+kernel /kernel
 module /initrd.zip

@@ -1,14 +1,17 @@
 use alloc::arc::Arc;
 use arch::keyboard::Keyboard;
-use arch::vga::Vga;
 use arch::vga_bochs;
+use arch::vga::Vga;
 use console::Console;
 use core::mem;
 use core::slice;
+use core::slice::bytes;
+use elf::*;
 use io::{Read,Write};
 use miniz_sys as mz;
 use multiboot::multiboot_module_t;
 use phys_mem::{self,PhysicalBitmap};
+use prelude::*;
 use process::{KObj,Process};
 use syscall::{ErrNum,Handle,FileHandle,Handler,Result};
 use thread::{self,Deferred};
@@ -82,7 +85,7 @@ test! {
         thread::with_scheduler(p.clone(), || {
             p.switch();
 
-            let code_slice = p.alloc(2 * 1024 * 1024, true, true).unwrap();
+            let temp_slice;
             unsafe {
                 let info = phys_mem::multiboot_info();
 
@@ -101,20 +104,47 @@ test! {
                 let mut zip = mem::zeroed();
                 assert!(mz::mz_zip_reader_init_mem(&mut zip, mod_data.as_ptr() as *const _, mod_data.len() as u64, 0));
 
-                let index = mz::mz_zip_reader_locate_file(&mut zip, b"hello.bin\0" as *const _, 0 as *const _, 0);
+                let index = mz::mz_zip_reader_locate_file(&mut zip, b"hello\0" as *const _, 0 as *const _, 0);
                 assert!(index >= 0);
 
                 let index = index as u32;
                 let mut stat = mem::zeroed();
                 assert!(mz::mz_zip_reader_file_stat(&mut zip, index, &mut stat));
-                assert!(stat.uncomp_size as usize <= code_slice.len());
-                assert!(mz::mz_zip_reader_extract_to_mem(&mut zip, index, code_slice.as_mut_ptr() as *mut _, stat.uncomp_size as u64, 0));
+                temp_slice = p.alloc::<u8>(stat.uncomp_size as usize, false, true).unwrap();
+                assert!(mz::mz_zip_reader_extract_to_mem(&mut zip, index, temp_slice.as_mut_ptr() as *mut _, temp_slice.len() as u64, 0));
                 mz::mz_zip_reader_end(&mut zip);
             }
 
-            let stack_slice = p.alloc(phys_mem::PAGE_SIZE, true, true).unwrap();
-            log!("code_slice = {:p}, stack_slice = {:p}", code_slice.as_ptr(), stack_slice.as_ptr());
-            log!("code_slice = {:?}", &code_slice[0..16]);
+            let ehdr = unsafe { *(temp_slice.as_ptr() as *const Elf64_Ehdr) };
+            assert_eq!([ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT], &ehdr.e_ident[0..7]);
+            assert_eq!((ET_EXEC, EM_X86_64), (ehdr.e_type, ehdr.e_machine));
+
+            let entry = ehdr.e_entry as *const u8;
+            log!("entry point is {:p}", entry);
+
+            let mut slices = Vec::new();
+            for i in 0..ehdr.e_phnum {
+                let phdr_offset = ehdr.e_phoff as isize + (i as isize) * (ehdr.e_phentsize as isize);
+                let phdr = unsafe { *(temp_slice.as_ptr().offset(phdr_offset) as *const Elf64_Phdr) };
+                if phdr.p_type != PT_LOAD {
+                    continue;
+                }
+
+                log!("segment {}: {:x} bytes @ {:p} (file: {:x} bytes @ {:x})", i, phdr.p_memsz, phdr.p_vaddr as *mut u8, phdr.p_filesz, phdr.p_offset);
+                assert!(phdr.p_memsz >= phdr.p_filesz);
+                let slice = unsafe { p.alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
+                let file_slice = &temp_slice[phdr.p_offset as usize .. (phdr.p_offset + phdr.p_filesz) as usize];
+                bytes::copy_memory(file_slice, slice);
+                slices.push(slice);
+            }
+
+            assert!(slices.iter().any(|ref slice| {
+                let slice_end = unsafe { slice.as_ptr().offset(slice.len() as isize) };
+                entry >= slice.as_ptr() && entry < slice_end
+            }));
+
+            let stack_slice = p.alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+            log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
 
             let mut deferred = Deferred::new();
 
@@ -125,7 +155,7 @@ test! {
             };
 
             let _x = ::arch::thread::register_syscall_handler(handler);
-            thread::spawn_user_mode(code_slice.as_ptr(), stack_slice);
+            thread::spawn_user_mode(entry, stack_slice);
 
             let code;
             loop {

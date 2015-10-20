@@ -26,11 +26,13 @@ RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 RUSTCFLAGS += --cfg feature=\"test\"
 
 ISO += initrd.zip
-ISO += kernel.bin
+ISO += kernel
 ISO += menu.lst
 ISO += stage2_eltorito
 
-: ../hello/hello.bin |> zip -j %o %f |> initrd.zip
+INITRD += ../hello/hello
+
+: $(INITRD) |> zip -j %o %f |> initrd.zip
 
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
 : foreach *.c |> !CC |> %B.o {objs}
@@ -40,12 +42,12 @@ ISO += stage2_eltorito
 : main.rs |> !RUSTDOC_CMD |> rustdoc
 
 ifeq (@(ARCH),amd64)
-: {objs} $(LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel.amd64.bin
-: kernel.amd64.bin |> $(OBJCOPY) -SF elf32-i386 %f %o |> kernel.bin
-: kernel.amd64.bin |> $(OBJDUMP) -d %f > %o |> kernel.txt
+: {objs} $(LIBS) | arch/amd64/link.ld |> !LD -T arch/amd64/link.ld |> kernel-amd64
+: kernel-amd64 |> $(OBJCOPY) -SF elf32-i386 %f %o |> kernel
+# : kernel-amd64 |> $(OBJDUMP) -d %f > %o |> kernel.txt
 else
-: {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel.bin
-# : kernel.bin |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
+: {objs} $(LIBS) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel
+# : kernel |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
 endif
 
-: $(ISO) |> cp stage2_eltorito stage2_eltorito_temp && genisoimage -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -graft-points -o %o kernel.bin initrd.zip boot/grub/menu.lst=menu.lst boot/grub/stage2_eltorito=stage2_eltorito_temp && rm stage2_eltorito_temp |> bootable.iso
+: $(ISO) |> cp stage2_eltorito stage2_eltorito_temp && genisoimage -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -graft-points -o %o kernel initrd.zip boot/grub/menu.lst=menu.lst boot/grub/stage2_eltorito=stage2_eltorito_temp && rm stage2_eltorito_temp |> bootable.iso
