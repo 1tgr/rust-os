@@ -52,7 +52,7 @@ impl VirtualState {
     pub fn reserve(&mut self, slice: &mut [u8]) -> bool {
         let (ptr, len) = (slice.as_mut_ptr(), slice.len());
         let (ptr, len) = Align::range(ptr, len, phys_mem::PAGE_SIZE);
-        log!("reserve({:p} -> {:p})", ptr, unsafe { ptr.offset(len as isize) });
+        log!("reserve({:p}..{:p})", ptr, unsafe { ptr.offset(len as isize) });
 
         let pos =
             match self.blocks.iter().position(|block| block.free && block.ptr <= ptr && block.len >= len) {

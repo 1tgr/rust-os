@@ -14,11 +14,11 @@ impl ArchProcess {
         })
     }
 
-    pub fn switch(&self) {
+    pub unsafe fn switch(&self) {
         self.address_space.switch()
     }
 
-    pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
+    pub unsafe fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
         self.address_space.map(ptr, addr, user, writable)
     }
 }

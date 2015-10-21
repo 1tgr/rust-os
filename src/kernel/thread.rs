@@ -83,12 +83,13 @@ pub struct Deferred<A> {
 #[inline(never)] // hmm?
 pub fn with_scheduler<F: FnOnce()>(idle_process: Arc<Process>, f: F) {
     let state = SchedulerState {
-        current: Thread::new(idle_process, &mut []),
+        current: Thread::new(idle_process.clone(), &mut []),
         threads: VecDeque::new(),
         garbage_stacks: Vec::new()
     };
 
     let _d = SCHEDULER.register(Mutex::new(state));
+    unsafe { idle_process.switch() };
     f()
 }
 
@@ -106,6 +107,7 @@ pub fn schedule() {
     let mut state = lock_sched!();
     match state.threads.pop_front() {
         Some((new_jmp_buf, new_current)) => {
+            let new_process = new_current.process.clone();
             let old_current = mem::replace(&mut state.current, new_current);
 
             match setjmp() {
@@ -114,6 +116,8 @@ pub fn schedule() {
                     drop_write_guard(state);
 
                     unsafe {
+                        new_process.switch();
+                        mem::drop(new_process);
                         libc::longjmp(&new_jmp_buf, 1);
                     }
                 },
@@ -139,8 +143,10 @@ pub fn exit() -> ! {
                 None => panic!("exit({}): no more threads", state.current.id)
             };
 
+        let new_process = new_current.process.clone();
         let old_current = mem::replace(&mut state.current, new_current);
         state.garbage_stacks.push(old_current.stack);
+        unsafe { new_process.switch() };
         new_jmp_buf
     };
 
@@ -247,6 +253,7 @@ impl<A> Deferred<A> {
                     None => panic!("block({}): no more threads", state.current.id)
                 };
 
+            let new_process = new_current.process.clone();
             let old_current = mem::replace(&mut state.current, new_current);
 
             match setjmp() {
@@ -256,6 +263,8 @@ impl<A> Deferred<A> {
                     drop_write_guard(dstate);
 
                     unsafe {
+                        new_process.switch();
+                        mem::drop(new_process);
                         libc::longjmp(&new_jmp_buf, 1);
                     }
                 },

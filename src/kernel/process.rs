@@ -69,7 +69,7 @@ impl Process {
         })
     }
 
-    pub fn switch(&self) {
+    pub unsafe fn switch(&self) {
         self.arch.switch();
     }
 
@@ -142,25 +142,74 @@ pub mod test {
     use core::intrinsics;
     use phys_mem::PhysicalBitmap;
     use super::*;
+    use thread;
     use virt_mem::VirtualTree;
 
     test!{
         fn can_alloc() {
             let phys = Arc::new(PhysicalBitmap::parse_multiboot());
             let kernel_virt = Arc::new(VirtualTree::for_kernel());
-            let p = Process::new(phys, kernel_virt).unwrap();
-            p.switch();
-
-            let len = 4096;
-            let slice = p.alloc::<u16>(len, false, true).unwrap();
-            let sentinel = 0xaa55;
-            for i in 0..len {
-                let ptr = &mut slice[i] as *mut u16;
-                unsafe {
-                    intrinsics::volatile_store(ptr, sentinel);
-                    assert_eq!(sentinel, intrinsics::volatile_load(ptr));
+            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
+            thread::with_scheduler(p.clone(), || {
+                let len = 4096;
+                let slice = p.alloc::<u16>(len, false, true).unwrap();
+                let sentinel = 0xaa55;
+                for i in 0..len {
+                    let ptr = &mut slice[i] as *mut u16;
+                    unsafe {
+                        intrinsics::volatile_store(ptr, sentinel);
+                        assert_eq!(sentinel, intrinsics::volatile_load(ptr));
+                    }
                 }
-            }
+            });
         }
+
+        fn user_addresses_are_separate() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::for_kernel());
+            let idle_process = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+            thread::with_scheduler(idle_process.clone(), || {
+                let p1 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+                let p2 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+
+                let d1 = thread::spawn_remote(p1.clone(), || unsafe {
+                    let slice = p1.alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
+                    assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
+                    intrinsics::volatile_store(slice.as_mut_ptr(), 123);
+                });
+
+                let d2 = thread::spawn_remote(p2.clone(), || unsafe {
+                    let slice = p2.alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
+                    assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
+                    intrinsics::volatile_store(slice.as_mut_ptr(), 456);
+                });
+
+                d1.get();
+                d2.get();
+            });
+        }
+
+        /*fn kernel_addresses_are_shared() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::for_kernel());
+            let idle_process = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+            thread::with_scheduler(idle_process.clone(), || {
+                let p1 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+                let p2 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+                let slice = idle_process.alloc(0x1000, false, true).unwrap();
+                unsafe { intrinsics::volatile_store(slice.as_mut_ptr(), 123) };
+
+                let d1 = thread::spawn_remote(p1.clone(), || unsafe {
+                    assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
+                });
+
+                let d2 = thread::spawn_remote(p2.clone(), || unsafe {
+                    assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
+                });
+
+                d1.get();
+                d2.get();
+            });
+        } */
     }
 }

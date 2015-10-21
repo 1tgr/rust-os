@@ -141,8 +141,6 @@ test! {
         let kernel_virt = Arc::new(VirtualTree::for_kernel());
         let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
         thread::with_scheduler(p.clone(), || {
-            p.switch();
-
             let temp_slice = unsafe {
                 let info = phys_mem::multiboot_info();
 
