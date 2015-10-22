@@ -80,6 +80,7 @@ pub struct Deferred<A> {
     state: Arc<Mutex<DeferredState<A>>>
 }
 
+#[inline(never)] // hmm?
 pub fn with_scheduler<F: FnOnce()>(idle_process: Arc<Process>, f: F) {
     let state = SchedulerState {
         current: Thread::new(idle_process, &mut []),
@@ -130,16 +131,18 @@ pub fn schedule() {
 pub fn exit() -> ! {
     assert_no_lock();
 
-    let mut state = lock_sched!();
-    let (new_jmp_buf, new_current) =
-        match state.threads.pop_front() {
-            Some(front) => front,
-            None => panic!("exit({}): no more threads", state.current.id)
-        };
+    let new_jmp_buf = {
+        let mut state = lock_sched!();
+        let (new_jmp_buf, new_current) =
+            match state.threads.pop_front() {
+                Some(front) => front,
+                None => panic!("exit({}): no more threads", state.current.id)
+            };
 
-    let old_current = mem::replace(&mut state.current, new_current);
-    state.garbage_stacks.push(old_current.stack);
-    drop_write_guard(state);
+        let old_current = mem::replace(&mut state.current, new_current);
+        state.garbage_stacks.push(old_current.stack);
+        new_jmp_buf
+    };
 
     unsafe {
         libc::longjmp(&new_jmp_buf, 1);
