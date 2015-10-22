@@ -3,16 +3,16 @@ use arch::keyboard::Keyboard;
 use arch::vga_bochs;
 use arch::vga::Vga;
 use console::Console;
-use core::mem;
 use core::slice;
 use core::slice::bytes;
+use core::str;
 use elf::*;
 use io::{Read,Write};
-use miniz_sys as mz;
 use multiboot::multiboot_module_t;
 use phys_mem::{self,PhysicalBitmap};
 use prelude::*;
 use process::{KObj,Process};
+use ptr::Align;
 use syscall::{ErrNum,Handle,FileHandle,Handler,Result};
 use thread::{self,Deferred};
 use virt_mem::VirtualTree;
@@ -77,6 +77,64 @@ impl Handler for TestSyscallHandler {
     }
 }
 
+#[repr(C)]
+pub struct TarHeader {
+    pub filename: [u8; 100],
+    pub mode: [u8; 8],
+    pub uid: [u8; 8],
+    pub gid: [u8; 8],
+    pub size: [u8; 12],
+    pub mtime: [u8; 12],
+    pub chksum: [u8; 8],
+    pub typeflag: [u8; 1],
+}
+
+impl TarHeader {
+    pub fn parse_size(&self) -> usize {
+        let mut size = 0usize;
+        let mut j = 11;
+        let mut count = 1;
+
+        while j > 0 {
+            size += (self.size[j - 1] - ('0' as u8)) as usize * count;
+            j -= 1;
+            count *= 8;
+        }
+
+        size
+    }
+}
+
+fn nul_terminate(s: &[u8]) -> &[u8] {
+    match s.iter().position(|b| *b == 0) {
+        Some(index) => &s[0..index],
+        None => s
+    }
+}
+
+fn tar_locate<'a>(data: &'a [u8], filename: &str) -> Option<&'a [u8]> {
+    unsafe {
+        let mut ptr = data.as_ptr();
+        let end = ptr.offset(data.len() as isize);
+        while ptr < end {
+            let header = &*(ptr as *const TarHeader);
+            let size = header.parse_size();
+            let header_filename = nul_terminate(&header.filename[..]);
+            ptr = ptr.offset(512);
+
+            if let Ok(header_filename) = str::from_utf8(header_filename) {
+                if header_filename == filename {
+                    return Some(slice::from_raw_parts(ptr, size));
+                }
+            }
+
+            ptr = ptr.offset(Align::up(size, 512) as isize);
+        }
+
+        None
+    }
+}
+
 test! {
     fn can_run_hello_world() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
@@ -85,8 +143,7 @@ test! {
         thread::with_scheduler(p.clone(), || {
             p.switch();
 
-            let temp_slice;
-            unsafe {
+            let temp_slice = unsafe {
                 let info = phys_mem::multiboot_info();
 
                 let mods: &[multiboot_module_t] = slice::from_raw_parts(
@@ -99,21 +156,8 @@ test! {
                     phys_mem::phys2virt(mods[0].mod_start as usize),
                     (mods[0].mod_end - mods[0].mod_start) as usize);
 
-                assert_eq!(('P', 'K'), (mod_data[0] as char, mod_data[1] as char));
-
-                let mut zip = mem::zeroed();
-                assert!(mz::mz_zip_reader_init_mem(&mut zip, mod_data.as_ptr() as *const _, mod_data.len() as u64, 0));
-
-                let index = mz::mz_zip_reader_locate_file(&mut zip, b"hello\0" as *const _, 0 as *const _, 0);
-                assert!(index >= 0);
-
-                let index = index as u32;
-                let mut stat = mem::zeroed();
-                assert!(mz::mz_zip_reader_file_stat(&mut zip, index, &mut stat));
-                temp_slice = p.alloc::<u8>(stat.uncomp_size as usize, false, true).unwrap();
-                assert!(mz::mz_zip_reader_extract_to_mem(&mut zip, index, temp_slice.as_mut_ptr() as *mut _, temp_slice.len() as u64, 0));
-                mz::mz_zip_reader_end(&mut zip);
-            }
+                tar_locate(mod_data, "hello").expect("file 'hello' not found in initrd")
+            };
 
             let ehdr = unsafe { *(temp_slice.as_ptr() as *const Elf64_Ehdr) };
             assert_eq!([ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT], &ehdr.e_ident[0..7]);

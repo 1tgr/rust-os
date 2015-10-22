@@ -6,4 +6,4 @@ timeout 2
 
 title My kernel
 kernel /kernel
-module /initrd.zip
+module /initrd.tar.gz

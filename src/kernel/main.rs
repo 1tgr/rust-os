@@ -53,7 +53,6 @@ pub mod elf;
 pub mod io;
 pub mod libc_helpers;
 pub mod logging;
-pub mod miniz_sys;
 pub mod multiboot;
 pub mod once;
 pub mod phys_mem;
