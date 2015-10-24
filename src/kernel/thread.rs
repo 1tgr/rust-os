@@ -9,9 +9,11 @@ use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use libc::{self,jmp_buf};
 use mutex::{Mutex,MutexGuard};
+use phys_mem::PhysicalBitmap;
 use prelude::*;
 use process::Process;
 use singleton::Singleton;
+use virt_mem::VirtualTree;
 
 static SCHEDULER: Singleton<Mutex<SchedulerState>> = Singleton::new();
 
@@ -82,7 +84,11 @@ pub struct Deferred<A> {
     state: Arc<Mutex<DeferredState<A>>>
 }
 
-pub fn with_scheduler<F: FnOnce()>(idle_process: Arc<Process>, f: F) {
+pub fn with_scheduler<F: FnOnce()>(f: F) {
+    let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+    let kernel_virt = Arc::new(VirtualTree::for_kernel());
+    let idle_process = Arc::new(Process::new(phys, kernel_virt).unwrap());
+
     let state = SchedulerState {
         current: Thread::new(idle_process.clone(), &mut []),
         threads: VecDeque::new(),
@@ -289,29 +295,19 @@ impl<A> Deferred<A> {
 
 #[cfg(feature = "test")]
 pub mod test {
-    use alloc::arc::Arc;
-    use phys_mem::PhysicalBitmap;
     use prelude::*;
-    use process::Process;
     use super::*;
-    use virt_mem::VirtualTree;
 
     test! {
         fn can_spawn_exit_thread() {
-            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-            let kernel_virt = Arc::new(VirtualTree::new());
-            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-            with_scheduler(p, || {
+            with_scheduler(|| {
                 let d = spawn(|| 123);
                 assert_eq!(123, d.get());
             });
         }
 
         fn can_spawn_exit_two_threads() {
-            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-            let kernel_virt = Arc::new(VirtualTree::new());
-            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-            with_scheduler(p, || {
+            with_scheduler(|| {
                 let d1 = spawn(|| 456);
                 let d2 = spawn(|| 789);
                 assert_eq!(456, d1.get());
@@ -320,10 +316,7 @@ pub mod test {
         }
 
         fn can_closure() {
-            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-            let kernel_virt = Arc::new(VirtualTree::new());
-            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-            with_scheduler(p, || {
+            with_scheduler(|| {
                 let s = String::from("hello");
                 let d = spawn(move || (s + &" world").len() as i32);
                 assert_eq!(11, d.get());
@@ -331,10 +324,7 @@ pub mod test {
         }
 
         fn threads_can_spawn_more_threads() {
-            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-            let kernel_virt = Arc::new(VirtualTree::new());
-            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
-            with_scheduler(p, || {
+            with_scheduler(|| {
                 let thread2_fn = || 1234;
 
                 let thread1_fn = {

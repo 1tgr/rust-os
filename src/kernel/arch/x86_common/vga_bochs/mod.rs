@@ -1,7 +1,7 @@
 use arch::cpu;
 use arch::pci;
 use mutex::{StaticMutex,STATIC_MUTEX_INIT};
-use process::Process;
+use process;
 use syscall::{ErrNum,Result};
 
 static MUTEX: StaticMutex = STATIC_MUTEX_INIT;
@@ -21,7 +21,7 @@ unsafe fn vbe_write(index: u16, value: u16) {
    cpu::outw(VBE_DISPI_IOPORT_DATA, value);
 }
 
-pub fn init(p: &Process, xres: u16, yres: u16, bpp: u8) -> Result<&mut [u8]> {
+pub fn init(xres: u16, yres: u16, bpp: u8) -> Result<&'static mut [u8]> {
     let _d = lock!(MUTEX);
     unsafe {
         let bus_slot =
@@ -39,6 +39,6 @@ pub fn init(p: &Process, xres: u16, yres: u16, bpp: u8) -> Result<&mut [u8]> {
         vbe_write(VBE_DISPI_INDEX_ENABLE, VBE_DISPI_ENABLED | VBE_DISPI_LFB_ENABLED);
 
         let len = (xres as usize * yres as usize * bpp as usize) / 8;
-        p.map_phys(base_address as usize, len, true, true)
+        process::map_phys(base_address as usize, len, true, true)
     }
 }
