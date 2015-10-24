@@ -1,4 +1,5 @@
 use alloc::arc::Arc;
+use arch::cpu;
 use arch::keyboard::Keyboard;
 use arch::vga_bochs;
 use arch::vga::Vga;
@@ -7,7 +8,7 @@ use io::{Read,Write};
 use phys_mem::PhysicalBitmap;
 use process::{self,KObj,Process};
 use syscall::{ErrNum,Handle,FileHandle,Handler,Result};
-use thread;
+use thread::{self,Deferred};
 use virt_mem::VirtualTree;
 
 struct TestSyscallHandler {
@@ -68,6 +69,25 @@ impl Handler for TestSyscallHandler {
     }
 }
 
+impl<A> Deferred<A> {
+    fn poll(mut self) -> A {
+        loop {
+            match self.try_get() {
+                Ok(result) => {
+                    return result
+                },
+
+                Err(d) => {
+                    thread::schedule();
+                    assert!(cpu::interrupts_enabled());
+                    cpu::wait_for_interrupt();
+                    self = d;
+                }
+            }
+        }
+    }
+}
+
 test! {
     fn can_run_hello_world() {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
@@ -79,23 +99,8 @@ test! {
             };
 
             let _x = ::arch::thread::register_syscall_handler(handler);
-            let (_, mut deferred) = process::spawn("hello").unwrap();
-
-            let code;
-            loop {
-                match deferred.try_get() {
-                    Ok(n) => {
-                        code = n;
-                        break;
-                    },
-                    Err(d) => {
-                        deferred = d;
-                        thread::schedule();
-                    }
-                }
-            }
-
-            assert_eq!(0x1234, code);
+            let (_, deferred) = process::spawn("hello").unwrap();
+            assert_eq!(0x1234, deferred.poll());
         });
     }
 }

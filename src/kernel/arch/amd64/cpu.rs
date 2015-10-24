@@ -132,6 +132,10 @@ pub fn interrupts_enabled() -> bool {
     (rflags & (1 << 9)) != 0
 }
 
+pub fn wait_for_interrupt() {
+    unsafe { asm!("hlt") }
+}
+
 pub fn current_frame() -> *const usize {
     let rbp;
     unsafe { asm!("mov %rbp, $0" : "=r"(rbp)) };
