@@ -41,7 +41,8 @@ fn assert_no_lock() {
 struct Thread {
     id: usize,
     stack: &'static mut [u8],
-    process: Arc<Process>
+    process: Arc<Process>,
+    exited: Deferred<i32>
 }
 
 impl Thread {
@@ -50,7 +51,8 @@ impl Thread {
         Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             stack: stack,
-            process: process
+            process: process,
+            exited: Deferred::new()
         }
     }
 }
@@ -83,12 +85,13 @@ pub struct Deferred<A> {
 #[inline(never)] // hmm?
 pub fn with_scheduler<F: FnOnce()>(idle_process: Arc<Process>, f: F) {
     let state = SchedulerState {
-        current: Thread::new(idle_process, &mut []),
+        current: Thread::new(idle_process.clone(), &mut []),
         threads: VecDeque::new(),
         garbage_stacks: Vec::new()
     };
 
     let _d = SCHEDULER.register(Mutex::new(state));
+    unsafe { idle_process.switch() };
     f()
 }
 
@@ -100,12 +103,17 @@ macro_rules! lock_sched {
     () => (lock!(current_sched()))
 }
 
+pub fn current_process() -> Arc<Process> {
+    lock_sched!().current.process.clone()
+}
+
 pub fn schedule() {
     assert_no_lock();
 
     let mut state = lock_sched!();
     match state.threads.pop_front() {
         Some((new_jmp_buf, new_current)) => {
+            let new_process = new_current.process.clone();
             let old_current = mem::replace(&mut state.current, new_current);
 
             match setjmp() {
@@ -114,6 +122,8 @@ pub fn schedule() {
                     drop_write_guard(state);
 
                     unsafe {
+                        new_process.switch();
+                        mem::drop(new_process);
                         libc::longjmp(&new_jmp_buf, 1);
                     }
                 },
@@ -128,10 +138,13 @@ pub fn schedule() {
     };
 }
 
-pub fn exit() -> ! {
-    assert_no_lock();
+pub fn exit(code: i32) -> ! {
+    let exited = lock_sched!().current.exited.clone();
+    exited.resolve(code);
 
     let new_jmp_buf = {
+        assert_no_lock();
+
         let mut state = lock_sched!();
         let (new_jmp_buf, new_current) =
             match state.threads.pop_front() {
@@ -139,8 +152,10 @@ pub fn exit() -> ! {
                 None => panic!("exit({}): no more threads", state.current.id)
             };
 
+        let new_process = new_current.process.clone();
         let old_current = mem::replace(&mut state.current, new_current);
         state.garbage_stacks.push(old_current.stack);
+        unsafe { new_process.switch() };
         new_jmp_buf
     };
 
@@ -149,20 +164,23 @@ pub fn exit() -> ! {
     }
 }
 
-fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) {
+fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) -> Deferred<i32> {
     let stack_len = 4096;
     let stack_base_ptr = unsafe { heap::allocate(stack_len, 16) };
     let b: Box<FnBox() + 'a> = Box::new(start);
     let jmp_buf = thread::new_jmp_buf(b, unsafe { stack_base_ptr.offset(stack_len as isize) });
     let thread = Thread::new(process, unsafe { slice::from_raw_parts_mut(stack_base_ptr, stack_len) });
+    let exited = thread.exited.clone();
 
     {
         let mut state = lock_sched!();
         state.threads.push_back((jmp_buf, thread));
     }
+
+    exited
 }
 
-pub fn spawn_user_mode(pc: *const u8, stack: &mut [u8]) {
+pub fn spawn_user_mode(pc: *const u8, stack: &mut [u8]) -> Deferred<i32> {
     let stack_ptr = stack.as_mut_ptr();
     let stack_len = stack.len();
 
@@ -177,23 +195,12 @@ pub fn spawn_user_mode(pc: *const u8, stack: &mut [u8]) {
     spawn_inner(process, Box::new(start))
 }
 
-pub fn spawn_remote<T, A>(process: Arc<Process>, start: T) -> Deferred<A> where T : FnOnce() -> A {
-    let d = Deferred::new();
-
-    let start = {
-        let d = d.clone();
-        move || {
-            let result = start();
-            d.resolve(result);
-            exit();
-        }
-    };
-
-    spawn_inner(process, Box::new(start));
-    d
+pub fn spawn_remote<T>(process: Arc<Process>, start: T) -> Deferred<i32> where T : FnOnce() -> i32 {
+    let start = || { exit(start()) };
+    spawn_inner(process, Box::new(start))
 }
 
-pub fn spawn<T, A>(start: T) -> Deferred<A> where T : FnOnce() -> A {
+pub fn spawn<T>(start: T) -> Deferred<i32> where T : FnOnce() -> i32 {
     let process = lock_sched!().current.process.clone();
     spawn_remote(process, start)
 }
@@ -247,6 +254,7 @@ impl<A> Deferred<A> {
                     None => panic!("block({}): no more threads", state.current.id)
                 };
 
+            let new_process = new_current.process.clone();
             let old_current = mem::replace(&mut state.current, new_current);
 
             match setjmp() {
@@ -256,6 +264,8 @@ impl<A> Deferred<A> {
                     drop_write_guard(dstate);
 
                     unsafe {
+                        new_process.switch();
+                        mem::drop(new_process);
                         libc::longjmp(&new_jmp_buf, 1);
                     }
                 },
@@ -316,8 +326,8 @@ pub mod test {
             let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
             with_scheduler(p, || {
                 let s = String::from("hello");
-                let d = spawn(move || s + &" world");
-                assert_eq!("hello world", d.get());
+                let d = spawn(move || (s + &" world").len() as i32);
+                assert_eq!(11, d.get());
             });
         }
 

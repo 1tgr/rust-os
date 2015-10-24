@@ -1,12 +1,17 @@
 use alloc::arc::Arc;
 use arch::process::ArchProcess;
+use arch::thread as arch_thread;
 use core::mem;
-use core::slice;
+use core::slice::{self,bytes};
+use elf::*;
 use io::{AsyncRead,Read,Write};
+use multiboot::multiboot_module_t;
 use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use prelude::*;
 use syscall::{ErrNum,Handle,Result};
+use tar;
+use thread::{self,Deferred};
 use virt_mem::VirtualTree;
 
 pub trait KObj {
@@ -69,7 +74,7 @@ impl Process {
         })
     }
 
-    pub fn switch(&self) {
+    pub unsafe fn switch(&self) {
         self.arch.switch();
     }
 
@@ -136,31 +141,147 @@ impl Process {
     }
 }
 
+pub fn spawn(executable: &str) -> Result<(Arc<Process>, Deferred<i32>)> {
+    let parent = thread::current_process();
+    let process = Arc::new(try!(Process::new(parent.phys.clone(), parent.kernel_virt.clone())));
+
+    let init_in_new_process = {
+        let process = process.clone();
+        move || {
+            let image_slice = unsafe {
+                let info = phys_mem::multiboot_info();
+
+                let mods: &[multiboot_module_t] = slice::from_raw_parts(
+                    phys_mem::phys2virt(info.mods_addr as usize),
+                    info.mods_count as usize);
+
+                assert_eq!(1, mods.len());
+
+                let mod_data: &[u8] = slice::from_raw_parts(
+                    phys_mem::phys2virt(mods[0].mod_start as usize),
+                    (mods[0].mod_end - mods[0].mod_start) as usize);
+
+                tar::locate(mod_data, executable).expect("file not found") // TODO
+            };
+
+            let (entry, stack_slice) = {
+                let ehdr = unsafe { *(image_slice.as_ptr() as *const Elf64_Ehdr) };
+                assert_eq!([ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT], &ehdr.e_ident[0..7]);
+                assert_eq!((ET_EXEC, EM_X86_64), (ehdr.e_type, ehdr.e_machine));
+
+                let entry = ehdr.e_entry as *const u8;
+                log!("entry point is {:p}", entry);
+
+                let mut slices = Vec::new();
+                for i in 0..ehdr.e_phnum {
+                    let phdr_offset = ehdr.e_phoff as isize + (i as isize) * (ehdr.e_phentsize as isize);
+                    let phdr = unsafe { *(image_slice.as_ptr().offset(phdr_offset) as *const Elf64_Phdr) };
+                    if phdr.p_type != PT_LOAD {
+                        continue;
+                    }
+
+                    log!("segment {}: {:x} bytes @ {:p} (file: {:x} bytes @ {:x})", i, phdr.p_memsz, phdr.p_vaddr as *mut u8, phdr.p_filesz, phdr.p_offset);
+                    assert!(phdr.p_memsz >= phdr.p_filesz);
+                    let slice = unsafe { process.alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
+                    let file_slice = &image_slice[phdr.p_offset as usize .. (phdr.p_offset + phdr.p_filesz) as usize];
+                    bytes::copy_memory(file_slice, slice);
+                    slices.push(slice);
+                }
+
+                assert!(slices.iter().any(|ref slice| {
+                    let slice_end = unsafe { slice.as_ptr().offset(slice.len() as isize) };
+                    entry >= slice.as_ptr() && entry < slice_end
+                }));
+
+                let stack_slice = process.alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+                log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
+                (entry, stack_slice)
+            };
+
+            unsafe { arch_thread::jmp_user_mode(entry, stack_slice.as_mut_ptr().offset(stack_slice.len() as isize)) }
+            // TODO: free stack
+        }
+    };
+
+    Ok((process.clone(), thread::spawn_remote(process, init_in_new_process)))
+}
+
 #[cfg(feature = "test")]
 pub mod test {
     use alloc::arc::Arc;
     use core::intrinsics;
     use phys_mem::PhysicalBitmap;
     use super::*;
+    use thread;
     use virt_mem::VirtualTree;
 
     test!{
         fn can_alloc() {
             let phys = Arc::new(PhysicalBitmap::parse_multiboot());
             let kernel_virt = Arc::new(VirtualTree::for_kernel());
-            let p = Process::new(phys, kernel_virt).unwrap();
-            p.switch();
-
-            let len = 4096;
-            let slice = p.alloc::<u16>(len, false, true).unwrap();
-            let sentinel = 0xaa55;
-            for i in 0..len {
-                let ptr = &mut slice[i] as *mut u16;
-                unsafe {
-                    intrinsics::volatile_store(ptr, sentinel);
-                    assert_eq!(sentinel, intrinsics::volatile_load(ptr));
+            let p = Arc::new(Process::new(phys, kernel_virt).unwrap());
+            thread::with_scheduler(p.clone(), || {
+                let len = 4096;
+                let slice = p.alloc::<u16>(len, false, true).unwrap();
+                let sentinel = 0xaa55;
+                for i in 0..len {
+                    let ptr = &mut slice[i] as *mut u16;
+                    unsafe {
+                        intrinsics::volatile_store(ptr, sentinel);
+                        assert_eq!(sentinel, intrinsics::volatile_load(ptr));
+                    }
                 }
-            }
+            });
         }
+
+        fn user_addresses_are_separate() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::for_kernel());
+            let idle_process = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+            thread::with_scheduler(idle_process.clone(), || {
+                let p1 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+                let p2 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+
+                let d1 = thread::spawn_remote(p1.clone(), || unsafe {
+                    let slice = p1.alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
+                    assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
+                    intrinsics::volatile_store(slice.as_mut_ptr(), 123);
+                    0
+                });
+
+                let d2 = thread::spawn_remote(p2.clone(), || unsafe {
+                    let slice = p2.alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
+                    assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
+                    intrinsics::volatile_store(slice.as_mut_ptr(), 456);
+                    0
+                });
+
+                d1.get();
+                d2.get();
+            });
+        }
+
+        /*fn kernel_addresses_are_shared() {
+            let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+            let kernel_virt = Arc::new(VirtualTree::for_kernel());
+            let idle_process = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+            thread::with_scheduler(idle_process.clone(), || {
+                let p1 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+                let p2 = Arc::new(Process::new(phys.clone(), kernel_virt.clone()).unwrap());
+                let slice = idle_process.alloc(0x1000, false, true).unwrap();
+                unsafe { intrinsics::volatile_store(slice.as_mut_ptr(), 123) };
+
+                let d1 = thread::spawn_remote(p1.clone(), || unsafe {
+                    assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
+                });
+
+                let d2 = thread::spawn_remote(p2.clone(), || unsafe {
+                    assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
+                });
+
+                d1.get();
+                d2.get();
+            });
+        } */
     }
 }

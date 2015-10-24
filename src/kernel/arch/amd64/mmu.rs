@@ -230,13 +230,15 @@ impl AddressSpace {
         })
     }
 
-    pub fn switch(&self) {
-        let _x = lock!(self.mutex);
-        log!("switch: {:x} -> {:x}", recursive_pml4_addr(), self.cr3);
-        unsafe { cpu::write_cr3(self.cr3) };
+    pub unsafe fn switch(&self) {
+        if cpu::read_cr3() != self.cr3 {
+            let _x = lock!(self.mutex);
+            log!("switch: {:x} -> {:x}", recursive_pml4_addr(), self.cr3);
+            cpu::write_cr3(self.cr3);
+        }
     }
 
-    pub fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
+    pub unsafe fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
         let _x = lock!(self.mutex);
         let pml4_entry = pml4_entry(ptr);
         let pdpt_entry = pdpt_entry(ptr);
@@ -299,7 +301,7 @@ pub mod test {
         fn can_switch() {
             let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
             let address_space = AddressSpace::new(bitmap).unwrap();
-            address_space.switch();
+            unsafe { address_space.switch() };
         }
 
         fn can_map_user() {
@@ -307,12 +309,12 @@ pub mod test {
             let ptr1 = 0x1000 as *mut u16;
             let addr = bitmap.alloc_page().unwrap();
             let address_space = AddressSpace::new(bitmap).unwrap();
-            address_space.switch();
-            address_space.map(ptr1, addr, false, true).unwrap();
-
-            let ptr2 = unsafe { phys_mem::phys2virt(addr) };
-            let sentinel = 0x55aa;
             unsafe {
+                address_space.switch();
+                address_space.map(ptr1, addr, false, true).unwrap();
+
+                let ptr2 = phys_mem::phys2virt(addr);
+                let sentinel = 0x55aa;
                 intrinsics::volatile_store(ptr1, sentinel);
                 assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
             }
@@ -325,12 +327,12 @@ pub mod test {
             let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
             let addr = bitmap.alloc_page().unwrap();
             let address_space = AddressSpace::new(bitmap).unwrap();
-            address_space.switch();
-            address_space.map(ptr1, addr, false, true).unwrap();
-
-            let ptr2 = unsafe { phys_mem::phys2virt(addr) };
-            let sentinel = 0x55aa;
             unsafe {
+                address_space.switch();
+                address_space.map(ptr1, addr, false, true).unwrap();
+
+                let ptr2 = phys_mem::phys2virt(addr);
+                let sentinel = 0x55aa;
                 intrinsics::volatile_store(ptr1, sentinel);
                 assert_eq!(sentinel, intrinsics::volatile_load(ptr2));
             }

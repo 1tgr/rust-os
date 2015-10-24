@@ -60,6 +60,7 @@ pub mod prelude;
 pub mod process;
 pub mod ptr;
 pub mod singleton;
+pub mod tar;
 pub mod thread;
 pub mod unwind;
 pub mod virt_mem;
@@ -78,10 +79,11 @@ fn run_tests() {
         arch::mmu::test::TESTS,
         device::test::TESTS,
         phys_mem::test::TESTS,
-        process::test::TESTS,
-        thread::test::TESTS,
         virt_mem::test::TESTS,
 
+        thread::test::TESTS,
+
+        process::test::TESTS,
         demo::TESTS
     ];
 
