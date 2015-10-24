@@ -82,7 +82,6 @@ pub struct Deferred<A> {
     state: Arc<Mutex<DeferredState<A>>>
 }
 
-#[inline(never)] // hmm?
 pub fn with_scheduler<F: FnOnce()>(idle_process: Arc<Process>, f: F) {
     let state = SchedulerState {
         current: Thread::new(idle_process.clone(), &mut []),
