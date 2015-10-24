@@ -78,10 +78,11 @@ fn run_tests() {
         arch::mmu::test::TESTS,
         device::test::TESTS,
         phys_mem::test::TESTS,
-        process::test::TESTS,
-        thread::test::TESTS,
         virt_mem::test::TESTS,
 
+        thread::test::TESTS,
+
+        process::test::TESTS,
         demo::TESTS
     ];
 

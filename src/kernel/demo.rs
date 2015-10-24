@@ -14,42 +14,39 @@ use prelude::*;
 use process::{KObj,Process};
 use ptr::Align;
 use syscall::{ErrNum,Handle,FileHandle,Handler,Result};
-use thread::{self,Deferred};
+use thread;
 use virt_mem::VirtualTree;
 
 struct TestSyscallHandler {
-    console: Arc<Console>,
-    deferred: Deferred<i32>,
-    process: Arc<Process>
+    console: Arc<Console>
 }
 
 impl Handler for TestSyscallHandler {
     fn exit_thread(&self, code: i32) -> Result<()> {
-        self.deferred.resolve(code);
-        thread::exit()
+        thread::exit(code)
     }
 
     fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<usize> {
-        let kobj = try!(self.process.resolve_handle(file).ok_or(ErrNum::InvalidHandle));
+        let kobj = try!(thread::current_process().resolve_handle(file).ok_or(ErrNum::InvalidHandle));
         let file: &Write = try!(kobj.write().ok_or(ErrNum::NotSupported));
         file.write(bytes)
     }
 
     fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize> {
-        let kobj = try!(self.process.resolve_handle(file).ok_or(ErrNum::InvalidHandle));
+        let kobj = try!(thread::current_process().resolve_handle(file).ok_or(ErrNum::InvalidHandle));
         let file: &Read = try!(kobj.read().ok_or(ErrNum::NotSupported));
         file.read(buf)
     }
 
     fn alloc_pages(&self, len: usize) -> Result<*mut u8> {
-        match self.process.alloc(len, true, true) {
+        match thread::current_process().alloc(len, true, true) {
             Ok(slice) => Ok(slice.as_mut_ptr()),
             Err(_) => Err(ErrNum::OutOfMemory)
         }
     }
 
     fn free_pages(&self, p: *mut u8) -> Result<bool> {
-        Ok(self.process.free(p))
+        Ok(thread::current_process().free(p))
     }
 
     fn open(&self, filename: &str) -> Result<FileHandle> {
@@ -60,11 +57,11 @@ impl Handler for TestSyscallHandler {
                 _ => { return Err(ErrNum::FileNotFound) }
             };
 
-        Ok(self.process.make_handle(file))
+        Ok(thread::current_process().make_handle(file))
     }
 
     fn close(&self, handle: Handle) -> Result<()> {
-        if !self.process.close_handle(handle) {
+        if !thread::current_process().close_handle(handle) {
             return Err(ErrNum::InvalidHandle)
         }
 
@@ -72,7 +69,8 @@ impl Handler for TestSyscallHandler {
     }
 
     fn init_video_mode(&self, width: u16, height: u16, bpp: u8) -> Result<*mut u8> {
-        let slice = try!(vga_bochs::init(&*self.process, width, height, bpp));
+        let process = thread::current_process();
+        let slice = try!(vga_bochs::init(&*process, width, height, bpp));
         Ok(slice.as_mut_ptr())
     }
 }
@@ -188,16 +186,12 @@ test! {
             let stack_slice = p.alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
             log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
 
-            let mut deferred = Deferred::new();
-
             let handler = TestSyscallHandler {
-                console: Arc::new(Console::new(Arc::new(Keyboard::new()), Arc::new(Vga::new()))),
-                deferred: deferred.clone(),
-                process: p.clone()
+                console: Arc::new(Console::new(Arc::new(Keyboard::new()), Arc::new(Vga::new())))
             };
 
             let _x = ::arch::thread::register_syscall_handler(handler);
-            thread::spawn_user_mode(entry, stack_slice);
+            let mut deferred = thread::spawn_user_mode(entry, stack_slice);
 
             let code;
             loop {

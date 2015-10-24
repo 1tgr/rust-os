@@ -176,12 +176,14 @@ pub mod test {
                     let slice = p1.alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
+                    0
                 });
 
                 let d2 = thread::spawn_remote(p2.clone(), || unsafe {
                     let slice = p2.alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 456);
+                    0
                 });
 
                 d1.get();
