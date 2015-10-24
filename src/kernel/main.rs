@@ -60,6 +60,7 @@ pub mod prelude;
 pub mod process;
 pub mod ptr;
 pub mod singleton;
+pub mod tar;
 pub mod thread;
 pub mod unwind;
 pub mod virt_mem;
