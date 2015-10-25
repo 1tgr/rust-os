@@ -1,0 +1,12 @@
+include_rules
+
+LIBS += $(ROOT)/cairo/lib/libcairo.a
+LIBS += $(ROOT)/cairo/lib/libpixman-1.a
+LIBS += $(ROOT)/cairo/lib/libpng16.a
+LIBS += $(ROOT)/cairo/lib/libz.a
+LIBS += $(ROOT)/newlib/$(TARGET)/lib/libm.a
+
+: main.rs | $(LIBS) |> !RUSTC_OBJ |> cairo_demo.o {objs}
+: {objs} $(LIBS) $(LIBS1) | $(ROOT)/libsyscall/arch/@(ARCH)/link.ld |> !LD |> cairo_demo-debug
+: cairo_demo-debug |> $(OBJCOPY) -S %f %o |> cairo_demo
+: cairo_demo-debug |> $(OBJDUMP) -d %f > %o |> cairo_demo.txt

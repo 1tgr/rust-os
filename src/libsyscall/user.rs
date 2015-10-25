@@ -1,4 +1,5 @@
-use marshal::{ErrNum,PackedArgs,SyscallArgs,SyscallResult};
+use super::ErrNum;
+use marshal::{PackedArgs,SyscallArgs,SyscallResult};
 
 pub unsafe fn syscall<T: SyscallArgs, U: SyscallResult>(num: u32, args: T) -> Result<U, ErrNum> {
     let mut args_vec = PackedArgs::new();

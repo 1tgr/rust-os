@@ -5,8 +5,9 @@ use arch::vga_bochs;
 use arch::vga::Vga;
 use console::Console;
 use io::{Read,Write};
+use prelude::*;
 use process::{self,KObj};
-use syscall::{ErrNum,Handle,FileHandle,Handler,Result};
+use syscall::{ErrNum,Handle,FileHandle,Handler,ProcessHandle,Result};
 use thread::{self,Deferred};
 
 struct TestSyscallHandler {
@@ -64,6 +65,18 @@ impl Handler for TestSyscallHandler {
         let slice = try!(vga_bochs::init(width, height, bpp));
         Ok(slice.as_mut_ptr())
     }
+
+    fn spawn(&self, executable: &str) -> Result<ProcessHandle> {
+        let executable = String::from(executable);
+        let (_, deferred) = try!(process::spawn(executable));
+        Ok(process::make_handle(Arc::new(deferred)))
+    }
+
+    fn wait_for_exit(&self, process: ProcessHandle) -> Result<i32> {
+        let kobj = try!(process::resolve_handle(process).ok_or(ErrNum::InvalidHandle));
+        let deferred: &Deferred<i32> = try!(kobj.deferred_i32().ok_or(ErrNum::NotSupported));
+        Ok((*deferred).clone().get())
+    }
 }
 
 impl<A> Deferred<A> {
@@ -93,8 +106,8 @@ test! {
             };
 
             let _x = ::arch::thread::register_syscall_handler(handler);
-            let (_, deferred) = process::spawn("hello").unwrap();
-            assert_eq!(0x1234, deferred.poll());
+            let (_, deferred) = process::spawn(String::from("hello")).unwrap();
+            deferred.poll();
         });
     }
 }

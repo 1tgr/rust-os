@@ -6,7 +6,7 @@ macro_rules! syscalls {
             fn $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty => $num:expr
         ),+
     ) => {
-        use $crate::marshal::ErrNum;
+        use $crate::ErrNum;
 
         #[allow(non_camel_case_types)]
         enum Num {
@@ -32,8 +32,9 @@ macro_rules! syscalls {
             fn $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty => $num:expr
         ),+
     ) => {
+        use $crate::ErrNum;
         use $crate::kernel::Dispatch;
-        use $crate::marshal::{ErrNum,PackedArgs,SyscallArgs,SyscallResult};
+        use $crate::marshal::{PackedArgs,SyscallArgs,SyscallResult};
         use core::fmt::Write;
 
         pub trait Handler {

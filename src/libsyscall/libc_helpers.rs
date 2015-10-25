@@ -1,4 +1,5 @@
 use libc::{c_char,c_int,c_void,size_t,ssize_t,off_t,mode_t};
+use super::{Handle,Result};
 
 static mut ERRNO: u32 = 0;
 
@@ -8,6 +9,8 @@ extern {
 }
 
 static mut errno: c_int = 0;
+pub static mut stdin: Handle = 0;
+pub static mut stdout: Handle = 0;
 
 #[no_mangle]
 pub unsafe extern fn __errno() -> *mut c_int {
@@ -96,10 +99,33 @@ pub unsafe extern fn unlink(_c: *const c_char) -> c_int {
     panic!("unlink was called")
 }
 
-pub unsafe fn init() {
+unsafe fn init() -> Result<()> {
     let mut ptr = &init_array_start as *const _;
     while ptr < &init_array_end {
         (*ptr)();
         ptr = ptr.offset(1);
     }
+
+    stdin = try!(super::open("stdin"));
+    stdout = try!(super::open("stdout"));
+    Ok(())
+}
+
+extern {
+    fn main() -> i32;
+}
+
+#[no_mangle]
+pub unsafe extern fn start() {
+    let result = init().and_then(|()| Ok(main()));
+    let _ = super::close(stdin);
+    let _ = super::close(stdout);
+
+    let code =
+        match result {
+            Ok(code) => code,
+            Err(num) => -(num as i32)
+        };
+
+    let _ = super::exit_thread(code);
 }

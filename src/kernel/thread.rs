@@ -2,6 +2,7 @@ use alloc::arc::Arc;
 use alloc::boxed::FnBox;
 use alloc::heap;
 use arch::cpu;
+use arch::isr;
 use arch::thread;
 use collections::vec_deque::VecDeque;
 use core::mem;
@@ -11,7 +12,8 @@ use libc::{self,jmp_buf};
 use mutex::{Mutex,MutexGuard};
 use phys_mem::PhysicalBitmap;
 use prelude::*;
-use process::Process;
+use process::{Process,KObj};
+use ptr::Align;
 use singleton::Singleton;
 use virt_mem::VirtualTree;
 
@@ -40,6 +42,18 @@ fn assert_no_lock() {
     assert!(cpu::interrupts_enabled());
 }
 
+struct HWToken {
+    process: Arc<Process>,
+    stack_ptr: *mut u8
+}
+
+impl HWToken {
+    pub unsafe fn switch(self) {
+        self.process.switch();
+        isr::set_kernel_stack(self.stack_ptr);
+    }
+}
+
 struct Thread {
     id: usize,
     stack: &'static mut [u8],
@@ -55,6 +69,13 @@ impl Thread {
             stack: stack,
             process: process,
             exited: Deferred::new()
+        }
+    }
+
+    pub fn hw_token(&mut self) -> HWToken {
+        HWToken {
+            process: self.process.clone(),
+            stack_ptr: Align::down(unsafe { self.stack.as_mut_ptr().offset(self.stack.len() as isize) }, 16)
         }
     }
 }
@@ -117,23 +138,22 @@ pub fn schedule() {
 
     let mut state = lock_sched!();
     match state.threads.pop_front() {
-        Some((new_jmp_buf, new_current)) => {
-            let new_process = new_current.process.clone();
+        Some((new_jmp_buf, mut new_current)) => {
+            let new_token = new_current.hw_token();
             let old_current = mem::replace(&mut state.current, new_current);
 
             match setjmp() {
                 Some(old_jmp_buf) => {
                     state.threads.push_back((old_jmp_buf, old_current));
+
+                    unsafe { new_token.switch(); }
                     drop_write_guard(state);
 
-                    unsafe {
-                        new_process.switch();
-                        mem::drop(new_process);
-                        libc::longjmp(&new_jmp_buf, 1);
-                    }
+                    unsafe { libc::longjmp(&new_jmp_buf, 1); }
                 },
 
                 None => {
+                    mem::forget(new_token);
                     forget_write_guard(state);
                 }
             }
@@ -151,16 +171,16 @@ pub fn exit(code: i32) -> ! {
         assert_no_lock();
 
         let mut state = lock_sched!();
-        let (new_jmp_buf, new_current) =
+        let (new_jmp_buf, mut new_current) =
             match state.threads.pop_front() {
                 Some(front) => front,
                 None => panic!("exit({}): no more threads", state.current.id)
             };
 
-        let new_process = new_current.process.clone();
+        let new_token = new_current.hw_token();
         let old_current = mem::replace(&mut state.current, new_current);
         state.garbage_stacks.push(old_current.stack);
-        unsafe { new_process.switch() };
+        unsafe { new_token.switch(); }
         new_jmp_buf
     };
 
@@ -249,33 +269,32 @@ impl<A> Deferred<A> {
             let mut dstate = lock!(self.state);
             match mem::replace(&mut dstate.result, None) {
                 Some(result) => { return result; },
-                None => { }
+                None => (),
             }
 
             let mut state = lock_sched!();
-            let (new_jmp_buf, new_current) =
+            let (new_jmp_buf, mut new_current) =
                 match state.threads.pop_front() {
                     Some(front) => front,
                     None => panic!("block({}): no more threads", state.current.id)
                 };
 
-            let new_process = new_current.process.clone();
+            let new_token = new_current.hw_token();
             let old_current = mem::replace(&mut state.current, new_current);
 
             match setjmp() {
                 Some(old_jmp_buf) => {
                     dstate.waiters.push_back((old_jmp_buf, old_current));
+
+                    unsafe { new_token.switch(); }
                     drop_write_guard(state);
                     drop_write_guard(dstate);
 
-                    unsafe {
-                        new_process.switch();
-                        mem::drop(new_process);
-                        libc::longjmp(&new_jmp_buf, 1);
-                    }
+                    unsafe { libc::longjmp(&new_jmp_buf, 1); }
                 },
 
                 None => {
+                    mem::forget(new_token);
                     forget_write_guard(state);
                     forget_write_guard(dstate);
                 }
@@ -290,6 +309,12 @@ impl<A> Deferred<A> {
         };
 
         opt.ok_or(self)
+    }
+}
+
+impl KObj for Deferred<i32> {
+    fn deferred_i32(&self) -> Option<&Self> {
+        Some(self)
     }
 }
 

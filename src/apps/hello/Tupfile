@@ -1,0 +1,6 @@
+include_rules
+
+: main.rs | $(LIBS) |> !RUSTC_OBJ |> hello.o {objs}
+: {objs} $(LIBS) $(LIBS1) | $(ROOT)/libsyscall/arch/@(ARCH)/link.ld |> !LD |> hello-debug
+: hello-debug |> $(OBJCOPY) -S %f %o |> hello
+: hello-debug |> $(OBJDUMP) -d %f > %o |> hello.txt

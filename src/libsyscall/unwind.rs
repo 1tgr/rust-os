@@ -1,6 +1,6 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * unwind.rs
  * - Stack unwind (panic) handling
@@ -9,7 +9,7 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
-use std::fmt::Arguments;
+use core::fmt::Arguments;
 
 #[cfg(not(test))]
 #[lang="panic_fmt"]
@@ -81,4 +81,3 @@ pub fn _Unwind_Resume()
 {
 	loop{}
 }
-

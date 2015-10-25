@@ -18,8 +18,6 @@ extern {
     static interrupt_handlers_end: u8;
 }
 
-static mut syscall_stack: [u8; 4096] = [0; 4096];
-
 lazy_static! {
     static ref IRQ_HANDLERS: Vec<Singleton<Box<Fn() + 'static>>> = {
         let mut v: Vec<Singleton<Box<Fn() + 'static>>> = Vec::new();
@@ -89,7 +87,6 @@ pub fn init_once() {
         GDT_TSS.limit_high_and_flags = 0x10;
 
         TSS = Default::default();
-        TSS.rsp0 = Align::down(&syscall_stack as *const _ as usize + mem::size_of_val(&syscall_stack), 16) as u64;
         TSS.iopm_len = mem::size_of::<Tss>() as u16;
 
         cpu::ltr(tss_selector);
@@ -136,6 +133,11 @@ pub fn init_once() {
 
         cpu::sti();
     });
+}
+
+pub unsafe fn set_kernel_stack(ptr: *mut u8) {
+    assert!(Align::is_aligned(ptr, 16));
+    TSS.rsp0 = ptr as u64;
 }
 
 #[no_mangle]

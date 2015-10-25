@@ -1,7 +1,7 @@
 use core::mem;
-use core::result;
-use core::str::{self,StrExt};
 use core::slice;
+use core::str::{self,StrExt};
+use super::{ErrNum,Result};
 
 struct TupleDeque6<T> {
     tuple: (T, T, T, T, T, T),
@@ -30,6 +30,7 @@ impl<T: Default> TupleDeque6<T> {
 }
 
 impl<T> TupleDeque6<T> {
+    #[allow(dead_code)]
     pub fn from_tuple(tuple: (T, T, T, T, T, T)) -> Self {
         TupleDeque6 {
             tuple: tuple,
@@ -54,21 +55,7 @@ impl<T> TupleDeque6<T> {
     }
 }
 
-#[repr(usize)]
-#[derive(Debug, Eq, PartialEq)]
-pub enum ErrNum {
-    Utf8Error = 1,
-    OutOfMemory = 2,
-    InvalidHandle = 3,
-    NotSupported = 4,
-    FileNotFound = 5,
-    InvalidArgument = 6,
-}
-
-pub type Handle = usize;
-pub type FileHandle = Handle;
 pub type PackedArgs = TupleDeque6<usize>;
-pub type Result<T> = result::Result<T, ErrNum>;
 
 pub trait SyscallArgs : Sized {
     fn as_args(self, args: &mut PackedArgs);
@@ -289,13 +276,33 @@ impl SyscallResult for bool {
     }
 }
 
+impl SyscallResult for i32 {
+    fn as_result(self) -> isize {
+        self as isize
+    }
+
+    fn from_result(value: isize) -> Self {
+        value as Self
+    }
+}
+
+impl SyscallResult for u32 {
+    fn as_result(self) -> isize {
+        self as isize
+    }
+
+    fn from_result(value: isize) -> Self {
+        value as Self
+    }
+}
+
 impl SyscallResult for usize {
     fn as_result(self) -> isize {
         self as isize
     }
 
     fn from_result(value: isize) -> Self {
-        value as usize
+        value as Self
     }
 }
 

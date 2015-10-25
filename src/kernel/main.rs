@@ -111,5 +111,7 @@ pub unsafe fn kmain() -> ! {
     arch::isr::init_once();
     libc_helpers::init();
     run_tests();
-    loop { }
+    loop {
+        arch::cpu::wait_for_interrupt();
+    }
 }

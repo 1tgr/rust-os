@@ -1,4 +1,4 @@
-use marshal::FileHandle;
+use super::{FileHandle,Handle,ProcessHandle};
 
 syscalls! {
     /// Exits the current thread.
@@ -13,8 +13,8 @@ syscalls! {
     /// Opens a file.
     fn open(filename: &'a str) -> FileHandle => 3,
 
-    /// Closes a file opened by `open`.
-    fn close(file: FileHandle) -> () => 4,
+    /// Closes a handle.
+    fn close(file: Handle) -> () => 4,
 
     /// Writes to a file.
     fn write(file: FileHandle, buf: &'a [u8]) -> usize => 5,
@@ -22,5 +22,7 @@ syscalls! {
     /// Reads from a file.
     fn read(file: FileHandle, buf: &'a mut [u8]) -> usize => 6,
 
-    fn init_video_mode(width: u16, height: u16, bpp: u8) -> *mut u8 => 7
+    fn init_video_mode(width: u16, height: u16, bpp: u8) -> *mut u8 => 7,
+    fn spawn(executable: &str) -> ProcessHandle => 8,
+    fn wait_for_exit(process: ProcessHandle) -> i32 => 9
 }

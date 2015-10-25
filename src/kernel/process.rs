@@ -19,6 +19,7 @@ pub trait KObj {
     fn async_read(&self) -> Option<&AsyncRead> { None }
     fn read(&self) -> Option<&Read> { None }
     fn write(&self) -> Option<&Write> { None }
+    fn deferred_i32(&self) -> Option<&Deferred<i32>> { None }
 }
 
 struct ProcessState {
@@ -75,9 +76,8 @@ impl Process {
         })
     }
 
-    pub fn spawn() -> Result<Self> {
-        let parent = thread::current_process();
-        Process::new(parent.phys.clone(), parent.kernel_virt.clone())
+    pub fn spawn(&self) -> Result<Self> {
+        Process::new(self.phys.clone(), self.kernel_virt.clone())
     }
 
     pub unsafe fn switch(&self) {
@@ -113,8 +113,8 @@ impl Process {
     }
 }
 
-pub fn spawn(executable: &str) -> Result<(Arc<Process>, Deferred<i32>)> {
-    let process = Arc::new(try!(Process::spawn()));
+pub fn spawn(executable: String) -> Result<(Arc<Process>, Deferred<i32>)> {
+    let process = Arc::new(try!(thread::current_process().spawn()));
 
     let init_in_new_process = move || {
         let image_slice = unsafe {
@@ -130,8 +130,10 @@ pub fn spawn(executable: &str) -> Result<(Arc<Process>, Deferred<i32>)> {
                 phys_mem::phys2virt(mods[0].mod_start as usize),
                 (mods[0].mod_end - mods[0].mod_start) as usize);
 
-            tar::locate(mod_data, executable).expect("file not found") // TODO
+            tar::locate(mod_data, &executable).expect("file not found") // TODO
         };
+
+        mem::drop(executable);
 
         let (entry, stack_slice) = {
             let ehdr = unsafe { *(image_slice.as_ptr() as *const Elf64_Ehdr) };
@@ -245,8 +247,9 @@ pub mod test {
 
         fn user_addresses_are_separate() {
             thread::with_scheduler(|| {
-                let p1 = Arc::new(Process::spawn().unwrap());
-                let p2 = Arc::new(Process::spawn().unwrap());
+                let p = thread::current_process();
+                let p1 = Arc::new(p.spawn().unwrap());
+                let p2 = Arc::new(p.spawn().unwrap());
 
                 let d1 = thread::spawn_remote(p1, || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
