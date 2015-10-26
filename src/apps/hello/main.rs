@@ -54,7 +54,9 @@ pub fn main() -> i32 {
                 if line == "exit" {
                     return 0;
                 } else if line.len() > 0 {
-                    println!("spawn({})", line);
+                    let handle = syscall::spawn(&line).unwrap();
+                    let _ = syscall::wait_for_exit(handle);
+                    let _ = syscall::close(handle);
                 }
             },
 

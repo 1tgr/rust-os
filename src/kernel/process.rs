@@ -130,50 +130,58 @@ pub fn spawn(executable: String) -> Result<(Arc<Process>, Deferred<i32>)> {
                 phys_mem::phys2virt(mods[0].mod_start as usize),
                 (mods[0].mod_end - mods[0].mod_start) as usize);
 
-            tar::locate(mod_data, &executable).expect("file not found") // TODO
+            try!(tar::locate(mod_data, &executable).ok_or(ErrNum::FileNotFound))
         };
 
         mem::drop(executable);
 
-        let (entry, stack_slice) = {
-            let ehdr = unsafe { *(image_slice.as_ptr() as *const Elf64_Ehdr) };
-            assert_eq!([ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT], &ehdr.e_ident[0..7]);
-            assert_eq!((ET_EXEC, EM_X86_64), (ehdr.e_type, ehdr.e_machine));
+        let ehdr = unsafe { *(image_slice.as_ptr() as *const Elf64_Ehdr) };
+        assert_eq!([ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT], &ehdr.e_ident[0..7]);
+        assert_eq!((ET_EXEC, EM_X86_64), (ehdr.e_type, ehdr.e_machine));
 
-            let entry = ehdr.e_entry as *const u8;
-            log!("entry point is {:p}", entry);
+        let entry = ehdr.e_entry as *const u8;
+        log!("entry point is {:p}", entry);
 
-            let mut slices = Vec::new();
-            for i in 0..ehdr.e_phnum {
-                let phdr_offset = ehdr.e_phoff as isize + (i as isize) * (ehdr.e_phentsize as isize);
-                let phdr = unsafe { *(image_slice.as_ptr().offset(phdr_offset) as *const Elf64_Phdr) };
-                if phdr.p_type != PT_LOAD {
-                    continue;
-                }
-
-                log!("segment {}: {:x} bytes @ {:p} (file: {:x} bytes @ {:x})", i, phdr.p_memsz, phdr.p_vaddr as *mut u8, phdr.p_filesz, phdr.p_offset);
-                assert!(phdr.p_memsz >= phdr.p_filesz);
-                let slice = unsafe { process::alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
-                let file_slice = &image_slice[phdr.p_offset as usize .. (phdr.p_offset + phdr.p_filesz) as usize];
-                bytes::copy_memory(file_slice, slice);
-                slices.push(slice);
+        let mut slices = Vec::new();
+        for i in 0..ehdr.e_phnum {
+            let phdr_offset = ehdr.e_phoff as isize + (i as isize) * (ehdr.e_phentsize as isize);
+            let phdr = unsafe { *(image_slice.as_ptr().offset(phdr_offset) as *const Elf64_Phdr) };
+            if phdr.p_type != PT_LOAD {
+                continue;
             }
 
-            assert!(slices.iter().any(|ref slice| {
-                let slice_end = unsafe { slice.as_ptr().offset(slice.len() as isize) };
-                entry >= slice.as_ptr() && entry < slice_end
-            }));
+            log!("segment {}: {:x} bytes @ {:p} (file: {:x} bytes @ {:x})", i, phdr.p_memsz, phdr.p_vaddr as *mut u8, phdr.p_filesz, phdr.p_offset);
+            assert!(phdr.p_memsz >= phdr.p_filesz);
+            let slice = unsafe { process::alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
+            let file_slice = &image_slice[phdr.p_offset as usize .. (phdr.p_offset + phdr.p_filesz) as usize];
+            bytes::copy_memory(file_slice, slice);
+            slices.push(slice);
+        }
 
-            let stack_slice = process::alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
-            log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
-            (entry, stack_slice)
-        };
+        assert!(slices.iter().any(|ref slice| {
+            let slice_end = unsafe { slice.as_ptr().offset(slice.len() as isize) };
+            entry >= slice.as_ptr() && entry < slice_end
+        }));
 
-        unsafe { arch_thread::jmp_user_mode(entry, stack_slice.as_mut_ptr().offset(stack_slice.len() as isize)) }
-        // TODO: free stack
+        let stack_slice = process::alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+        log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
+        Ok((entry, stack_slice))
     };
 
-    Ok((process.clone(), thread::spawn_remote(process, init_in_new_process)))
+    let deferred = thread::spawn_remote(process.clone(), move || {
+        match init_in_new_process() {
+            Ok((entry, stack_slice)) => {
+                unsafe { arch_thread::jmp_user_mode(entry, stack_slice.as_mut_ptr().offset(stack_slice.len() as isize)) }
+                // TODO: free stack
+            },
+
+            Err(num) => {
+                thread::exit(-(num as i32));
+            }
+        }
+    });
+
+    Ok((process.clone(), deferred))
 }
 
 pub fn alloc<T>(len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {

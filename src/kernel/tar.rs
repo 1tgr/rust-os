@@ -45,10 +45,14 @@ pub fn locate<'a>(data: &'a [u8], filename: &str) -> Option<&'a [u8]> {
             &*(header_slice.as_ptr() as *const Header)
         };
 
+        let header_filename = nul_terminate(&header.filename[..]);
+        if header_filename.len() == 0 {
+            break;
+        }
+
         offset += 512;
 
         let size = header.parse_size();
-        let header_filename = nul_terminate(&header.filename[..]);
         if let Ok(header_filename) = str::from_utf8(header_filename) {
             if header_filename == filename {
                 return Some(&data[offset .. offset + size]);

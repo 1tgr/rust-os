@@ -1,7 +1,9 @@
 //! Input and output.
 
+pub mod flat_map;
+pub mod pipe;
+
 mod nodes;
-mod pipe;
 
 use core::result;
 use core::slice::bytes;
@@ -10,6 +12,7 @@ use prelude::*;
 use syscall::Result;
 use thread::Deferred;
 
+pub use self::flat_map::FlatMap;
 pub use self::pipe::Pipe;
 
 /// Allows for reading bytes from a source.

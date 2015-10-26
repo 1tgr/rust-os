@@ -165,10 +165,6 @@ pub fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pd
 pub fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
 pub fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
 
-fn recursive_pml4_addr() -> usize {
-    pml4()[MMU_RECURSIVE_SLOT].addr()
-}
-
 pub fn print_mapping<T>(ptr: *const T) {
     let pml4_entry = pml4_entry(ptr);
     log!("[{:p}] PML4 = {:?}", ptr, pml4_entry);
@@ -233,7 +229,6 @@ impl AddressSpace {
     pub unsafe fn switch(&self) {
         if cpu::read_cr3() != self.cr3 {
             let _x = lock!(self.mutex);
-            log!("switch: {:x} -> {:x}", recursive_pml4_addr(), self.cr3);
             cpu::write_cr3(self.cr3);
         }
     }

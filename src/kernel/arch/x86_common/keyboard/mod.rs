@@ -1,14 +1,12 @@
 use alloc::arc::Arc;
 use arch::cpu;
 use arch::isr::{self,DropIrqHandler};
-use collections::vec_deque::VecDeque;
 use core::char;
 use core::mem;
-use device::ByteDevice;
-use io::{AsyncRead,Promise};
+use io::{AsyncRead,Pipe,Write};
 use mutex::Mutex;
 use prelude::*;
-use syscall::Result;
+use process::KObj;
 
 //                  S    C    C+S  AGr  AGr+S
 pub struct Key(u32, u32, u32, u32, u32, u32);
@@ -93,7 +91,6 @@ impl Key {
 }
 
 struct KeyboardState {
-    queue: VecDeque<u8>,
     extended: bool,
     keys: keys::Bucky,
     compose: u32,
@@ -108,7 +105,6 @@ enum Keypress {
 impl KeyboardState {
     pub fn new() -> KeyboardState {
         KeyboardState {
-            queue: VecDeque::new(),
             extended: false,
             keys: keys::Bucky::empty(),
             compose: 0
@@ -238,7 +234,7 @@ impl KeyboardState {
         }
     }
 
-    pub fn queue(&mut self, code: u8) {
+    pub fn translate(&mut self, code: u8) -> Vec<u8> {
         let c =
             match self.decode(code) {
                 Some(Keypress::Char(c)) => c,
@@ -257,7 +253,7 @@ impl KeyboardState {
 
                         keys.bits() | c
                     } else {
-                        return;
+                        return Vec::new();
                     }
                 },
 
@@ -266,14 +262,14 @@ impl KeyboardState {
                         cpu::outb(0x60, 0xed);
                         cpu::outb(0x60, flags);
                     }
-                    return;
+                    return Vec::new();
                 },
 
-                None => { return; }
+                None => { return Vec::new(); }
             };
 
         let data: [u8; 4] = unsafe { mem::transmute(c) };
-        self.queue.extend(data.iter());
+        data.to_vec()
     }
 }
 
@@ -281,37 +277,33 @@ mod british;
 
 pub struct Keyboard {
     _drop_irq_handler: DropIrqHandler,
-    state: Arc<Mutex<KeyboardState>>,
-    device: Arc<ByteDevice>
+    device: Arc<Pipe>
 }
 
 impl Keyboard {
     pub fn new() -> Self {
-        let state = Arc::new(Mutex::new(KeyboardState::new()));
-        let device = Arc::new(ByteDevice::new());
+        let device = Arc::new(Pipe::new());
 
         let handler = {
-            let state = state.clone();
+            let state = Mutex::new(KeyboardState::new());
             let device = device.clone();
             move || {
                 let mut state = lock!(state);
                 let code = unsafe { cpu::inb(0x60) };
-                state.queue(code);
-                device.fulfil(&mut state.queue);
+                let bytes = state.translate(code);
+                let _ = device.write(&bytes[..]);
             }
         };
 
         Keyboard {
             _drop_irq_handler: isr::register_irq_handler(1, handler),
-            state: state,
             device: device
         }
     }
 }
 
-impl AsyncRead for Keyboard {
-    fn read_async(&self, buf: Vec<u8>) -> Promise<Result<Vec<u8>>> {
-        let mut state = lock!(self.state);
-        self.device.read_async(&mut state.queue, buf)
+impl KObj for Keyboard {
+    fn async_read(&self) -> Option<&AsyncRead> {
+        Some(&*self.device)
     }
 }

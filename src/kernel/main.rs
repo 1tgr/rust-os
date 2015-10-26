@@ -48,7 +48,6 @@ pub mod arch;
 
 pub mod bit_vec;
 pub mod console;
-pub mod device;
 pub mod elf;
 pub mod io;
 pub mod libc_helpers;
@@ -77,7 +76,7 @@ fn run_tests() {
 
         arch::isr::test::TESTS,
         arch::mmu::test::TESTS,
-        device::test::TESTS,
+        io::pipe::test::TESTS,
         phys_mem::test::TESTS,
         virt_mem::test::TESTS,
 
