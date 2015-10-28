@@ -215,11 +215,13 @@ syscall_entry_asm:
 #define ISR_ASM(num, rust_handler) \
 	sti ;\
     push %rax ;\
+    pushq $0 ; \
     PUSH_REGS ;\
 	mov $num, %rdi ;\
     mov %rsp, %rsi ;\
     call rust_handler ;\
     POP_REGS ;\
+    pop %rax ;\
     pop %rax ;\
 	cli ;\
     add $8, %rsp

@@ -1,9 +1,7 @@
 extern crate syscall;
 
-use std::cmp;
 use std::fmt::{self,Write};
-use std::slice;
-use syscall::Result;
+use syscall::{ErrNum,Result};
 use syscall::libc_helpers::{stdin,stdout};
 
 struct Writer;
@@ -29,19 +27,38 @@ macro_rules! println {
     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
 }
 
-fn read_line(s: &mut String) -> Result<()> {
-    let v = unsafe { s.as_mut_vec() };
-    let capacity = v.capacity();
-    let mut slice = unsafe { slice::from_raw_parts_mut(v.as_mut_ptr(), capacity) };
-    let count = try!(syscall::read(unsafe { stdin }, slice));
-    unsafe { v.set_len(cmp::min(count, capacity)) };
-    Ok(())
+fn read_line() -> Result<String> {
+    let mut v = Vec::new();
+    loop {
+        let mut buf = vec![0; 100];
+        let bytes = try!(syscall::read(unsafe { stdin }, &mut buf[..]));
+        if bytes < buf.len() {
+            buf.truncate(bytes);
+            v.extend(buf);
+            break;
+        }
+
+        v.extend(buf);
+    }
+
+    String::from_utf8(v).map_err(|_| ErrNum::Utf8Error)
 }
 
 #[no_mangle]
 pub fn main() -> i32 {
-    let handle = syscall::spawn("cairo_demo").unwrap();
-    let code = syscall::wait_for_exit(handle);
-    let _ = syscall::close(handle);
-    0
+    loop {
+        print!("> ");
+
+        match read_line() {
+            Ok(line) => {
+                if line == "exit" {
+                    return 0;
+                } else if line.len() > 0 {
+                    println!("spawn({})", line);
+                }
+            },
+
+            Err(code) => { return -(code as i32) }
+        }
+    }
 }
