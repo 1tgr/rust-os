@@ -8,11 +8,12 @@ use collections::vec_deque::VecDeque;
 use core::mem;
 use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use deferred::Deferred;
 use libc::{self,jmp_buf};
-use mutex::{Mutex,MutexGuard};
+use mutex::Mutex;
 use phys_mem::PhysicalBitmap;
 use prelude::*;
-use process::{Process,KObj};
+use process::Process;
 use ptr::Align;
 use singleton::Singleton;
 use virt_mem::VirtualTree;
@@ -30,18 +31,6 @@ fn setjmp() -> Option<jmp_buf> {
     }
 }
 
-fn drop_write_guard<'a, T>(guard: MutexGuard<'a, T>) {
-    mem::drop(guard);
-}
-
-fn forget_write_guard<'a, T>(guard: MutexGuard<'a, T>) {
-    mem::forget(guard);
-}
-
-fn assert_no_lock() {
-    assert!(cpu::interrupts_enabled());
-}
-
 struct HWToken {
     process: Arc<Process>,
     stack_ptr: *mut u8
@@ -55,7 +44,7 @@ impl HWToken {
 }
 
 struct Thread {
-    id: usize,
+    _id: usize,
     stack: &'static mut [u8],
     process: Arc<Process>,
     exited: Deferred<i32>
@@ -65,7 +54,7 @@ impl Thread {
     pub fn new(process: Arc<Process>, stack: &'static mut [u8]) -> Thread {
         static NEXT_THREAD_ID: AtomicUsize = ATOMIC_USIZE_INIT;
         Thread {
-            id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
+            _id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             stack: stack,
             process: process,
             exited: Deferred::new()
@@ -80,14 +69,11 @@ impl Thread {
     }
 }
 
-struct DeferredState<A> {
-    result: Option<A>,
-    waiters: VecDeque<(jmp_buf, Thread)>
-}
+pub struct BlockedThread(jmp_buf, Thread);
 
 struct SchedulerState {
     current: Thread,
-    threads: VecDeque<(jmp_buf, Thread)>,
+    threads: VecDeque<BlockedThread>,
     garbage_stacks: Vec<&'static mut [u8]>
 }
 
@@ -99,10 +85,6 @@ impl Drop for SchedulerState {
             unsafe { heap::deallocate(stack.as_mut_ptr(), stack.len(), 16) };
         }
     }
-}
-
-pub struct Deferred<A> {
-    state: Arc<Mutex<DeferredState<A>>>
 }
 
 pub fn with_scheduler<F: FnOnce()>(f: F) {
@@ -133,60 +115,56 @@ pub fn current_process() -> Arc<Process> {
     lock_sched!().current.process.clone()
 }
 
-pub fn schedule() {
-    assert_no_lock();
-
+pub fn block<F: FnOnce(BlockedThread)>(park: F) -> bool {
     let mut state = lock_sched!();
     match state.threads.pop_front() {
-        Some((new_jmp_buf, mut new_current)) => {
-            let new_token = new_current.hw_token();
-            let old_current = mem::replace(&mut state.current, new_current);
+        Some(BlockedThread(new_jmp_buf, mut new_current)) => {
+            let switch = {
+                let new_token = new_current.hw_token();
+                let old_current = mem::replace(&mut state.current, new_current);
+                mem::drop(state);
+
+                move |old_jmp_buf| {
+                    park(BlockedThread(old_jmp_buf, old_current));
+                    assert!(cpu::interrupts_enabled(), "current thread is holding a spinlock and it's about to be blocked");
+                    unsafe {
+                        new_token.switch();
+                        libc::longjmp(&new_jmp_buf, 1)
+                    }
+                }
+            };
 
             match setjmp() {
-                Some(old_jmp_buf) => {
-                    state.threads.push_back((old_jmp_buf, old_current));
-
-                    unsafe { new_token.switch(); }
-                    drop_write_guard(state);
-
-                    unsafe { libc::longjmp(&new_jmp_buf, 1); }
-                },
-
-                None => {
-                    mem::forget(new_token);
-                    forget_write_guard(state);
-                }
+                Some(old_jmp_buf) => switch(old_jmp_buf),
+                None => { mem::forget(switch); true }
             }
         },
 
-        None => { }
-    };
+        None => false
+    }
+}
+
+impl BlockedThread {
+    pub fn resume(self) {
+        let mut state = lock_sched!();
+        state.threads.push_back(self);
+    }
+}
+
+pub fn schedule() {
+    block(move |thread| thread.resume());
 }
 
 pub fn exit(code: i32) -> ! {
     let exited = lock_sched!().current.exited.clone();
     exited.resolve(code);
 
-    let new_jmp_buf = {
-        assert_no_lock();
-
+    block(move |thread| {
         let mut state = lock_sched!();
-        let (new_jmp_buf, mut new_current) =
-            match state.threads.pop_front() {
-                Some(front) => front,
-                None => panic!("exit({}): no more threads", state.current.id)
-            };
+        state.garbage_stacks.push(thread.1.stack);
+    });
 
-        let new_token = new_current.hw_token();
-        let old_current = mem::replace(&mut state.current, new_current);
-        state.garbage_stacks.push(old_current.stack);
-        unsafe { new_token.switch(); }
-        new_jmp_buf
-    };
-
-    unsafe {
-        libc::longjmp(&new_jmp_buf, 1);
-    }
+    panic!("exit: no more threads")
 }
 
 fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) -> Deferred<i32> {
@@ -196,12 +174,7 @@ fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) -> Deferred<
     let jmp_buf = thread::new_jmp_buf(b, unsafe { stack_base_ptr.offset(stack_len as isize) });
     let thread = Thread::new(process, unsafe { slice::from_raw_parts_mut(stack_base_ptr, stack_len) });
     let exited = thread.exited.clone();
-
-    {
-        let mut state = lock_sched!();
-        state.threads.push_back((jmp_buf, thread));
-    }
-
+    BlockedThread(jmp_buf, thread).resume();
     exited
 }
 
@@ -228,94 +201,6 @@ pub fn spawn_remote<T>(process: Arc<Process>, start: T) -> Deferred<i32> where T
 pub fn spawn<T>(start: T) -> Deferred<i32> where T : FnOnce() -> i32 {
     let process = lock_sched!().current.process.clone();
     spawn_remote(process, start)
-}
-
-impl<A> Clone for Deferred<A> {
-    fn clone(&self) -> Self {
-        Deferred { state: self.state.clone() }
-    }
-}
-
-impl<A> Deferred<A> {
-    pub fn new() -> Self {
-        let dstate = Arc::new(Mutex::new(DeferredState {
-            result: None,
-            waiters: VecDeque::new()
-        }));
-
-        Deferred { state: dstate }
-    }
-
-    pub fn resolve(&self, result: A) {
-        let mut dstate = lock!(self.state);
-        match dstate.result {
-            Some(_) => panic!("promise is already resolved"),
-            None => { }
-        }
-
-        dstate.result = Some(result);
-
-        let mut waiters = mem::replace(&mut dstate.waiters, VecDeque::new());
-        if waiters.len() > 0 {
-            let mut state = lock_sched!();
-            state.threads.append(&mut waiters);
-        }
-    }
-
-    pub fn get(self) -> A {
-        loop {
-            assert_no_lock();
-
-            let mut dstate = lock!(self.state);
-            match mem::replace(&mut dstate.result, None) {
-                Some(result) => { return result; },
-                None => (),
-            }
-
-            let mut state = lock_sched!();
-            let (new_jmp_buf, mut new_current) =
-                match state.threads.pop_front() {
-                    Some(front) => front,
-                    None => panic!("block({}): no more threads", state.current.id)
-                };
-
-            let new_token = new_current.hw_token();
-            let old_current = mem::replace(&mut state.current, new_current);
-
-            match setjmp() {
-                Some(old_jmp_buf) => {
-                    dstate.waiters.push_back((old_jmp_buf, old_current));
-
-                    unsafe { new_token.switch(); }
-                    drop_write_guard(state);
-                    drop_write_guard(dstate);
-
-                    unsafe { libc::longjmp(&new_jmp_buf, 1); }
-                },
-
-                None => {
-                    mem::forget(new_token);
-                    forget_write_guard(state);
-                    forget_write_guard(dstate);
-                }
-            }
-        }
-    }
-
-    pub fn try_get(self) -> Result<A, Self> {
-        let opt = {
-            let mut state = lock!(self.state);
-            mem::replace(&mut state.result, None)
-        };
-
-        opt.ok_or(self)
-    }
-}
-
-impl KObj for Deferred<i32> {
-    fn deferred_i32(&self) -> Option<&Self> {
-        Some(self)
-    }
 }
 
 #[cfg(feature = "test")]

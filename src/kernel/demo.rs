@@ -4,11 +4,12 @@ use arch::keyboard::Keyboard;
 use arch::vga_bochs;
 use arch::vga::Vga;
 use console::Console;
+use deferred::Deferred;
 use io::{Read,Write};
 use prelude::*;
 use process::{self,KObj};
 use syscall::{ErrNum,Handle,FileHandle,Handler,ProcessHandle,Result};
-use thread::{self,Deferred};
+use thread;
 
 struct TestSyscallHandler {
     console: Arc<Console>

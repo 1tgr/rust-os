@@ -1,10 +1,10 @@
 use collections::vec_deque::VecDeque;
 use core::cmp;
+use deferred::Deferred;
 use io::{AsyncRead,Promise,Write};
 use mutex::Mutex;
 use prelude::*;
 use syscall::Result;
-use thread::Deferred;
 
 struct IoRequest {
     buf: Vec<u8>,

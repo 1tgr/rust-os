@@ -48,6 +48,7 @@ pub mod arch;
 
 pub mod bit_vec;
 pub mod console;
+pub mod deferred;
 pub mod elf;
 pub mod io;
 pub mod libc_helpers;

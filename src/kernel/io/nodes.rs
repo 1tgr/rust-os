@@ -1,7 +1,7 @@
 use core::result;
+use deferred::Deferred;
 use io::Promise;
 use prelude::*;
-use thread::Deferred;
 
 pub trait PromiseNode<A> {
     fn get(self: Box<Self>) -> A;

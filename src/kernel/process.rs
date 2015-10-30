@@ -3,6 +3,7 @@ use arch::process::ArchProcess;
 use arch::thread as arch_thread;
 use core::mem;
 use core::slice::{self,bytes};
+use deferred::Deferred;
 use elf::*;
 use io::{AsyncRead,Read,Write};
 use multiboot::multiboot_module_t;
@@ -12,7 +13,7 @@ use prelude::*;
 use process;
 use syscall::{ErrNum,Handle,Result};
 use tar;
-use thread::{self,Deferred};
+use thread;
 use virt_mem::VirtualTree;
 
 pub trait KObj {
