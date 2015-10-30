@@ -178,21 +178,6 @@ fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) -> Deferred<
     exited
 }
 
-pub fn spawn_user_mode(pc: *const u8, stack: &mut [u8]) -> Deferred<i32> {
-    let stack_ptr = stack.as_mut_ptr();
-    let stack_len = stack.len();
-
-    let start = move || {
-        unsafe {
-            thread::jmp_user_mode(pc, stack_ptr.offset(stack_len as isize))
-        }
-        // TODO: free stack
-    };
-
-    let process = lock_sched!().current.process.clone();
-    spawn_inner(process, Box::new(start))
-}
-
 pub fn spawn_remote<T>(process: Arc<Process>, start: T) -> Deferred<i32> where T : FnOnce() -> i32 {
     let start = || { exit(start()) };
     spawn_inner(process, Box::new(start))
