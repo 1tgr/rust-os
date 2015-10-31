@@ -51,6 +51,7 @@ pub mod console;
 pub mod deferred;
 pub mod elf;
 pub mod io;
+pub mod ksyscall;
 pub mod libc_helpers;
 pub mod logging;
 pub mod multiboot;

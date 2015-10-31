@@ -33,13 +33,10 @@ pub type Result<T> = core::result::Result<T, ErrNum>;
 mod marshal;
 mod table;
 
-#[cfg(not(feature = "kernel"))]
-mod user;
+#[cfg(feature = "kernel")] mod kernel;
+#[cfg(feature = "kernel")] pub use kernel::*;
 
-#[cfg(feature = "kernel")]
-pub mod kernel;
+#[cfg(not(feature = "kernel"))] mod user;
+#[cfg(not(feature = "kernel"))] pub use user::*;
 
 pub use table::*;
-
-#[cfg(not(feature = "kernel"))] pub mod libc_helpers;
-#[cfg(not(feature = "kernel"))] pub mod unwind;

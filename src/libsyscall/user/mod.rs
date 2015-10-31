@@ -1,6 +1,9 @@
 use super::ErrNum;
 use marshal::{PackedArgs,SyscallArgs,SyscallResult};
 
+pub mod libc_helpers;
+pub mod unwind;
+
 pub unsafe fn syscall<T: SyscallArgs, U: SyscallResult>(num: u32, args: T) -> Result<U, ErrNum> {
     let mut args_vec = PackedArgs::new();
     args.as_args(&mut args_vec);

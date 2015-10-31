@@ -1,14 +1,12 @@
 use alloc::boxed::FnBox;
 use arch::cpu::{self,Regs};
 use core::mem;
+use ksyscall;
 use libc::jmp_buf;
-use logging::Writer;
 use once::{self,Once};
 use prelude::*;
 use ptr::Align;
-use singleton::{DropSingleton,Singleton};
-use syscall::{Dispatcher,Handler};
-use syscall::kernel::{Dispatch,PackedArgs};
+use syscall::PackedArgs;
 
 extern {
     static thread_entry_asm: u8;
@@ -17,25 +15,10 @@ extern {
 
 pub type RegsHandler = Fn(&Regs) -> usize;
 
-lazy_static! {
-    static ref SYSCALL_DISPATCH: Singleton<Box<Dispatch+'static>> = Singleton::<Box<Dispatch+'static>>::new();
-}
-
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> isize {
-    if let Some(ref d) = SYSCALL_DISPATCH.get() {
-        let d: &Box<Dispatch> = d;
-        let d: &Dispatch = &**d;
-        d.dispatch(regs.rax as usize, PackedArgs::from_tuple((regs.rdi as usize, regs.rsi as usize, regs.rdx as usize, regs.rcx as usize, regs.r8 as usize, regs.r9 as usize)))
-    } else {
-        0
-    }
-}
-
-pub type DropSyscallHandler = DropSingleton<Box<Dispatch>>;
-
-pub fn register_syscall_handler<T: Handler+'static>(handler: T) -> DropSyscallHandler {
-    SYSCALL_DISPATCH.register(Box::new(Dispatcher::new(Writer, handler)))
+    let args = PackedArgs::from_tuple((regs.rdi as usize, regs.rsi as usize, regs.rdx as usize, regs.rcx as usize, regs.r8 as usize, regs.r9 as usize));
+    ksyscall::dispatch(regs.rax as usize, args)
 }
 
 #[no_mangle]

@@ -33,49 +33,31 @@ macro_rules! syscalls {
         ),+
     ) => {
         use $crate::ErrNum;
-        use $crate::kernel::Dispatch;
         use $crate::marshal::{PackedArgs,SyscallArgs,SyscallResult};
         use core::fmt::Write;
 
-        pub trait Handler {
+        pub trait HandleSyscall {
             $(
                 fn $name<'a>(&self, $($arg_name: $arg_ty),+) -> Result<$result, ErrNum>;
             )+
         }
 
-        pub struct Dispatcher<W, T> {
-            writer: W,
-            handler: T
-        }
-
-        impl<W, T> Dispatcher<W, T> {
-            pub fn new(writer: W, handler: T) -> Dispatcher<W, T> {
-                Dispatcher {
-                    writer: writer,
-                    handler: handler
-                }
-            }
-        }
-
-        impl<T: Handler, W: Clone + Write> Dispatch for Dispatcher<W, T> {
-            fn dispatch(&self, num: usize, mut args: PackedArgs) -> isize {
-                match num {
-                    $(
-                        $num =>
-                            (match SyscallArgs::from_args(&mut args) {
-                                Ok(tuple) => {
-                                    let mut writer = self.writer.clone();
-                                    let _ = write!(writer, concat!(stringify!($name), "{:?}"), tuple);
-                                    let ($($arg_name,)+) = tuple;
-                                    let result = self.handler.$name($($arg_name),+);
-                                    let _ = writeln!(writer, " => {:?}", result);
-                                    result
-                                },
-                                Err(num) => Err(num)
-                            }).as_result(),
-                    )+
-                    _ => 0
-                }
+        pub fn dispatch<T: HandleSyscall, W: Write>(handler: &T, writer: &mut W, num: usize, mut args: PackedArgs) -> isize {
+            match num {
+                $(
+                    $num =>
+                        (match SyscallArgs::from_args(&mut args) {
+                            Ok(tuple) => {
+                                let _ = write!(writer, concat!(stringify!($name), "{:?}"), tuple);
+                                let ($($arg_name,)+) = tuple;
+                                let result = handler.$name($($arg_name),+);
+                                let _ = writeln!(writer, " => {:?}", result);
+                                result
+                            },
+                            Err(num) => Err(num)
+                        }).as_result(),
+                )+
+                _ => 0
             }
         }
     }

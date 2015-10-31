@@ -1,5 +1,6 @@
 use libc::{c_char,c_int,c_void,size_t,ssize_t,off_t,mode_t};
-use super::{Handle,Result};
+use table as syscall;
+use ::{Handle,Result};
 
 static mut ERRNO: u32 = 0;
 
@@ -19,7 +20,7 @@ pub unsafe extern fn __errno() -> *mut c_int {
 
 #[no_mangle]
 pub extern fn sbrk(len: usize) -> *mut u8 {
-    match super::alloc_pages(len) {
+    match syscall::alloc_pages(len) {
         Ok(p) => p,
         Err(num) => {
             unsafe { ERRNO = num as u32; }
@@ -30,7 +31,7 @@ pub extern fn sbrk(len: usize) -> *mut u8 {
 
 #[no_mangle]
 pub unsafe extern fn __assert_fail(_assertion: *const c_char, _file: *const c_char, _line: c_int, _function: *const c_char) -> ! {
-    let _ = super::exit_thread(-1);
+    let _ = syscall::exit_thread(-1);
     unreachable!()
 }
 
@@ -106,8 +107,8 @@ unsafe fn init() -> Result<()> {
         ptr = ptr.offset(1);
     }
 
-    stdin = try!(super::open("stdin"));
-    stdout = try!(super::open("stdout"));
+    stdin = try!(syscall::open("stdin"));
+    stdout = try!(syscall::open("stdout"));
     Ok(())
 }
 
@@ -118,8 +119,8 @@ extern {
 #[no_mangle]
 pub unsafe extern fn start() {
     let result = init().and_then(|()| Ok(main()));
-    let _ = super::close(stdin);
-    let _ = super::close(stdout);
+    let _ = syscall::close(stdin);
+    let _ = syscall::close(stdout);
 
     let code =
         match result {
@@ -127,5 +128,5 @@ pub unsafe extern fn start() {
             Err(num) => -(num as i32)
         };
 
-    let _ = super::exit_thread(code);
+    let _ = syscall::exit_thread(code);
 }

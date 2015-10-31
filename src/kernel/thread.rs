@@ -115,7 +115,7 @@ pub fn current_process() -> Arc<Process> {
     lock_sched!().current.process.clone()
 }
 
-pub fn block<F: FnOnce(BlockedThread)>(park: F) -> bool {
+pub fn block<Park: FnOnce(BlockedThread)>(park: Park) -> bool {
     let mut state = lock_sched!();
     match state.threads.pop_front() {
         Some(BlockedThread(new_jmp_buf, mut new_current)) => {
