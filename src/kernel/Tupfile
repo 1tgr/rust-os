@@ -25,17 +25,6 @@ RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 RUSTCFLAGS += --cfg feature=\"test\"
 
-ISO += initrd.tar.gz
-ISO += kernel
-ISO += menu.lst
-ISO += stage2_eltorito
-
-INITRD += ../apps/hello/hello
-INITRD += ../apps/cairo_demo/cairo_demo
-
-: $(INITRD) |> tar --transform 's/.*\///g' -cf %o %f |> initrd.tar
-: initrd.tar |> gzip -k %f |> initrd.tar.gz
-
 : foreach arch/@(ARCH)/*.S |> !AS |> %B.o {objs}
 : foreach *.c |> !CC |> %B.o {objs}
 : main.rs | $(LIBS) *.rs |> !RUSTC_OBJ |> kernel.o {objs}
@@ -51,5 +40,3 @@ else
 : {objs} $(LIBS) $(LIBS1) | arch/@(ARCH)/link.ld |> !LD -T arch/@(ARCH)/link.ld |> kernel
 : kernel |> $(OBJDUMP) -Sd %f > %o |> kernel.txt
 endif
-
-: $(ISO) |> cp stage2_eltorito stage2_eltorito_temp && genisoimage -R -b boot/grub/stage2_eltorito -no-emul-boot -boot-load-size 4 -boot-info-table -graft-points -o %o kernel initrd.tar.gz boot/grub/menu.lst=menu.lst boot/grub/stage2_eltorito=stage2_eltorito_temp && rm stage2_eltorito_temp |> bootable.iso
