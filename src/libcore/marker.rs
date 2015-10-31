@@ -18,6 +18,7 @@
 
 use clone::Clone;
 use cmp;
+use default::Default;
 use option::Option;
 use hash::Hash;
 use hash::Hasher;
@@ -36,6 +37,17 @@ impl<T> !Send for *const T { }
 impl<T> !Send for *mut T { }
 
 /// Types with a constant size known at compile-time.
+///
+/// All type parameters which can be bounded have an implicit bound of `Sized`. The special syntax
+/// `?Sized` can be used to remove this bound if it is not appropriate.
+///
+/// ```
+/// struct Foo<T>(T);
+/// struct Bar<T: ?Sized>(T);
+///
+/// // struct FooUse(Foo<[i32]>); // error: Sized is not implemented for [i32]
+/// struct BarUse(Bar<[i32]>); // OK
+/// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 #[lang = "sized"]
 #[rustc_on_unimplemented = "`{Self}` does not have a constant size known at compile-time"]
@@ -172,7 +184,7 @@ pub trait Copy : Clone {
 ///
 /// A somewhat surprising consequence of the definition is `&mut T` is
 /// `Sync` (if `T` is `Sync`) even though it seems that it might
-/// provide unsynchronised mutation. The trick is a mutable reference
+/// provide unsynchronized mutation. The trick is a mutable reference
 /// stored in an aliasable reference (that is, `& &mut T`) becomes
 /// read-only, as if it were a `& &T`, hence there is no risk of a data
 /// race.
@@ -195,7 +207,7 @@ pub trait Copy : Clone {
 ///
 /// Any types with interior mutability must also use the `std::cell::UnsafeCell`
 /// wrapper around the value(s) which can be mutated when behind a `&`
-/// reference; not doing this is undefined behaviour (for example,
+/// reference; not doing this is undefined behavior (for example,
 /// `transmute`-ing from `&T` to `&mut T` is invalid).
 #[stable(feature = "rust1", since = "1.0.0")]
 #[lang = "sync"]
@@ -242,6 +254,12 @@ macro_rules! impls{
 
         impl<T:?Sized> Clone for $t<T> {
             fn clone(&self) -> $t<T> {
+                $t
+            }
+        }
+
+        impl<T:?Sized> Default for $t<T> {
+            fn default() -> $t<T> {
                 $t
             }
         }
@@ -381,7 +399,7 @@ mod impls {
 /// ```
 ///
 /// Without the declaration `T:Reflect`, `foo` would not type check
-/// (note: as a matter of style, it would be preferable to to write
+/// (note: as a matter of style, it would be preferable to write
 /// `T:Any`, because `T:Any` implies `T:Reflect` and `T:'static`, but
 /// we use `Reflect` here to show how it works). The `Reflect` bound
 /// thus serves to alert `foo`'s caller to the fact that `foo` may

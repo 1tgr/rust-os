@@ -315,8 +315,14 @@ impl<K: Ord, V> BTreeMap<K, V> {
     // 2) While ODS may potentially return the pair we *just* inserted after
     // the split, we will never do this. Again, this shouldn't effect the analysis.
 
-    /// Inserts a key-value pair into the map. If the key already had a value
-    /// present in the map, that value is returned. Otherwise, `None` is returned.
+    /// Inserts a key-value pair into the map.
+    ///
+    /// If the map did not have this key present, `None` is returned.
+    ///
+    /// If the map did have this key present, that value is returned, and the
+    /// entry is not updated. See the [module-level documentation] for more.
+    ///
+    /// [module-level documentation]: index.html#insert-and-complex-keys
     ///
     /// # Examples
     ///
@@ -593,7 +599,7 @@ mod stack {
         top: node::Handle<*mut Node<K, V>, Type, NodeType>,
     }
 
-    /// A `PartialSearchStack` that doesn't hold a a reference to the next node, and is just
+    /// A `PartialSearchStack` that doesn't hold a reference to the next node, and is just
     /// just waiting for a `Handle` to that next node to be pushed. See `PartialSearchStack::with`
     /// for more details.
     pub struct Pusher<'id, 'a, K:'a, V:'a> {
@@ -949,7 +955,7 @@ impl<'a, K: Ord, Q: ?Sized, V> Index<&'a Q> for BTreeMap<K, V>
     }
 }
 
-/// Genericises over how to get the correct type of iterator from the correct type
+/// Genericizes over how to get the correct type of iterator from the correct type
 /// of Node ownership.
 trait Traverse<N> {
     fn traverse(node: N) -> Self;

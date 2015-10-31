@@ -18,11 +18,11 @@
 
 use clone::Clone;
 use intrinsics;
-use ops::Deref;
+use ops::{CoerceUnsized, Deref};
 use fmt;
 use hash;
 use option::Option::{self, Some, None};
-use marker::{PhantomData, Send, Sized, Sync};
+use marker::{Copy, PhantomData, Send, Sized, Sync, Unsize};
 use mem;
 use nonzero::NonZero;
 
@@ -39,6 +39,8 @@ pub use intrinsics::copy;
 
 #[stable(feature = "rust1", since = "1.0.0")]
 pub use intrinsics::write_bytes;
+
+pub use intrinsics::drop_in_place;
 
 /// Creates a null raw pointer.
 ///
@@ -69,7 +71,7 @@ pub const fn null<T>() -> *const T { 0 as *const T }
 pub const fn null_mut<T>() -> *mut T { 0 as *mut T }
 
 /// Swaps the values at two mutable locations of the same type, without
-/// deinitialising either. They may overlap, unlike `mem::swap` which is
+/// deinitializing either. They may overlap, unlike `mem::swap` which is
 /// otherwise equivalent.
 ///
 /// # Safety
@@ -145,9 +147,11 @@ pub unsafe fn read_and_drop<T>(dest: *mut T) -> T {
 ///
 /// # Safety
 ///
-/// Beyond accepting a raw pointer, this operation is unsafe because it does
-/// not drop the contents of `dst`. This could leak allocations or resources,
-/// so care must be taken not to overwrite an object that should be dropped.
+/// This operation is marked unsafe because it accepts a raw pointer.
+///
+/// It does not drop the contents of `dst`. This is safe, but it could leak
+/// allocations or resources, so care must be taken not to overwrite an object
+/// that should be dropped.
 ///
 /// This is appropriate for initializing uninitialized memory, or overwriting
 /// memory that has previously been `read` from.
@@ -245,7 +249,7 @@ impl<T: ?Sized> *mut T {
     /// # Safety
     ///
     /// The offset must be in-bounds of the object, or one-byte-past-the-end.
-    /// Otherwise `offset` invokes Undefined Behaviour, regardless of whether
+    /// Otherwise `offset` invokes Undefined Behavior, regardless of whether
     /// the pointer is used.
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
@@ -385,6 +389,13 @@ fnptr_impls_args! { A, B }
 fnptr_impls_args! { A, B, C }
 fnptr_impls_args! { A, B, C, D }
 fnptr_impls_args! { A, B, C, D, E }
+fnptr_impls_args! { A, B, C, D, E, F }
+fnptr_impls_args! { A, B, C, D, E, F, G }
+fnptr_impls_args! { A, B, C, D, E, F, G, H }
+fnptr_impls_args! { A, B, C, D, E, F, G, H, I }
+fnptr_impls_args! { A, B, C, D, E, F, G, H, I, J }
+fnptr_impls_args! { A, B, C, D, E, F, G, H, I, J, K }
+fnptr_impls_args! { A, B, C, D, E, F, G, H, I, J, K, L }
 
 // Comparison for pointers
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -489,12 +500,28 @@ unsafe impl<T: Send + ?Sized> Send for Unique<T> { }
 #[unstable(feature = "unique", issue = "27730")]
 unsafe impl<T: Sync + ?Sized> Sync for Unique<T> { }
 
+#[cfg(stage0)]
+macro_rules! unique_new {
+    () => (
+        /// Creates a new `Unique`.
+        pub unsafe fn new(ptr: *mut T) -> Unique<T> {
+            Unique { pointer: NonZero::new(ptr), _marker: PhantomData }
+        }
+    )
+}
+#[cfg(not(stage0))]
+macro_rules! unique_new {
+    () => (
+        /// Creates a new `Unique`.
+        pub const unsafe fn new(ptr: *mut T) -> Unique<T> {
+            Unique { pointer: NonZero::new(ptr), _marker: PhantomData }
+        }
+    )
+}
+
 #[unstable(feature = "unique", issue = "27730")]
 impl<T: ?Sized> Unique<T> {
-    /// Creates a new `Unique`.
-    pub unsafe fn new(ptr: *mut T) -> Unique<T> {
-        Unique { pointer: NonZero::new(ptr), _marker: PhantomData }
-    }
+    unique_new!{}
 
     /// Dereferences the content.
     pub unsafe fn get(&self) -> &T {
@@ -519,6 +546,71 @@ impl<T:?Sized> Deref for Unique<T> {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T> fmt::Pointer for Unique<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Pointer::fmt(&*self.pointer, f)
+    }
+}
+
+/// A wrapper around a raw `*mut T` that indicates that the possessor
+/// of this wrapper has shared ownership of the referent. Useful for
+/// building abstractions like `Rc<T>` or `Arc<T>`, which internally
+/// use raw pointers to manage the memory that they own.
+#[unstable(feature = "shared", reason = "needs an RFC to flesh out design",
+           issue = "27730")]
+pub struct Shared<T: ?Sized> {
+    pointer: NonZero<*const T>,
+    // NOTE: this marker has no consequences for variance, but is necessary
+    // for dropck to understand that we logically own a `T`.
+    //
+    // For details, see:
+    // https://github.com/rust-lang/rfcs/blob/master/text/0769-sound-generic-drop.md#phantom-data
+    _marker: PhantomData<T>,
+}
+
+/// `Shared` pointers are not `Send` because the data they reference may be aliased.
+// NB: This impl is unnecessary, but should provide better error messages.
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> !Send for Shared<T> { }
+
+/// `Shared` pointers are not `Sync` because the data they reference may be aliased.
+// NB: This impl is unnecessary, but should provide better error messages.
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> !Sync for Shared<T> { }
+
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> Shared<T> {
+    /// Creates a new `Shared`.
+    pub unsafe fn new(ptr: *mut T) -> Self {
+        Shared { pointer: NonZero::new(ptr), _marker: PhantomData }
+    }
+}
+
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> Copy for Shared<T> { }
+
+#[cfg(not(stage0))] // remove cfg after new snapshot
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized, U: ?Sized> CoerceUnsized<Shared<U>> for Shared<T> where T: Unsize<U> { }
+
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> Deref for Shared<T> {
+    type Target = *mut T;
+
+    #[inline]
+    fn deref(&self) -> &*mut T {
+        unsafe { mem::transmute(&*self.pointer) }
+    }
+}
+
+#[unstable(feature = "shared", issue = "27730")]
+impl<T> fmt::Pointer for Shared<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&*self.pointer, f)
     }

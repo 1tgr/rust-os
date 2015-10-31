@@ -164,7 +164,12 @@ fn calculate_allocation_generic<K, V>(capacity: usize, is_leaf: bool) -> (usize,
     let (keys_size, keys_align) = (capacity * mem::size_of::<K>(), mem::align_of::<K>());
     let (vals_size, vals_align) = (capacity * mem::size_of::<V>(), mem::align_of::<V>());
     let (edges_size, edges_align) = if is_leaf {
-        (0, 1)
+        // allocate one edge to ensure that we don't pass size 0 to `heap::allocate`
+        if mem::size_of::<K>() == 0 && mem::size_of::<V>() == 0 {
+            (1, mem::align_of::<Node<K, V>>())
+        } else {
+            (0, 1)
+        }
     } else {
         ((capacity + 1) * mem::size_of::<Node<K, V>>(), mem::align_of::<Node<K, V>>())
     };
@@ -270,12 +275,14 @@ impl<T> DoubleEndedIterator for RawItems<T> {
 }
 
 impl<T> Drop for RawItems<T> {
+    #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
-        for _ in self.by_ref() {}
+        for _ in self {}
     }
 }
 
 impl<K, V> Drop for Node<K, V> {
+    #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
         if self.keys.is_null() ||
             (unsafe { self.keys.get() as *const K as usize == mem::POST_DROP_USIZE })
@@ -811,7 +818,7 @@ impl<K, V, NodeRef> Handle<NodeRef, handle::Edge, handle::Internal> where
         }
     }
 
-    /// Handle an underflow in this node's child. We favour handling "to the left" because we know
+    /// Handle an underflow in this node's child. We favor handling "to the left" because we know
     /// we're empty, but our neighbour can be full. Handling to the left means when we choose to
     /// steal, we pop off the end of our neighbour (always fast) and "unshift" ourselves
     /// (always slow, but at least faster since we know we're half-empty).
@@ -1414,6 +1421,7 @@ impl<K, V> TraversalImpl for MoveTraversalImpl<K, V> {
 }
 
 impl<K, V> Drop for MoveTraversalImpl<K, V> {
+    #[unsafe_destructor_blind_to_params]
     fn drop(&mut self) {
         // We need to cleanup the stored values manually, as the RawItems destructor would run
         // after our deallocation.

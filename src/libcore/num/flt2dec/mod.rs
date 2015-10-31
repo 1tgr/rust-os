@@ -136,7 +136,6 @@ use slice::bytes;
 pub use self::decoder::{decode, DecodableFloat, FullDecoded, Decoded};
 
 pub mod estimator;
-pub mod bignum;
 pub mod decoder;
 
 /// Digit-generation algorithms.
@@ -462,7 +461,7 @@ pub fn to_shortest_str<'a, T, F>(mut format_shortest: F, v: T,
 /// You probably would want `strategy::grisu::format_shortest` for this.
 ///
 /// The `dec_bounds` is a tuple `(lo, hi)` such that the number is formatted
-/// as decimal only when `10^lo <= V < 10^hi`. Note that this is the *apparant* `V`
+/// as decimal only when `10^lo <= V < 10^hi`. Note that this is the *apparent* `V`
 /// instead of the actual `v`! Thus any printed exponent in the exponential form
 /// cannot be in this range, avoiding any confusion.
 ///

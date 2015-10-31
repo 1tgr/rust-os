@@ -655,6 +655,11 @@ impl<'a, T> Default for &'a [T] {
     fn default() -> &'a [T] { &[] }
 }
 
+#[stable(feature = "mut_slice_default", since = "1.5.0")]
+impl<'a, T> Default for &'a mut [T] {
+    fn default() -> &'a mut [T] { &mut [] }
+}
+
 //
 // Iterators
 //
@@ -1410,16 +1415,18 @@ impl<'a, T> ExactSizeIterator for ChunksMut<'a, T> {}
 // Free functions
 //
 
-/// Converts a pointer to A into a slice of length 1 (without copying).
+/// Converts a reference to A into a slice of length 1 (without copying).
 #[unstable(feature = "ref_slice", issue = "27774")]
+#[deprecated(since = "1.5.0", reason = "unclear whether belongs in libstd")]
 pub fn ref_slice<A>(s: &A) -> &[A] {
     unsafe {
         from_raw_parts(s, 1)
     }
 }
 
-/// Converts a pointer to A into a slice of length 1 (without copying).
+/// Converts a reference to A into a slice of length 1 (without copying).
 #[unstable(feature = "ref_slice", issue = "27774")]
+#[deprecated(since = "1.5.0", reason = "unclear whether belongs in libstd")]
 pub fn mut_ref_slice<A>(s: &mut A) -> &mut [A] {
     unsafe {
         from_raw_parts_mut(s, 1)
@@ -1430,7 +1437,7 @@ pub fn mut_ref_slice<A>(s: &mut A) -> &mut [A] {
 ///
 /// The `len` argument is the number of **elements**, not the number of bytes.
 ///
-/// # Unsafety
+/// # Safety
 ///
 /// This function is unsafe as there is no guarantee that the given pointer is
 /// valid for `len` elements, nor whether the lifetime inferred is a suitable

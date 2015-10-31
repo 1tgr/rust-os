@@ -17,6 +17,7 @@ use self::wrapping::OverflowingOps;
 
 use char::CharExt;
 use cmp::{Eq, PartialOrd};
+use convert::From;
 use fmt;
 use intrinsics;
 use marker::{Copy, Sized};
@@ -39,12 +40,16 @@ use slice::SliceExt;
 /// all standard arithmetic operations on the underlying value are
 /// intended to have wrapping semantics.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug, Default)]
 pub struct Wrapping<T>(#[stable(feature = "rust1", since = "1.0.0")] pub T);
 
 pub mod wrapping;
+
+// All these modules are technically private and only exposed for libcoretest:
 pub mod flt2dec;
 pub mod dec2flt;
+pub mod bignum;
+pub mod diy_float;
 
 /// Types that have a "zero" value.
 ///
@@ -53,7 +58,7 @@ pub mod dec2flt;
 #[unstable(feature = "zero_one",
            reason = "unsure of placement, wants to use associated constants",
            issue = "27739")]
-pub trait Zero {
+pub trait Zero: Sized {
     /// The "zero" (usually, additive identity) for this type.
     fn zero() -> Self;
 }
@@ -65,7 +70,7 @@ pub trait Zero {
 #[unstable(feature = "zero_one",
            reason = "unsure of placement, wants to use associated constants",
            issue = "27739")]
-pub trait One {
+pub trait One: Sized {
     /// The "one" (usually, multiplicative identity) for this type.
     fn one() -> Self;
 }
@@ -399,12 +404,12 @@ macro_rules! int_impl {
         /// ```
         #[stable(feature = "rust1", since = "1.0.0")]
         #[inline]
-        pub fn checked_div(self, v: Self) -> Option<Self> {
-            match v {
-                0   => None,
+        pub fn checked_div(self, other: Self) -> Option<Self> {
+            match other {
+                0    => None,
                -1 if self == Self::min_value()
-                    => None,
-                v   => Some(self / v),
+                     => None,
+               other => Some(self / other),
             }
         }
 
@@ -968,10 +973,10 @@ macro_rules! uint_impl {
         /// ```
         #[stable(feature = "rust1", since = "1.0.0")]
         #[inline]
-        pub fn checked_div(self, v: Self) -> Option<Self> {
-            match v {
+        pub fn checked_div(self, other: Self) -> Option<Self> {
+            match other {
                 0 => None,
-                v => Some(self / v),
+                other => Some(self / other),
             }
         }
 
@@ -1379,54 +1384,55 @@ fn from_str_radix<T: FromStrRadixHelper>(src: &str, radix: u32)
 
     // all valid digits are ascii, so we will just iterate over the utf8 bytes
     // and cast them to chars. .to_digit() will safely return None for anything
-    // other than a valid ascii digit for a the given radix, including the first-byte
+    // other than a valid ascii digit for the given radix, including the first-byte
     // of multi-byte sequences
     let src = src.as_bytes();
 
-    match (src[0], &src[1..])  {
-        (b'-', digits) if digits.is_empty() => Err(PIE { kind: Empty }),
-        (b'-', digits) if is_signed_ty => {
-            // The number is negative
-            let mut result = T::from_u32(0);
-            for &c in digits {
-                let x = match (c as char).to_digit(radix) {
-                    Some(x) => x,
-                    None => return Err(PIE { kind: InvalidDigit }),
-                };
-                result = match result.checked_mul(radix) {
-                    Some(result) => result,
-                    None => return Err(PIE { kind: Underflow }),
-                };
-                result = match result.checked_sub(x) {
-                    Some(result) => result,
-                    None => return Err(PIE { kind: Underflow }),
-                };
-            }
-            Ok(result)
-        },
-        (c, digits) => {
-            // The number is signed
-            let mut result = match (c as char).to_digit(radix) {
-                Some(x) => T::from_u32(x),
+    let (is_positive, digits) = match src[0] {
+        b'+' => (true, &src[1..]),
+        b'-' if is_signed_ty => (false, &src[1..]),
+        _ => (true, src)
+    };
+
+    if digits.is_empty() {
+        return Err(PIE { kind: Empty });
+    }
+
+    let mut result = T::from_u32(0);
+    if is_positive {
+        // The number is positive
+        for &c in digits {
+            let x = match (c as char).to_digit(radix) {
+                Some(x) => x,
                 None => return Err(PIE { kind: InvalidDigit }),
             };
-            for &c in digits {
-                let x = match (c as char).to_digit(radix) {
-                    Some(x) => x,
-                    None => return Err(PIE { kind: InvalidDigit }),
-                };
-                result = match result.checked_mul(radix) {
-                    Some(result) => result,
-                    None => return Err(PIE { kind: Overflow }),
-                };
-                result = match result.checked_add(x) {
-                    Some(result) => result,
-                    None => return Err(PIE { kind: Overflow }),
-                };
-            }
-            Ok(result)
+            result = match result.checked_mul(radix) {
+                Some(result) => result,
+                None => return Err(PIE { kind: Overflow }),
+            };
+            result = match result.checked_add(x) {
+                Some(result) => result,
+                None => return Err(PIE { kind: Overflow }),
+            };
+        }
+    } else {
+        // The number is negative
+        for &c in digits {
+            let x = match (c as char).to_digit(radix) {
+                Some(x) => x,
+                None => return Err(PIE { kind: InvalidDigit }),
+            };
+            result = match result.checked_mul(radix) {
+                Some(result) => result,
+                None => return Err(PIE { kind: Underflow }),
+            };
+            result = match result.checked_sub(x) {
+                Some(result) => result,
+                None => return Err(PIE { kind: Underflow }),
+            };
         }
     }
+    Ok(result)
 }
 
 /// An error which can be returned when parsing an integer.
@@ -1466,3 +1472,66 @@ impl fmt::Display for ParseIntError {
 }
 
 pub use num::dec2flt::ParseFloatError;
+
+// Conversion traits for primitive integer and float types
+// Conversions T -> T are covered by a blanket impl and therefore excluded
+// Some conversions from and to usize/isize are not implemented due to portability concerns
+macro_rules! impl_from {
+    ($Small: ty, $Large: ty) => {
+        #[stable(feature = "lossless_prim_conv", since = "1.5.0")]
+        impl From<$Small> for $Large {
+            #[stable(feature = "lossless_prim_conv", since = "1.5.0")]
+            #[inline]
+            fn from(small: $Small) -> $Large {
+                small as $Large
+            }
+        }
+    }
+}
+
+// Unsigned -> Unsigned
+impl_from! { u8, u16 }
+impl_from! { u8, u32 }
+impl_from! { u8, u64 }
+impl_from! { u8, usize }
+impl_from! { u16, u32 }
+impl_from! { u16, u64 }
+impl_from! { u32, u64 }
+
+// Signed -> Signed
+impl_from! { i8, i16 }
+impl_from! { i8, i32 }
+impl_from! { i8, i64 }
+impl_from! { i8, isize }
+impl_from! { i16, i32 }
+impl_from! { i16, i64 }
+impl_from! { i32, i64 }
+
+// Unsigned -> Signed
+impl_from! { u8, i16 }
+impl_from! { u8, i32 }
+impl_from! { u8, i64 }
+impl_from! { u16, i32 }
+impl_from! { u16, i64 }
+impl_from! { u32, i64 }
+
+// Note: integers can only be represented with full precision in a float if
+// they fit in the significand, which is 24 bits in f32 and 53 bits in f64.
+// Lossy float conversions are not implemented at this time.
+
+// Signed -> Float
+impl_from! { i8, f32 }
+impl_from! { i8, f64 }
+impl_from! { i16, f32 }
+impl_from! { i16, f64 }
+impl_from! { i32, f64 }
+
+// Unsigned -> Float
+impl_from! { u8, f32 }
+impl_from! { u8, f64 }
+impl_from! { u16, f32 }
+impl_from! { u16, f64 }
+impl_from! { u32, f64 }
+
+// Float -> Float
+impl_from! { f32, f64 }

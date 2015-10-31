@@ -21,7 +21,8 @@
 #![feature(str_char)]
 #![feature(unicode)]
 #![feature(vec_push_all)]
-#![feature(vec_resize)]
+#![feature(wrapping)]
+#![feature(zero_one)]
 
 #![no_std]
 
