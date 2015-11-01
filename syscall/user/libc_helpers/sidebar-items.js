@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["__assert_fail",""],["__errno",""],["__stack_chk_fail",""],["_exit",""],["_fputwc_r",""],["close",""],["fstat",""],["getpid",""],["isatty",""],["kill",""],["lseek",""],["open",""],["read",""],["sbrk",""],["start",""],["unlink",""],["write",""]],"static":[["stdin",""],["stdout",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["flat_map",""],["pipe",""]],"struct":[["Promise","A computation that might eventually resolve to a value of type `T`."]],"trait":[["AsyncRead","Allows for reading bytes asynchronously from a source."],["Read","Allows for reading bytes from a source."],["Write","A trait for objects which are byte-oriented sinks."]]});

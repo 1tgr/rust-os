@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Regs` struct in crate `kernel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Regs">
+
+    <title>kernel::arch::cpu::Regs - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='../../index.html'>kernel</a>::<wbr><a href='../index.html'>arch</a>::<wbr><a href='index.html'>cpu</a></p><script>window.sidebarCurrent = {name: 'Regs', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../../index.html'>kernel</a>::<wbr><a href='../index.html'>arch</a>::<wbr><a href='index.html'>cpu</a>::<wbr><a class='struct' href=''>Regs</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-512' class='srclink' href='../../../src/kernel/arch/amd64/cpu.rs.html#3-25' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Regs {
+    pub r15: u64,
+    pub r14: u64,
+    pub r13: u64,
+    pub r12: u64,
+    pub r11: u64,
+    pub r10: u64,
+    pub r9: u64,
+    pub r8: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rbx: u64,
+    pub rax: u64,
+    pub error: u64,
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,
+    pub ss: u64,
+}</pre><h2 class='fields'>Fields</h2>
+<table><tr class='stab '>
+                                  <td id='structfield.r15'><code>r15</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r14'><code>r14</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r13'><code>r13</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r12'><code>r12</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r11'><code>r11</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r10'><code>r10</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r9'><code>r9</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.r8'><code>r8</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rsi'><code>rsi</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rdi'><code>rdi</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rbp'><code>rbp</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rdx'><code>rdx</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rcx'><code>rcx</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rbx'><code>rbx</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rax'><code>rax</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.error'><code>error</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rip'><code>rip</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.cs'><code>cs</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rflags'><code>rflags</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.rsp'><code>rsp</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.ss'><code>ss</code></td><td></td></tr></table><h2 id='implementations'>Trait Implementations</h2><h3 id='derived_implementations'>Derived Implementations </h3><h3 class='impl'><code>impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='../../../kernel/arch/cpu/struct.Regs.html' title='kernel::arch::cpu::Regs'>Regs</a></code></h3><div class='impl-items'><h4 id='method.fmt' class='method'><code>fn <a href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html#method.fmt' class='fnname'>fmt</a>(&amp;self, __arg_0: &amp;mut <a class='struct' href='https://doc.rust-lang.org/nightly/core/fmt/struct.Formatter.html' title='core::fmt::Formatter'>Formatter</a>) -&gt; <a class='type' href='https://doc.rust-lang.org/nightly/core/fmt/type.Result.html' title='core::fmt::Result'>Result</a></code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../../";
+        window.currentCrate = "kernel";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../../jquery.js"></script>
+    <script src="../../../main.js"></script>
+    
+    <script async src="../../../search-index.js"></script>
+</body>
+</html>

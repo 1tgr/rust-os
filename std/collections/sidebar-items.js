@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Bound","An endpoint of a range of keys."]],"struct":[["BTreeMap","A map based on a B-Tree."],["LinkedList","A doubly-linked list."],["VecDeque","`VecDeque` is a growable ring buffer, which can be used as a double-ended queue efficiently."]]});

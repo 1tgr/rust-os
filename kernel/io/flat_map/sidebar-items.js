@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["FlatMap","An adaptor which will modify the data produced by a reader."]]});
