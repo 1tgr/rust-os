@@ -7,27 +7,23 @@ use prelude::*;
 use ptr::{self,Align};
 use syscall::{ErrNum,Result};
 
-extern {
-    static kernel_end: u8;
-}
-
-struct Block {
+struct Block<T> {
     ptr: *mut u8,
     len: usize,
-    free: bool
+    tag: Option<T>
 }
 
-struct VirtualState {
-    blocks: Vec<Block>
+struct VirtualState<T> {
+    blocks: Vec<Block<T>>
 }
 
-impl VirtualState {
-    pub fn alloc(&mut self, len: usize) -> Result<&'static mut [u8]> {
+impl<T> VirtualState<T> {
+    pub fn alloc(&mut self, len: usize, tag: T) -> Result<&'static mut [u8]> {
         let unaligned_len = len;
         let len = Align::up(len, phys_mem::PAGE_SIZE);
 
         let pos =
-            match self.blocks.iter().position(|block| block.free && block.len >= len) {
+            match self.blocks.iter().position(|block| block.tag.is_none() && block.len >= len) {
                 Some(pos) => pos,
                 None => { return Err(ErrNum::OutOfMemory) }
             };
@@ -35,27 +31,27 @@ impl VirtualState {
         let (orig_len, orig_ptr) = {
             let block1 = &mut self.blocks[pos];
             let orig_len = mem::replace(&mut block1.len, len);
-            block1.free = false;
+            block1.tag = Some(tag);
             (orig_len, block1.ptr)
         };
 
         let block2 = Block {
             ptr: unsafe { orig_ptr.offset(len as isize) },
             len: orig_len - len,
-            free: true
+            tag: None
         };
 
         self.blocks.insert(pos + 1, block2);
         Ok(unsafe { slice::from_raw_parts_mut(orig_ptr, unaligned_len) })
     }
 
-    pub fn reserve(&mut self, slice: &mut [u8]) -> bool {
+    pub fn reserve(&mut self, slice: &mut [u8], tag: T) -> bool {
         let (ptr, len) = (slice.as_mut_ptr(), slice.len());
         let (ptr, len) = Align::range(ptr, len, phys_mem::PAGE_SIZE);
         log!("reserve({:p}..{:p})", ptr, unsafe { ptr.offset(len as isize) });
 
         let pos =
-            match self.blocks.iter().position(|block| block.free && block.ptr <= ptr && block.len >= len) {
+            match self.blocks.iter().position(|block| block.tag.is_none() && block.ptr <= ptr && block.len >= len) {
                 Some(pos) => pos,
                 None => { return false }
             };
@@ -70,13 +66,13 @@ impl VirtualState {
         let block1 = Block {
             ptr: ptr,
             len: len,
-            free: false
+            tag: Some(tag)
         };
 
         let block2 = Block {
             ptr: unsafe { ptr.offset(len as isize) },
             len: orig_len - len - len0,
-            free: true
+            tag: None
         };
 
         self.blocks.insert(pos + 1, block1);
@@ -84,16 +80,20 @@ impl VirtualState {
         true
     }
 
+    fn find_block_position(&self, ptr: *mut u8) -> Option<usize> {
+        self.blocks.iter().position(|block| block.ptr <= ptr && ptr < unsafe { block.ptr.offset(block.len as isize) })
+    }
+
     pub fn free(&mut self, ptr: *mut u8) -> bool {
         let pos =
-            match self.blocks.iter().position(|block| block.ptr == ptr) {
+            match self.find_block_position(ptr) {
                 Some(pos) => pos,
                 None => { return false }
             };
 
-        self.blocks[pos].free = true;
+        self.blocks[pos].tag = None;
 
-        if pos < self.blocks.len() - 1 && self.blocks[pos + 1].free {
+        if pos < self.blocks.len() - 1 && self.blocks[pos + 1].tag.is_none() {
             let block2 = self.blocks.remove(pos + 1);
             let block1 = &mut self.blocks[pos];
             block1.len += block2.len;
@@ -101,50 +101,63 @@ impl VirtualState {
 
         true
     }
+
+    pub fn tag_at(&self, ptr: *mut u8) -> Option<(&'static mut [u8], &T)> {
+        match self.find_block_position(ptr) {
+            Some(pos) => {
+                let block = &self.blocks[pos];
+                let slice = unsafe { slice::from_raw_parts_mut(block.ptr, block.len) };
+                block.tag.as_ref().map(|tag| (slice, tag))
+            },
+
+            None => None
+        }
+    }
 }
 
-pub struct VirtualTree {
-    state: Mutex<VirtualState>
+pub struct VirtualTree<T> {
+    state: Mutex<VirtualState<T>>
 }
 
-impl VirtualTree {
-    pub fn new() -> VirtualTree {
+impl<T> VirtualTree<T> {
+    pub fn new() -> Self {
         VirtualTree {
             state: Mutex::new(VirtualState {
                 blocks: vec![Block {
                     ptr: 0 as *mut u8,
                     len: usize::MAX,
-                    free: true
+                    tag: None
                 }]
             })
         }
-    }
-
-    pub fn for_kernel() -> VirtualTree {
-        let tree = VirtualTree::new();
-        let two_meg = 2 * 1024 * 1024;
-        let kernel_end_ptr = Align::up(&kernel_end as *const u8, 4 * two_meg);
-        let identity = unsafe { slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize) };
-        tree.reserve(identity);
-        tree
     }
 
     pub fn block_count(&self) -> usize {
         lock!(self.state).blocks.len()
     }
 
-    pub fn alloc(&self, len: usize) -> Result<&mut [u8]> {
-        let slice: &'static mut [u8] = try!(lock!(self.state).alloc(len));
+    pub fn alloc(&self, len: usize, tag: T) -> Result<&mut [u8]> {
+        let slice: &'static mut [u8] = try!(lock!(self.state).alloc(len, tag));
         let slice: &mut [u8] = unsafe { mem::transmute(slice) };
         Ok(slice)
     }
 
-    pub fn reserve(&self, slice: &mut [u8]) -> bool {
-        lock!(self.state).reserve(slice)
+    pub fn reserve(&self, slice: &mut [u8], tag: T) -> bool {
+        lock!(self.state).reserve(slice, tag)
     }
 
     pub fn free(&self, p: *mut u8) -> bool {
         lock!(self.state).free(p)
+    }
+}
+
+impl<T: Clone> VirtualTree<T> {
+    pub fn tag_at(&self, p: *mut u8) -> Option<(&'static mut [u8], T)> {
+        lock!(self.state).tag_at(p).map(|(slice, tag)| {
+            let slice: &mut [u8] = unsafe { mem::transmute(slice) };
+            let tag = (*tag).clone();
+            (slice, tag)
+        })
     }
 }
 
@@ -158,9 +171,11 @@ pub mod test {
            let tree = VirtualTree::new();
            assert_eq!(1, tree.block_count());
 
-           let slice = tree.alloc(4096).unwrap();
+           let slice = tree.alloc(4096, ()).unwrap();
            assert_eq!(0 as *const u8, slice.as_ptr());
            assert_eq!(2, tree.block_count());
+
+           //tree.tag_at(slice.as_mut_ptr()).unwrap();
 
            assert!(tree.free(slice.as_mut_ptr()));
            assert_eq!(1, tree.block_count());
@@ -170,10 +185,12 @@ pub mod test {
            let tree = VirtualTree::new();
            assert_eq!(1, tree.block_count());
 
-           assert!(tree.reserve(unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) }));
+           assert!(tree.reserve(unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) }, ()));
            assert_eq!(3, tree.block_count());
 
-           let slice = tree.alloc(4096).unwrap();
+           //tree.tag_at(0 as *mut u8).unwrap();
+
+           let slice = tree.alloc(4096, ()).unwrap();
            assert_eq!(4, tree.block_count());
            assert_eq!(4096 as *const u8, slice.as_ptr());
 

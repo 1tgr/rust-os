@@ -16,6 +16,7 @@ pub struct Regs {
     pub rcx: u64,
     pub rbx: u64,
     pub rax: u64,
+    pub _alignment: u64,
     pub error: u64,
     pub rip: u64,
     pub cs: u64,

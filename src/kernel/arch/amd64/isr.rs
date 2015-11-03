@@ -4,6 +4,7 @@ use arch::mmu;
 use core::mem;
 use once::{self,Once};
 use prelude::*;
+use process;
 use ptr::{self,Align};
 use singleton::{DropSingleton,Singleton};
 
@@ -72,6 +73,7 @@ pub fn init_once() {
         assert_len!(&IDT, &IDTEnd);
         assert_eq!(104, mem::size_of::<Tss>());
         assert_eq!(10, mem::size_of::<Dtr>());
+        assert!(Align::is_aligned(mem::size_of::<Regs>(), 16));
 
         let tss_selector = ptr::bytes_between(&GDT, &GDT_TSS as *const _ as *const u8) as u16;
         assert_eq!(0x38, tss_selector);
@@ -163,7 +165,11 @@ pub extern fn irq(num: usize, _: &Regs) {
 
 #[no_mangle]
 pub extern fn exception(num: u8, regs: &Regs) {
-    let cr2: *const u8 = cpu::read_cr2();
+    let cr2: *mut u8 = cpu::read_cr2();
+    if num == 14 && process::resolve_page_fault(cr2) {
+        return;
+    }
+
     log!("exception {}: error=0x{:x}  cr2={:p}", num, regs.error, cr2);
     log!("ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}", regs.ss, regs.rsp, regs.cs, regs.rip, regs.rflags);
     log!("rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}", regs.rax, regs.rbx, regs.rcx, regs.rdx);

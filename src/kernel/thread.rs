@@ -11,12 +11,10 @@ use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use deferred::Deferred;
 use libc::{self,jmp_buf};
 use mutex::Mutex;
-use phys_mem::PhysicalBitmap;
 use prelude::*;
 use process::Process;
 use ptr::Align;
 use singleton::Singleton;
-use virt_mem::VirtualTree;
 
 static SCHEDULER: Singleton<Mutex<SchedulerState>> = Singleton::new();
 
@@ -88,9 +86,7 @@ impl Drop for SchedulerState {
 }
 
 pub fn with_scheduler<F: FnOnce()>(f: F) {
-    let phys = Arc::new(PhysicalBitmap::parse_multiboot());
-    let kernel_virt = Arc::new(VirtualTree::for_kernel());
-    let idle_process = Arc::new(Process::new(phys, kernel_virt).unwrap());
+    let idle_process = Arc::new(Process::for_kernel().unwrap());
 
     let state = SchedulerState {
         current: Thread::new(idle_process.clone(), &mut []),

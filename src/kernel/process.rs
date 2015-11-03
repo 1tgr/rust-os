@@ -11,6 +11,7 @@ use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use prelude::*;
 use process;
+use ptr::{self,Align};
 use syscall::{ErrNum,Handle,Result};
 use tar;
 use thread;
@@ -54,19 +55,39 @@ impl ProcessState {
     }
 }
 
+#[derive(Copy, Clone)]
+pub enum Pager {
+    Null,
+    Zeroed,
+    Physical(usize)
+}
+
+#[derive(Copy, Clone)]
+struct MemBlock {
+    user: bool,
+    writable: bool,
+    pager: Pager
+}
+
 pub struct Process {
     arch: ArchProcess,
     phys: Arc<PhysicalBitmap>,
-    user_virt: VirtualTree,
-    kernel_virt: Arc<VirtualTree>,
+    user_virt: VirtualTree<MemBlock>,
+    kernel_virt: Arc<VirtualTree<MemBlock>>,
     state: Mutex<ProcessState>
 }
 
 impl Process {
-    pub fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree>) -> Result<Self> {
+    fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree<MemBlock>>) -> Result<Self> {
         let arch = try!(ArchProcess::new(phys.clone()));
         let user_virt = VirtualTree::new();
-        user_virt.reserve(unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) });
+        user_virt.reserve(
+            unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) },
+            MemBlock {
+                user: false,
+                writable: false,
+                pager: Pager::Null
+            });
 
         Ok(Process {
             arch: arch,
@@ -77,6 +98,27 @@ impl Process {
         })
     }
 
+    pub fn for_kernel() -> Result<Self> {
+        extern {
+            static kernel_end: u8;
+        }
+
+        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let kernel_virt = Arc::new(VirtualTree::new());
+        let two_meg = 2 * 1024 * 1024;
+        let kernel_end_ptr = Align::up(&kernel_end as *const u8, 4 * two_meg);
+        let identity = unsafe { slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize) };
+        kernel_virt.reserve(
+            identity,
+            MemBlock {
+                user: false,
+                writable: false,
+                pager: Pager::Null
+            });
+
+        Process::new(phys, kernel_virt)
+    }
+
     pub fn spawn(&self) -> Result<Self> {
         Process::new(self.phys.clone(), self.kernel_virt.clone())
     }
@@ -85,32 +127,20 @@ impl Process {
         self.arch.switch();
     }
 
-    unsafe fn alloc_inner<F: Fn(usize) -> Result<usize>>(&self, ptr_opt: Option<*mut u8>, phys: F, len: usize, user: bool, writable: bool) -> Result<*mut u8> {
+    unsafe fn alloc_inner(&self, ptr_opt: Option<*mut u8>, len: usize, user: bool, writable: bool, pager: Pager) -> Result<*mut u8> {
         let virt = if user { &self.user_virt } else { &*self.kernel_virt };
-
-        let ptr =
-            match ptr_opt {
-                Some(ptr) => {
-                    if !virt.reserve(slice::from_raw_parts_mut(ptr, len)) {
-                        return Err(ErrNum::InvalidArgument);
-                    }
-
-                    ptr
+        let block = MemBlock { user: user, writable: writable, pager: pager };
+        match ptr_opt {
+            Some(ptr) => {
+                if virt.reserve(slice::from_raw_parts_mut(ptr, len), block) {
+                    Ok(ptr)
+                } else {
+                    Err(ErrNum::InvalidArgument)
                 }
+            },
 
-                None => try!(virt.alloc(len)).as_mut_ptr()
-            };
-
-        let mut offset = 0;
-        while offset < len  {
-            let ptr = ptr.offset(offset as isize);
-            let addr = try!(phys(offset));
-            //log!("alloc({}): map {:p} -> {:x}", len, ptr, addr);
-            try!(self.arch.map(ptr, addr, user, writable));
-            offset += phys_mem::PAGE_SIZE;
+            None => virt.alloc(len, block).map(|slice| slice.as_mut_ptr())
         }
-
-        Ok(ptr)
     }
 }
 
@@ -185,32 +215,102 @@ pub fn spawn(executable: String) -> Result<(Arc<Process>, Deferred<i32>)> {
     Ok((process.clone(), deferred))
 }
 
-pub fn alloc<T>(len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
-    let process = thread::current_process();
-    unsafe {
-        let make_page = |_| process.phys.alloc_page();
-        let ptr = try!(process.alloc_inner(None, make_page, len * mem::size_of::<T>(), user, writable));
-        Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
+pub struct Allocation<T> {
+    len: usize,
+    base: Option<*mut T>,
+    user: bool,
+    writable: bool,
+    pager: Pager
+}
+
+impl<T> Allocation<T> {
+    pub fn new(len: usize, pager: Pager) -> Self {
+        Allocation {
+            base: None,
+            len: len,
+            user: false,
+            writable: false,
+            pager: pager
+        }
+    }
+
+    pub fn zeroed(len: usize) -> Self {
+        Allocation::new(len, Pager::Zeroed)
+    }
+
+    pub fn phys(len: usize, addr: usize) -> Self {
+        Allocation::new(len, Pager::Physical(addr))
+    }
+
+    pub fn user(mut self, user: bool) -> Self {
+        self.user = user;
+        self
+    }
+
+    pub fn writable(mut self, writable: bool) -> Self {
+        self.writable = writable;
+        self
+    }
+
+    pub fn base(mut self, base: *mut T) -> Self {
+        self.base = Some(base);
+        self
+    }
+
+    pub fn allocate(self) -> Result<&'static mut [T]> {
+        let process = thread::current_process();
+        let base = self.base.map(|ptr| ptr as *mut u8);
+        let len = self.len * mem::size_of::<T>();
+        unsafe {
+            let ptr = try!(process.alloc_inner(base, len, self.user, self.writable, self.pager));
+            Ok(slice::from_raw_parts_mut(ptr as *mut T, self.len))
+        }
     }
 }
 
+pub fn alloc<T>(len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
+    Allocation::zeroed(len).user(user).writable(writable).allocate()
+}
+
 pub unsafe fn alloc_at<T>(base: *mut T, len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
-    let process = thread::current_process();
-    let make_page = |_| process.phys.alloc_page();
-    let ptr = try!(process.alloc_inner(Some(base as *mut u8), make_page, len * mem::size_of::<T>(), user, writable));
-    assert_eq!(base as *mut u8, ptr);
-    Ok(slice::from_raw_parts_mut(base, len))
+    Allocation::zeroed(len).user(user).writable(writable).base(base).allocate()
 }
 
 pub unsafe fn map_phys<T>(addr: usize, len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
-    let process = thread::current_process();
-    let make_page = |offset| Ok(addr + offset);
-    let ptr = try!(process.alloc_inner(None, make_page, len * mem::size_of::<T>(), user, writable));
-    Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
+    Allocation::phys(len, addr).user(user).writable(writable).allocate()
 }
 
 pub fn free(p: *mut u8) -> bool {
     thread::current_process().user_virt.free(p)
+}
+
+macro_rules! try_option {
+    ($e:expr) => ({
+        match $e {
+            Some(e) => e,
+            None => return false,
+        }
+    })
+}
+
+pub fn resolve_page_fault(ptr: *mut u8) -> bool {
+    let process = thread::current_process();
+    let ptr = Align::down(ptr, phys_mem::PAGE_SIZE);
+    let (slice, block) = try_option!(process.user_virt.tag_at(ptr).or_else(|| process.kernel_virt.tag_at(ptr)));
+    assert!(slice.as_mut_ptr() <= ptr && ptr < unsafe { slice.as_mut_ptr().offset(slice.len() as isize) });
+
+    let offset = ptr::bytes_between(slice.as_mut_ptr(), ptr);
+
+    let addr =
+        try_option!(match block.pager {
+            Pager::Null => None,
+            Pager::Zeroed => process.phys.alloc_page().ok(),
+            Pager::Physical(addr) => Some(addr + offset),
+        });
+
+    unsafe {
+        process.arch.map(ptr, addr, block.user, block.writable).is_ok()
+    }
 }
 
 pub fn make_handle(obj: Arc<KObj>) -> Handle {
