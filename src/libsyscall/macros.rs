@@ -3,7 +3,7 @@ macro_rules! syscalls {
     (
         $(
             $(#[$attrs:meta])*
-            fn $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty => $num:expr
+            fn $name:ident($($arg_name:ident: $arg_ty:ty),*) -> $result:ty => $num:expr
         ),+
     ) => {
         use $crate::ErrNum;
@@ -17,8 +17,8 @@ macro_rules! syscalls {
 
         $(
             $(#[$attrs])*
-            pub fn $name<'a>($($arg_name: $arg_ty),+) -> Result<$result, ErrNum> {
-                unsafe { $crate::user::syscall(Num::$name as u32, ($($arg_name,)+)) }
+            pub fn $name<'a>($($arg_name: $arg_ty),*) -> Result<$result, ErrNum> {
+                unsafe { $crate::user::syscall(Num::$name as u32, ($($arg_name,)*)) }
             }
         )+
     }
@@ -29,7 +29,7 @@ macro_rules! syscalls {
     (
         $(
             $(#[$attrs:meta])*
-            fn $name:ident($($arg_name:ident: $arg_ty:ty),+) -> $result:ty => $num:expr
+            fn $name:ident($($arg_name:ident: $arg_ty:ty),*) -> $result:ty => $num:expr
         ),+
     ) => {
         use $crate::ErrNum;
@@ -38,7 +38,7 @@ macro_rules! syscalls {
 
         pub trait HandleSyscall {
             $(
-                fn $name<'a>(&self, $($arg_name: $arg_ty),+) -> Result<$result, ErrNum>;
+                fn $name<'a>(&self, $($arg_name: $arg_ty),*) -> Result<$result, ErrNum>;
             )+
         }
 
@@ -49,8 +49,8 @@ macro_rules! syscalls {
                         (match SyscallArgs::from_args(&mut args) {
                             Ok(tuple) => {
                                 let _ = write!(writer, concat!(stringify!($name), "{:?}"), tuple);
-                                let ($($arg_name,)+) = tuple;
-                                let result = handler.$name($($arg_name),+);
+                                let ($($arg_name,)*) = tuple;
+                                let result = handler.$name($($arg_name),*);
                                 let _ = writeln!(writer, " => {:?}", result);
                                 result
                             },

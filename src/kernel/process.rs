@@ -19,11 +19,23 @@ use tar;
 use thread;
 use virt_mem::VirtualTree;
 
+macro_rules! try_option {
+    ($e:expr) => ({
+        match $e {
+            Some(e) => e,
+            None => return false,
+        }
+    })
+}
+
+pub struct SharedMemBlock(Mutex<Vec<Option<NonZero<usize>>>>);
+
 pub trait KObj {
     fn async_read(&self) -> Option<&AsyncRead> { None }
     fn read(&self) -> Option<&Read> { None }
     fn write(&self) -> Option<&Write> { None }
     fn deferred_i32(&self) -> Option<&Deferred<i32>> { None }
+    fn shared_mem_block(&self) -> Option<&SharedMemBlock> { None }
 }
 
 pub struct KObjRef<T: ?Sized> {
@@ -61,6 +73,18 @@ impl<T: ?Sized> Deref for KObjRef<T> {
     }
 }
 
+impl SharedMemBlock {
+    pub fn new() -> Self {
+        SharedMemBlock(Mutex::new(Vec::new()))
+    }
+}
+
+impl KObj for SharedMemBlock {
+    fn shared_mem_block(&self) -> Option<&SharedMemBlock> {
+        Some(&self)
+    }
+}
+
 struct ProcessState {
     handles: Vec<Option<Arc<KObj>>>
 }
@@ -92,18 +116,46 @@ impl ProcessState {
     }
 }
 
-#[derive(Copy, Clone)]
-pub enum Pager {
-    Null,
+#[derive(Clone)]
+enum Pager {
     Zeroed,
-    Physical(usize)
+    Physical(usize),
+    Shared(KObjRef<SharedMemBlock>)
 }
 
-#[derive(Copy, Clone)]
+impl Pager {
+    fn alloc<AllocPage: Fn() -> Result<usize>>(&self, offset: usize, alloc_page: AllocPage) -> Option<usize> {
+        match self {
+            &Pager::Zeroed => alloc_page().ok(),
+            &Pager::Physical(addr) => Some(addr + offset),
+
+            &Pager::Shared(ref pages) => {
+                let mut pages = lock!(pages.0);
+                let index = offset / phys_mem::PAGE_SIZE;
+                if pages.len() <= index {
+                    pages.resize(index + 1, None);
+                }
+
+                match pages[index] {
+                    Some(addr) => Some(*addr),
+                    None => {
+                        alloc_page().ok().map(|addr| {
+                            assert!(addr != 0);
+                            pages[index] = Some(unsafe { NonZero::new(addr) });
+                            addr
+                        })
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
 struct MemBlock {
     user: bool,
     writable: bool,
-    pager: Pager
+    pager: Option<Pager>
 }
 
 pub struct Process {
@@ -123,7 +175,7 @@ impl Process {
             MemBlock {
                 user: false,
                 writable: false,
-                pager: Pager::Null
+                pager: None
             });
 
         Ok(Process {
@@ -150,7 +202,7 @@ impl Process {
             MemBlock {
                 user: false,
                 writable: false,
-                pager: Pager::Null
+                pager: None
             });
 
         Process::new(phys, kernel_virt)
@@ -166,12 +218,20 @@ impl Process {
 
     unsafe fn alloc_inner(&self, ptr_opt: Option<*mut u8>, len: usize, user: bool, writable: bool, pager: Pager) -> Result<*mut u8> {
         let virt = if user { &self.user_virt } else { &*self.kernel_virt };
-        let block = MemBlock { user: user, writable: writable, pager: pager };
+
+        let block =
+            MemBlock {
+                user: user,
+                writable: writable,
+                pager: Some(pager)
+            };
+
         match ptr_opt {
             Some(ptr) => {
                 if virt.reserve(slice::from_raw_parts_mut(ptr, len), block) {
                     Ok(ptr)
                 } else {
+                    log!("can't reserve {} bytes at {:p}", len, ptr);
                     Err(ErrNum::InvalidArgument)
                 }
             },
@@ -261,7 +321,7 @@ pub struct Allocation<T> {
 }
 
 impl<T> Allocation<T> {
-    pub fn new(len: usize, pager: Pager) -> Self {
+    fn new(len: usize, pager: Pager) -> Self {
         Allocation {
             base: None,
             len: len,
@@ -277,6 +337,10 @@ impl<T> Allocation<T> {
 
     pub fn phys(len: usize, addr: usize) -> Self {
         Allocation::new(len, Pager::Physical(addr))
+    }
+
+    pub fn shared(len: usize, shared: KObjRef<SharedMemBlock>) -> Self {
+        Allocation::new(len, Pager::Shared(shared))
     }
 
     pub fn user(mut self, user: bool) -> Self {
@@ -317,17 +381,12 @@ pub unsafe fn map_phys<T>(addr: usize, len: usize, user: bool, writable: bool) -
     Allocation::phys(len, addr).user(user).writable(writable).allocate()
 }
 
-pub fn free(p: *mut u8) -> bool {
-    thread::current_process().user_virt.free(p)
+pub fn map_shared<T>(block: KObjRef<SharedMemBlock>, len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
+    Allocation::shared(len, block).user(user).writable(writable).allocate()
 }
 
-macro_rules! try_option {
-    ($e:expr) => ({
-        match $e {
-            Some(e) => e,
-            None => return false,
-        }
-    })
+pub fn free(p: *mut u8) -> bool {
+    thread::current_process().user_virt.free(p)
 }
 
 pub fn resolve_page_fault(ptr: *mut u8) -> bool {
@@ -336,14 +395,9 @@ pub fn resolve_page_fault(ptr: *mut u8) -> bool {
     let (slice, block) = try_option!(process.user_virt.tag_at(ptr).or_else(|| process.kernel_virt.tag_at(ptr)));
     assert!(slice.as_mut_ptr() <= ptr && ptr < unsafe { slice.as_mut_ptr().offset(slice.len() as isize) });
 
+    let pager = try_option!(block.pager);
     let offset = ptr::bytes_between(slice.as_mut_ptr(), ptr);
-
-    let addr =
-        try_option!(match block.pager {
-            Pager::Null => None,
-            Pager::Zeroed => process.phys.alloc_page().ok(),
-            Pager::Physical(addr) => Some(addr + offset),
-        });
+    let addr = try_option!(pager.alloc(offset, || process.phys.alloc_page()));
 
     unsafe {
         process.arch.map(ptr, addr, block.user, block.writable).is_ok()
@@ -394,17 +448,15 @@ pub mod test {
         fn user_addresses_are_separate() {
             thread::with_scheduler(|| {
                 let p = thread::current_process();
-                let p1 = Arc::new(p.spawn().unwrap());
-                let p2 = Arc::new(p.spawn().unwrap());
 
-                let d1 = thread::spawn_remote(p1, || unsafe {
+                let d1 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
                     0
                 });
 
-                let d2 = thread::spawn_remote(p2, || unsafe {
+                let d2 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 456);
@@ -412,6 +464,32 @@ pub mod test {
                 });
 
                 d1.get();
+                d2.get();
+            });
+        }
+
+        fn can_share_memory() {
+            thread::with_scheduler(|| {
+                let shared = KObjRef::new(Arc::new(SharedMemBlock::new()), |kobj| kobj.shared_mem_block()).unwrap();
+                let p = thread::current_process();
+                let shared1 = shared.clone();
+                let shared2 = shared.clone();
+
+                let d1 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
+                    let slice = Allocation::shared(0x1000, shared1).base(0x1000_0000 as *mut u8).user(true).writable(true).allocate().unwrap();
+                    assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
+                    intrinsics::volatile_store(slice.as_mut_ptr(), 123);
+                    0
+                });
+
+                d1.get();
+
+                let d2 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
+                    let slice = Allocation::shared(0x1000, shared2).base(0x2000_0000 as *mut u8).user(true).allocate().unwrap();
+                    assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
+                    0
+                });
+
                 d2.get();
             });
         }

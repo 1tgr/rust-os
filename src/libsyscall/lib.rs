@@ -24,8 +24,6 @@ pub enum ErrNum {
 }
 
 pub type Handle = usize;
-pub type FileHandle = Handle;
-pub type ProcessHandle = Handle;
 pub type Result<T> = core::result::Result<T, ErrNum>;
 
 #[macro_use] mod macros;

@@ -76,6 +76,16 @@ impl SyscallArgs for () {
     }
 }
 
+impl SyscallArgs for bool {
+    fn as_args(self, args: &mut PackedArgs) {
+        args.push_back(if self { 1 } else { 0 })
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        Ok(args.pop_front().unwrap() != 0)
+    }
+}
+
 impl SyscallArgs for u8 {
     fn as_args(self, args: &mut PackedArgs) {
         args.push_back(self as usize);

@@ -4,9 +4,9 @@ use console::Console;
 use io::{Read,Write};
 use logging::Writer;
 use prelude::*;
-use process::{self,KObj};
+use process::{self,KObj,SharedMemBlock};
 use singleton::{DropSingleton,Singleton};
-use syscall::{self,ErrNum,FileHandle,Handle,HandleSyscall,PackedArgs,ProcessHandle,Result};
+use syscall::{self,ErrNum,Handle,HandleSyscall,PackedArgs,Result};
 use thread;
 
 pub struct SyscallHandler {
@@ -42,12 +42,12 @@ impl HandleSyscall for SyscallHandler {
         thread::exit(code)
     }
 
-    fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<usize> {
+    fn write(&self, file: Handle, bytes: &[u8]) -> Result<usize> {
         let file = try!(process::resolve_handle(file, |kobj| kobj.write()));
         file.write(bytes)
     }
 
-    fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize> {
+    fn read(&self, file: Handle, buf: &mut [u8]) -> Result<usize> {
         let file = try!(process::resolve_handle(file, |kobj| kobj.read()));
         file.read(buf)
     }
@@ -63,7 +63,7 @@ impl HandleSyscall for SyscallHandler {
         Ok(process::free(p))
     }
 
-    fn open(&self, filename: &str) -> Result<FileHandle> {
+    fn open(&self, filename: &str) -> Result<Handle> {
         let file: Arc<KObj> =
             match filename {
                 "stdin" => self.console.clone(),
@@ -87,14 +87,24 @@ impl HandleSyscall for SyscallHandler {
         Ok(slice.as_mut_ptr())
     }
 
-    fn spawn(&self, executable: &str) -> Result<ProcessHandle> {
+    fn spawn(&self, executable: &str) -> Result<Handle> {
         let executable = String::from(executable);
         let (_, deferred) = try!(process::spawn(executable));
         Ok(process::make_handle(Arc::new(deferred)))
     }
 
-    fn wait_for_exit(&self, process: ProcessHandle) -> Result<i32> {
+    fn wait_for_exit(&self, process: Handle) -> Result<i32> {
         let deferred = try!(process::resolve_handle(process, |kobj| kobj.deferred_i32()));
         Ok((*deferred).clone().get())
+    }
+
+    fn create_shared_mem(&self) -> Result<Handle> {
+        Ok(process::make_handle(Arc::new(SharedMemBlock::new())))
+    }
+
+    fn map_shared_mem(&self, block: Handle, len: usize, writable: bool) -> Result<*mut u8> {
+        let block = try!(process::resolve_handle(block, |kobj| kobj.shared_mem_block()));
+        let slice = try!(process::map_shared(block, len, true, writable));
+        Ok(slice.as_mut_ptr())
     }
 }
