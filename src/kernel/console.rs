@@ -1,17 +1,16 @@
-use alloc::arc::Arc;
 use arch::keyboard::keys;
 use core::char;
 use io::{AsyncRead,FlatMap,Read,Write};
 use prelude::*;
-use process::KObj;
+use process::{KObj,KObjRef};
 
 pub struct Console {
     input: FlatMap,
-    output: Arc<KObj>
+    output: KObjRef<Write>
 }
 
 impl Console {
-    pub fn new(input: Arc<KObj>, output: Arc<KObj>) -> Self {
+    pub fn new(input: KObjRef<AsyncRead>, output: KObjRef<Write>) -> Self {
         Console {
             output: output.clone(),
             input: FlatMap::new(input, 4, move |keys| {
@@ -25,10 +24,7 @@ impl Console {
                     let len = char::encode_utf8(c, &mut bytes).unwrap();
                     bytes.truncate(len);
 
-                    if let Some(output) = output.write() {
-                        let _ = output.write(&bytes[..]);
-                    }
-
+                    let _ = output.write(&bytes[..]);
                     bytes
                 } else {
                     Vec::new()
@@ -54,6 +50,6 @@ impl KObj for Console {
     }
 
     fn write(&self) -> Option<&Write> {
-        self.output.write()
+        Some(&*self.output)
     }
 }

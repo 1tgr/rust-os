@@ -3,8 +3,8 @@ use collections::vec_deque::VecDeque;
 use io::{AsyncRead,Promise};
 use mutex::Mutex;
 use prelude::*;
-use process::KObj;
-use syscall::{ErrNum,Result};
+use process::KObjRef;
+use syscall::Result;
 
 struct FlatMapShared {
     queue: Mutex<VecDeque<u8>>,
@@ -16,10 +16,10 @@ struct FlatMapShared {
 /// An adaptor which will modify the data produced by a reader.
 pub struct FlatMap {
     shared: Arc<FlatMapShared>,
-    input: Arc<KObj>
+    input: KObjRef<AsyncRead>
 }
 
-fn read_async_inner(shared: Arc<FlatMapShared>, input: Arc<KObj>, mut buf: Vec<u8>, len: usize) -> Promise<Result<Vec<u8>>> {
+fn read_async_inner(shared: Arc<FlatMapShared>, input: KObjRef<AsyncRead>, mut buf: Vec<u8>, len: usize) -> Promise<Result<Vec<u8>>> {
     {
         let mut queue = lock!(shared.queue);
         while buf.len() < len {
@@ -39,27 +39,23 @@ fn read_async_inner(shared: Arc<FlatMapShared>, input: Arc<KObj>, mut buf: Vec<u
         }
     }
 
-    if let Some(async_read) = input.clone().async_read() {
-        async_read
-            .read_async(vec![0; shared.buf_len])
-            .then(move |result| {
-                if let Ok(data) = result {
-                    let output = (shared.collect)(data);
-                    lock!(shared.queue).extend(output);
-                    read_async_inner(shared, input, buf, len)
-                }
-                else {
-                    Promise::resolved(result)
-                }
-            })
-        .unwrap()
-    } else {
-        Promise::resolved(Err(ErrNum::NotSupported))
-    }
+    input
+        .read_async(vec![0; shared.buf_len])
+        .then(move |result| {
+            if let Ok(data) = result {
+                let output = (shared.collect)(data);
+                lock!(shared.queue).extend(output);
+                read_async_inner(shared, input, buf, len)
+            }
+            else {
+                Promise::resolved(result)
+            }
+        })
+    .unwrap()
 }
 
 impl FlatMap {
-    pub fn new<F: Fn(Vec<u8>) -> Vec<u8> + 'static, G: Fn(&mut Vec<u8>) -> Option<Vec<u8>> + 'static>(input: Arc<KObj>, buf_len: usize, collect: F, finished: G) -> Self {
+    pub fn new<F: Fn(Vec<u8>) -> Vec<u8> + 'static, G: Fn(&mut Vec<u8>) -> Option<Vec<u8>> + 'static>(input: KObjRef<AsyncRead>, buf_len: usize, collect: F, finished: G) -> Self {
         FlatMap {
             shared: Arc::new(FlatMapShared {
                 queue: Mutex::new(VecDeque::new()),

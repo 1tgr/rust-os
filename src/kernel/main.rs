@@ -20,6 +20,7 @@
 #![feature(lang_items)]	//< unwind needs to define lang items
 #![feature(libc)]
 #![feature(no_std)]
+#![feature(nonzero)]
 #![feature(slice_bytes)]
 #![feature(unicode)]
 

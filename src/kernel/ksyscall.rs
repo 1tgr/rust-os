@@ -1,7 +1,6 @@
 use alloc::arc::Arc;
 use arch::vga_bochs;
 use console::Console;
-use deferred::Deferred;
 use io::{Read,Write};
 use logging::Writer;
 use prelude::*;
@@ -44,14 +43,12 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn write(&self, file: FileHandle, bytes: &[u8]) -> Result<usize> {
-        let kobj = try!(process::resolve_handle(file).ok_or(ErrNum::InvalidHandle));
-        let file: &Write = try!(kobj.write().ok_or(ErrNum::NotSupported));
+        let file = try!(process::resolve_handle(file, |kobj| kobj.write()));
         file.write(bytes)
     }
 
     fn read(&self, file: FileHandle, buf: &mut [u8]) -> Result<usize> {
-        let kobj = try!(process::resolve_handle(file).ok_or(ErrNum::InvalidHandle));
-        let file: &Read = try!(kobj.read().ok_or(ErrNum::NotSupported));
+        let file = try!(process::resolve_handle(file, |kobj| kobj.read()));
         file.read(buf)
     }
 
@@ -97,8 +94,7 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn wait_for_exit(&self, process: ProcessHandle) -> Result<i32> {
-        let kobj = try!(process::resolve_handle(process).ok_or(ErrNum::InvalidHandle));
-        let deferred: &Deferred<i32> = try!(kobj.deferred_i32().ok_or(ErrNum::NotSupported));
+        let deferred = try!(process::resolve_handle(process, |kobj| kobj.deferred_i32()));
         Ok((*deferred).clone().get())
     }
 }

@@ -2,6 +2,8 @@ use alloc::arc::Arc;
 use arch::process::ArchProcess;
 use arch::thread as arch_thread;
 use core::mem;
+use core::nonzero::NonZero;
+use core::ops::Deref;
 use core::slice::{self,bytes};
 use deferred::Deferred;
 use elf::*;
@@ -22,6 +24,41 @@ pub trait KObj {
     fn read(&self) -> Option<&Read> { None }
     fn write(&self) -> Option<&Write> { None }
     fn deferred_i32(&self) -> Option<&Deferred<i32>> { None }
+}
+
+pub struct KObjRef<T: ?Sized> {
+    kobj: Arc<KObj>,
+    ptr: NonZero<*const T>
+}
+
+impl<'a, T: ?Sized+'a> KObjRef<T> {
+    pub fn new<F: FnOnce(&'a KObj) -> Option<&'a T>>(kobj: Arc<KObj>, f: F) -> Result<Self> {
+        let ptr = {
+            let kobj: &KObj = &*kobj;
+            let kobj: &'a KObj = unsafe { mem::transmute(kobj) };
+            match f(kobj) {
+                Some(r) => r as *const T,
+                None => { return Err(ErrNum::NotSupported) }
+            }
+        };
+
+        Ok(KObjRef { kobj: kobj, ptr: unsafe { NonZero::new(ptr) } })
+    }
+}
+
+impl<T: ?Sized> Clone for KObjRef<T> {
+    fn clone(&self) -> Self {
+        KObjRef { kobj: self.kobj.clone(), ptr: self.ptr }
+    }
+}
+
+impl<T: ?Sized> Deref for KObjRef<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        let ptr: *const T = *self.ptr;
+        unsafe { &*ptr }
+    }
 }
 
 struct ProcessState {
@@ -319,10 +356,10 @@ pub fn make_handle(obj: Arc<KObj>) -> Handle {
     state.make_handle(obj)
 }
 
-pub fn resolve_handle(handle: Handle) -> Option<Arc<KObj>> {
+pub fn resolve_handle<'a, T: 'a+?Sized, F: FnOnce(&'a KObj) -> Option<&'a T>>(handle: Handle, f: F) -> Result<KObjRef<T>> {
     let process = thread::current_process();
-    let state = lock!(process.state);
-    state.resolve_handle(handle)
+    let kobj = try!(lock!(process.state).resolve_handle(handle).ok_or(ErrNum::InvalidHandle));
+    KObjRef::new(kobj, f)
 }
 
 pub fn close_handle(handle: Handle) -> bool {
