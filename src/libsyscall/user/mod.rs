@@ -12,7 +12,7 @@ pub unsafe fn syscall<T: SyscallArgs, U: SyscallResult>(num: u32, args: T) -> Re
     let result: isize;
     asm!("syscall"
          : "={rax}"(result)
-         : "{rax}"(num), "{rdi}"(args.0), "{rsi}"(args.1), "{rdx}"(args.2), "{rcx}"(args.3), "{r8}"(args.4), "{r9}"(args.5)
+         : "{rax}"(num), "{rdi}"(args.0), "{rsi}"(args.1), "{rdx}"(args.2), "{r8}"(args.3), "{r9}"(args.4), "{r10}"(args.5)
          : "rcx", "r11", "cc",      // syscall/sysret clobbers rcx, r11, rflags
            "memory"
          : "volatile");

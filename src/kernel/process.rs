@@ -90,9 +90,9 @@ struct ProcessState {
 }
 
 impl ProcessState {
-    fn new() -> Self {
+    fn new(handles: Vec<Option<Arc<KObj>>>) -> Self {
         ProcessState {
-            handles: Vec::new()
+            handles: handles
         }
     }
 
@@ -102,8 +102,12 @@ impl ProcessState {
         handle
     }
 
-    fn resolve_handle(&self, handle: Handle) -> Option<Arc<KObj>> {
-        self.handles.get(handle).map(|ref o| (*o).clone()).unwrap_or(None)
+    fn resolve_handle(&self, handle: Handle) -> Result<Arc<KObj>> {
+        self.handles
+            .get(handle)
+            .map(|ref o| (*o).clone())
+            .unwrap_or(None)
+            .ok_or(ErrNum::InvalidHandle)
     }
 
     fn close_handle(&mut self, handle: Handle) -> bool {
@@ -167,7 +171,7 @@ pub struct Process {
 }
 
 impl Process {
-    fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree<MemBlock>>) -> Result<Self> {
+    fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree<MemBlock>>, handles: Vec<Option<Arc<KObj>>>) -> Result<Self> {
         let arch = try!(ArchProcess::new(phys.clone()));
         let user_virt = VirtualTree::new();
         user_virt.reserve(
@@ -183,7 +187,7 @@ impl Process {
             phys: phys,
             user_virt: user_virt,
             kernel_virt: kernel_virt,
-            state: Mutex::new(ProcessState::new())
+            state: Mutex::new(ProcessState::new(handles))
         })
     }
 
@@ -205,11 +209,17 @@ impl Process {
                 pager: None
             });
 
-        Process::new(phys, kernel_virt)
+        Process::new(phys, kernel_virt, Vec::new())
     }
 
-    pub fn spawn(&self) -> Result<Self> {
-        Process::new(self.phys.clone(), self.kernel_virt.clone())
+    pub fn spawn<I: IntoIterator<Item=Handle>>(&self, inherit: I) -> Result<Self> {
+        let mut handles = Vec::new();
+        let state = lock!(self.state);
+        for handle in inherit {
+            handles.push(Some(try!(state.resolve_handle(handle))));
+        }
+
+        Process::new(self.phys.clone(), self.kernel_virt.clone(), handles)
     }
 
     pub unsafe fn switch(&self) {
@@ -241,8 +251,9 @@ impl Process {
     }
 }
 
-pub fn spawn(executable: String) -> Result<(Arc<Process>, Deferred<i32>)> {
-    let process = Arc::new(try!(thread::current_process().spawn()));
+pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Result<(Arc<Process>, Deferred<i32>)> {
+    let current = thread::current_process();
+    let process = Arc::new(try!(current.spawn(inherit)));
 
     let init_in_new_process = move || {
         let image_slice = unsafe {
@@ -412,7 +423,7 @@ pub fn make_handle(obj: Arc<KObj>) -> Handle {
 
 pub fn resolve_handle<'a, T: 'a+?Sized, F: FnOnce(&'a KObj) -> Option<&'a T>>(handle: Handle, f: F) -> Result<KObjRef<T>> {
     let process = thread::current_process();
-    let kobj = try!(lock!(process.state).resolve_handle(handle).ok_or(ErrNum::InvalidHandle));
+    let kobj = try!(lock!(process.state).resolve_handle(handle));
     KObjRef::new(kobj, f)
 }
 
@@ -449,14 +460,14 @@ pub mod test {
             thread::with_scheduler(|| {
                 let p = thread::current_process();
 
-                let d1 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
+                let d1 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
                     0
                 });
 
-                let d2 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
+                let d2 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 456);
@@ -475,7 +486,7 @@ pub mod test {
                 let shared1 = shared.clone();
                 let shared2 = shared.clone();
 
-                let d1 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
+                let d1 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
                     let slice = Allocation::shared(0x1000, shared1).base(0x1000_0000 as *mut u8).user(true).writable(true).allocate().unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
@@ -484,7 +495,7 @@ pub mod test {
 
                 d1.get();
 
-                let d2 = thread::spawn_remote(Arc::new(p.spawn().unwrap()), || unsafe {
+                let d2 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
                     let slice = Allocation::shared(0x1000, shared2).base(0x2000_0000 as *mut u8).user(true).allocate().unwrap();
                     assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
                     0

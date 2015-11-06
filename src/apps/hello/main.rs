@@ -46,6 +46,7 @@ fn read_line() -> Result<String> {
 
 #[no_mangle]
 pub fn main() -> i32 {
+    let inherit = unsafe { [ stdin, stdout ] };
     loop {
         print!("> ");
 
@@ -54,7 +55,7 @@ pub fn main() -> i32 {
                 if line == "exit" {
                     return 0;
                 } else if line.len() > 0 {
-                    let handle = syscall::spawn(&line).unwrap();
+                    let handle = syscall::spawn(&line, &inherit).unwrap();
                     let _ = syscall::wait_for_exit(handle);
                     let _ = syscall::close(handle);
                 }

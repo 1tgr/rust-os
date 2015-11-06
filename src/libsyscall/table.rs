@@ -23,7 +23,7 @@ syscalls! {
     fn read(file: Handle, buf: &'a mut [u8]) -> usize => 6,
 
     fn init_video_mode(width: u16, height: u16, bpp: u8) -> *mut u8 => 7,
-    fn spawn(executable: &str) -> Handle => 8,
+    fn spawn(executable: &str, inherit: &'a [Handle]) -> Handle => 8,
     fn wait_for_exit(process: Handle) -> i32 => 9,
     fn create_shared_mem() -> Handle => 10,
     fn map_shared_mem(block: Handle, len: usize, writable: bool) -> *mut u8 => 11

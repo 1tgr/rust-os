@@ -87,9 +87,9 @@ impl HandleSyscall for SyscallHandler {
         Ok(slice.as_mut_ptr())
     }
 
-    fn spawn(&self, executable: &str) -> Result<Handle> {
-        let executable = String::from(executable);
-        let (_, deferred) = try!(process::spawn(executable));
+    fn spawn(&self, executable: &str, inherit: &[Handle]) -> Result<Handle> {
+        let inherit = inherit.iter().map(|handle| *handle);
+        let (_, deferred) = try!(process::spawn(String::from(executable), inherit));
         Ok(process::make_handle(Arc::new(deferred)))
     }
 
