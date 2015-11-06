@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `FileHandle` type in crate `syscall`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, FileHandle">
+    <meta name="description" content="API documentation for the Rust `map_shared_mem` fn in crate `syscall`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, map_shared_mem">
 
-    <title>syscall::FileHandle - Rust</title>
+    <title>syscall::map_shared_mem - Rust</title>
 
     <link rel="stylesheet" type="text/css" href="../main.css">
 
@@ -26,7 +26,7 @@
 
     <nav class="sidebar">
         
-        <p class='location'><a href='index.html'>syscall</a></p><script>window.sidebarCurrent = {name: 'FileHandle', ty: 'type', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='index.html'>syscall</a></p><script>window.sidebarCurrent = {name: 'map_shared_mem', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </nav>
 
     <nav class="sub">
@@ -40,13 +40,13 @@
         </form>
     </nav>
 
-    <section id='main' class="content type">
-<h1 class='fqn'><span class='in-band'><a href='index.html'>syscall</a>::<wbr><a class='type' href=''>FileHandle</a></span><span class='out-of-band'><span id='render-detail'>
+    <section id='main' class="content fn">
+<h1 class='fqn'><span class='in-band'>Function <a href='index.html'>syscall</a>::<wbr><a class='fn' href=''>map_shared_mem</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-31' class='srclink' href='../src/syscall/lib.rs.html#27' title='goto source code'>[src]</a></span></h1>
-<pre class='rust typedef'>type FileHandle = <a class='type' href='../syscall/type.Handle.html' title='syscall::Handle'>Handle</a>;</pre></section>
+        </span><a id='src-326' class='srclink' href='../src/syscall/macros.rs.html#20-22' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn map_shared_mem&lt;'a&gt;(block: <a class='type' href='../syscall/type.Handle.html' title='syscall::Handle'>Handle</a>, len: usize, writable: bool) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;*mut u8, <a class='enum' href='../syscall/enum.ErrNum.html' title='syscall::ErrNum'>ErrNum</a>&gt;</pre></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>

@@ -273,10 +273,6 @@
 <span id="231">231</span>
 <span id="232">232</span>
 <span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
 </pre><pre class='rust '>
 <span class='kw'>use</span> <span class='ident'>alloc</span>::<span class='ident'>arc</span>::<span class='ident'>Arc</span>;
 <span class='kw'>use</span> <span class='ident'>alloc</span>::<span class='ident'>boxed</span>::<span class='ident'>FnBox</span>;
@@ -291,12 +287,10 @@
 <span class='kw'>use</span> <span class='ident'>deferred</span>::<span class='ident'>Deferred</span>;
 <span class='kw'>use</span> <span class='ident'>libc</span>::{<span class='self'>self</span>,<span class='ident'>jmp_buf</span>};
 <span class='kw'>use</span> <span class='ident'>mutex</span>::<span class='ident'>Mutex</span>;
-<span class='kw'>use</span> <span class='ident'>phys_mem</span>::<span class='ident'>PhysicalBitmap</span>;
 <span class='kw'>use</span> <span class='ident'>prelude</span>::<span class='op'>*</span>;
 <span class='kw'>use</span> <span class='ident'>process</span>::<span class='ident'>Process</span>;
 <span class='kw'>use</span> <span class='ident'>ptr</span>::<span class='ident'>Align</span>;
 <span class='kw'>use</span> <span class='ident'>singleton</span>::<span class='ident'>Singleton</span>;
-<span class='kw'>use</span> <span class='ident'>virt_mem</span>::<span class='ident'>VirtualTree</span>;
 
 <span class='kw'>static</span> <span class='ident'>SCHEDULER</span>: <span class='ident'>Singleton</span><span class='op'>&lt;</span><span class='ident'>Mutex</span><span class='op'>&lt;</span><span class='ident'>SchedulerState</span><span class='op'>&gt;&gt;</span> <span class='op'>=</span> <span class='ident'>Singleton</span>::<span class='ident'>new</span>();
 
@@ -368,9 +362,7 @@
 }
 
 <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>with_scheduler</span><span class='op'>&lt;</span><span class='ident'>F</span>: <span class='ident'>FnOnce</span>()<span class='op'>&gt;</span>(<span class='ident'>f</span>: <span class='ident'>F</span>) {
-    <span class='kw'>let</span> <span class='ident'>phys</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>PhysicalBitmap</span>::<span class='ident'>parse_multiboot</span>());
-    <span class='kw'>let</span> <span class='ident'>kernel_virt</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>VirtualTree</span>::<span class='ident'>for_kernel</span>());
-    <span class='kw'>let</span> <span class='ident'>idle_process</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Process</span>::<span class='ident'>new</span>(<span class='ident'>phys</span>, <span class='ident'>kernel_virt</span>).<span class='ident'>unwrap</span>());
+    <span class='kw'>let</span> <span class='ident'>idle_process</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>Process</span>::<span class='ident'>for_kernel</span>().<span class='ident'>unwrap</span>());
 
     <span class='kw'>let</span> <span class='ident'>state</span> <span class='op'>=</span> <span class='ident'>SchedulerState</span> {
         <span class='ident'>current</span>: <span class='ident'>Thread</span>::<span class='ident'>new</span>(<span class='ident'>idle_process</span>.<span class='ident'>clone</span>(), <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> []),

@@ -45,7 +45,7 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-4702' class='srclink' href='../../src/kernel/io/mod.rs.html#29' title='goto source code'>[src]</a></span></h1>
+        </span><a id='src-4703' class='srclink' href='../../src/kernel/io/mod.rs.html#29' title='goto source code'>[src]</a></span></h1>
 <pre class='rust struct'>pub struct Promise&lt;T&gt;(_);</pre><div class='docblock'><p>A computation that might eventually resolve to a value of type <code>T</code>.</p>
 </div><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl&lt;T: 'static&gt; <a class='struct' href='../../kernel/io/struct.Promise.html' title='kernel::io::Promise'>Promise</a>&lt;T&gt;</code></h3><div class='impl-items'><h4 id='method.new' class='method'><code>fn <a href='#method.new' class='fnname'>new</a>(d: <a class='struct' href='../../kernel/deferred/struct.Deferred.html' title='kernel::deferred::Deferred'>Deferred</a>&lt;T&gt;) -&gt; Self</code></h4>
 <div class='docblock'><p>Creates a promise from a kernel <code>Deferred</code> object. The promise is resolved once the deferred is resolved.</p>

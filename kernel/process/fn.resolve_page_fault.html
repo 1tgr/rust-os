@@ -4,12 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="generator" content="rustdoc">
-    <meta name="description" content="API documentation for the Rust `ProcessHandle` type in crate `syscall`.">
-    <meta name="keywords" content="rust, rustlang, rust-lang, ProcessHandle">
+    <meta name="description" content="API documentation for the Rust `resolve_page_fault` fn in crate `kernel`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, resolve_page_fault">
 
-    <title>syscall::ProcessHandle - Rust</title>
+    <title>kernel::process::resolve_page_fault - Rust</title>
 
-    <link rel="stylesheet" type="text/css" href="../main.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
 
     
     
@@ -26,7 +26,7 @@
 
     <nav class="sidebar">
         
-        <p class='location'><a href='index.html'>syscall</a></p><script>window.sidebarCurrent = {name: 'ProcessHandle', ty: 'type', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+        <p class='location'><a href='../index.html'>kernel</a>::<wbr><a href='index.html'>process</a></p><script>window.sidebarCurrent = {name: 'resolve_page_fault', ty: 'fn', relpath: ''};</script><script defer src="sidebar-items.js"></script>
     </nav>
 
     <nav class="sub">
@@ -40,13 +40,13 @@
         </form>
     </nav>
 
-    <section id='main' class="content type">
-<h1 class='fqn'><span class='in-band'><a href='index.html'>syscall</a>::<wbr><a class='type' href=''>ProcessHandle</a></span><span class='out-of-band'><span id='render-detail'>
+    <section id='main' class="content fn">
+<h1 class='fqn'><span class='in-band'>Function <a href='../index.html'>kernel</a>::<wbr><a href='index.html'>process</a>::<wbr><a class='fn' href=''>resolve_page_fault</a></span><span class='out-of-band'><span id='render-detail'>
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-32' class='srclink' href='../src/syscall/lib.rs.html#28' title='goto source code'>[src]</a></span></h1>
-<pre class='rust typedef'>type ProcessHandle = <a class='type' href='../syscall/type.Handle.html' title='syscall::Handle'>Handle</a>;</pre></section>
+        </span><a id='src-5559' class='srclink' href='../../src/kernel/process.rs.html#403-416' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn resolve_page_fault(ptr: *mut u8) -&gt; bool</pre></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>
@@ -98,13 +98,13 @@
     
 
     <script>
-        window.rootPath = "../";
-        window.currentCrate = "syscall";
+        window.rootPath = "../../";
+        window.currentCrate = "kernel";
         window.playgroundUrl = "";
     </script>
-    <script src="../jquery.js"></script>
-    <script src="../main.js"></script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
     
-    <script async src="../search-index.js"></script>
+    <script async src="../../search-index.js"></script>
 </body>
 </html>

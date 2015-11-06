@@ -248,6 +248,12 @@
 <span id="206">206</span>
 <span id="207">207</span>
 <span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
 </pre><pre class='rust '>
 <span class='kw'>use</span> <span class='ident'>arch</span>::<span class='ident'>cpu</span>::{<span class='self'>self</span>,<span class='ident'>DescriptorExtra</span>,<span class='ident'>Dtr</span>,<span class='ident'>InterruptDescriptor</span>,<span class='ident'>Regs</span>,<span class='ident'>Tss</span>};
 <span class='kw'>use</span> <span class='ident'>arch</span>::<span class='ident'>debug</span>;
@@ -255,6 +261,7 @@
 <span class='kw'>use</span> <span class='ident'>core</span>::<span class='ident'>mem</span>;
 <span class='kw'>use</span> <span class='ident'>once</span>::{<span class='self'>self</span>,<span class='ident'>Once</span>};
 <span class='kw'>use</span> <span class='ident'>prelude</span>::<span class='op'>*</span>;
+<span class='kw'>use</span> <span class='ident'>process</span>;
 <span class='kw'>use</span> <span class='ident'>ptr</span>::{<span class='self'>self</span>,<span class='ident'>Align</span>};
 <span class='kw'>use</span> <span class='ident'>singleton</span>::{<span class='ident'>DropSingleton</span>,<span class='ident'>Singleton</span>};
 
@@ -323,6 +330,7 @@
         <span class='macro'>assert_len</span><span class='macro'>!</span>(<span class='kw-2'>&amp;</span><span class='ident'>IDT</span>, <span class='kw-2'>&amp;</span><span class='ident'>IDTEnd</span>);
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='number'>104</span>, <span class='ident'>mem</span>::<span class='ident'>size_of</span>::<span class='op'>&lt;</span><span class='ident'>Tss</span><span class='op'>&gt;</span>());
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='number'>10</span>, <span class='ident'>mem</span>::<span class='ident'>size_of</span>::<span class='op'>&lt;</span><span class='ident'>Dtr</span><span class='op'>&gt;</span>());
+        <span class='macro'>assert</span><span class='macro'>!</span>(<span class='ident'>Align</span>::<span class='ident'>is_aligned</span>(<span class='ident'>mem</span>::<span class='ident'>size_of</span>::<span class='op'>&lt;</span><span class='ident'>Regs</span><span class='op'>&gt;</span>(), <span class='number'>16</span>));
 
         <span class='kw'>let</span> <span class='ident'>tss_selector</span> <span class='op'>=</span> <span class='ident'>ptr</span>::<span class='ident'>bytes_between</span>(<span class='kw-2'>&amp;</span><span class='ident'>GDT</span>, <span class='kw-2'>&amp;</span><span class='ident'>GDT_TSS</span> <span class='kw'>as</span> <span class='op'>*</span><span class='kw'>const</span> _ <span class='kw'>as</span> <span class='op'>*</span><span class='kw'>const</span> <span class='ident'>u8</span>) <span class='kw'>as</span> <span class='ident'>u16</span>;
         <span class='macro'>assert_eq</span><span class='macro'>!</span>(<span class='number'>0x38</span>, <span class='ident'>tss_selector</span>);
@@ -414,7 +422,11 @@
 
 <span class='attribute'>#[<span class='ident'>no_mangle</span>]</span>
 <span class='kw'>pub</span> <span class='kw'>extern</span> <span class='kw'>fn</span> <span class='ident'>exception</span>(<span class='ident'>num</span>: <span class='ident'>u8</span>, <span class='ident'>regs</span>: <span class='kw-2'>&amp;</span><span class='ident'>Regs</span>) {
-    <span class='kw'>let</span> <span class='ident'>cr2</span>: <span class='op'>*</span><span class='kw'>const</span> <span class='ident'>u8</span> <span class='op'>=</span> <span class='ident'>cpu</span>::<span class='ident'>read_cr2</span>();
+    <span class='kw'>let</span> <span class='ident'>cr2</span>: <span class='op'>*</span><span class='kw-2'>mut</span> <span class='ident'>u8</span> <span class='op'>=</span> <span class='ident'>cpu</span>::<span class='ident'>read_cr2</span>();
+    <span class='kw'>if</span> <span class='ident'>num</span> <span class='op'>==</span> <span class='number'>14</span> <span class='op'>&amp;&amp;</span> <span class='ident'>process</span>::<span class='ident'>resolve_page_fault</span>(<span class='ident'>cr2</span>) {
+        <span class='kw'>return</span>;
+    }
+
     <span class='macro'>log</span><span class='macro'>!</span>(<span class='string'>&quot;exception {}: error=0x{:x}  cr2={:p}&quot;</span>, <span class='ident'>num</span>, <span class='ident'>regs</span>.<span class='ident'>error</span>, <span class='ident'>cr2</span>);
     <span class='macro'>log</span><span class='macro'>!</span>(<span class='string'>&quot;ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}&quot;</span>, <span class='ident'>regs</span>.<span class='ident'>ss</span>, <span class='ident'>regs</span>.<span class='ident'>rsp</span>, <span class='ident'>regs</span>.<span class='ident'>cs</span>, <span class='ident'>regs</span>.<span class='ident'>rip</span>, <span class='ident'>regs</span>.<span class='ident'>rflags</span>);
     <span class='macro'>log</span><span class='macro'>!</span>(<span class='string'>&quot;rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}&quot;</span>, <span class='ident'>regs</span>.<span class='ident'>rax</span>, <span class='ident'>regs</span>.<span class='ident'>rbx</span>, <span class='ident'>regs</span>.<span class='ident'>rcx</span>, <span class='ident'>regs</span>.<span class='ident'>rdx</span>);

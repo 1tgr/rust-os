@@ -45,8 +45,8 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-5315' class='srclink' href='../../src/kernel/process.rs.html#117-186' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn spawn(executable: <a class='struct' href='../../kernel/prelude/struct.String.html' title='kernel::prelude::String'>String</a>) -&gt; Result&lt;(<a class='struct' href='https://doc.rust-lang.org/nightly/alloc/arc/struct.Arc.html' title='alloc::arc::Arc'>Arc</a>&lt;<a class='struct' href='../../kernel/process/struct.Process.html' title='kernel::process::Process'>Process</a>&gt;, <a class='struct' href='../../kernel/deferred/struct.Deferred.html' title='kernel::deferred::Deferred'>Deferred</a>&lt;i32&gt;)&gt;</pre></section>
+        </span><a id='src-5420' class='srclink' href='../../src/kernel/process.rs.html#254-324' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn spawn&lt;I: <a class='trait' href='https://doc.rust-lang.org/nightly/core/iter/trait.IntoIterator.html' title='core::iter::IntoIterator'>IntoIterator</a>&lt;Item=Handle&gt;&gt;(executable: <a class='struct' href='../../kernel/prelude/struct.String.html' title='kernel::prelude::String'>String</a>, inherit: I) -&gt; Result&lt;(<a class='struct' href='https://doc.rust-lang.org/nightly/alloc/arc/struct.Arc.html' title='alloc::arc::Arc'>Arc</a>&lt;<a class='struct' href='../../kernel/process/struct.Process.html' title='kernel::process::Process'>Process</a>&gt;, <a class='struct' href='../../kernel/deferred/struct.Deferred.html' title='kernel::deferred::Deferred'>Deferred</a>&lt;i32&gt;)&gt;</pre></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>

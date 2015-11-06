@@ -1,1 +1,1 @@
-initSidebarItems({"fn":[["alloc",""],["alloc_at",""],["close_handle",""],["free",""],["make_handle",""],["map_phys",""],["resolve_handle",""],["spawn",""]],"struct":[["Process",""]],"trait":[["KObj",""]]});
+initSidebarItems({"fn":[["alloc",""],["alloc_at",""],["close_handle",""],["free",""],["make_handle",""],["map_phys",""],["map_shared",""],["resolve_handle",""],["resolve_page_fault",""],["spawn",""]],"struct":[["Allocation",""],["KObjRef",""],["Process",""],["SharedMemBlock",""]],"trait":[["KObj",""]]});

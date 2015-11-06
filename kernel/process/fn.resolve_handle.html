@@ -45,8 +45,8 @@
             <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                 [<span class='inner'>&#x2212;</span>]
             </a>
-        </span><a id='src-5438' class='srclink' href='../../src/kernel/process.rs.html#222-226' title='goto source code'>[src]</a></span></h1>
-<pre class='rust fn'>pub fn resolve_handle(handle: Handle) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/alloc/arc/struct.Arc.html' title='alloc::arc::Arc'>Arc</a>&lt;<a class='trait' href='../../kernel/process/trait.KObj.html' title='kernel::process::KObj'>KObj</a>&gt;&gt;</pre></section>
+        </span><a id='src-5582' class='srclink' href='../../src/kernel/process.rs.html#424-428' title='goto source code'>[src]</a></span></h1>
+<pre class='rust fn'>pub fn resolve_handle&lt;'a, T: 'a + ?<a class='trait' href='https://doc.rust-lang.org/nightly/core/marker/trait.Sized.html' title='core::marker::Sized'>Sized</a>, F: <a class='trait' href='https://doc.rust-lang.org/nightly/core/ops/trait.FnOnce.html' title='core::ops::FnOnce'>FnOnce</a>(&amp;'a <a class='trait' href='../../kernel/process/trait.KObj.html' title='kernel::process::KObj'>KObj</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;'a T&gt;&gt;(handle: Handle, f: F) -&gt; Result&lt;<a class='struct' href='../../kernel/process/struct.KObjRef.html' title='kernel::process::KObjRef'>KObjRef</a>&lt;T&gt;&gt;</pre></section>
     <section id='search' class="content hidden"></section>
 
     <section class="footer"></section>

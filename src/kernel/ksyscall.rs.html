@@ -144,17 +144,22 @@
 <span id="102">102</span>
 <span id="103">103</span>
 <span id="104">104</span>
+<span id="105">105</span>
+<span id="106">106</span>
+<span id="107">107</span>
+<span id="108">108</span>
+<span id="109">109</span>
+<span id="110">110</span>
 </pre><pre class='rust '>
 <span class='kw'>use</span> <span class='ident'>alloc</span>::<span class='ident'>arc</span>::<span class='ident'>Arc</span>;
 <span class='kw'>use</span> <span class='ident'>arch</span>::<span class='ident'>vga_bochs</span>;
 <span class='kw'>use</span> <span class='ident'>console</span>::<span class='ident'>Console</span>;
-<span class='kw'>use</span> <span class='ident'>deferred</span>::<span class='ident'>Deferred</span>;
 <span class='kw'>use</span> <span class='ident'>io</span>::{<span class='ident'>Read</span>,<span class='ident'>Write</span>};
 <span class='kw'>use</span> <span class='ident'>logging</span>::<span class='ident'>Writer</span>;
 <span class='kw'>use</span> <span class='ident'>prelude</span>::<span class='op'>*</span>;
-<span class='kw'>use</span> <span class='ident'>process</span>::{<span class='self'>self</span>,<span class='ident'>KObj</span>};
+<span class='kw'>use</span> <span class='ident'>process</span>::{<span class='self'>self</span>,<span class='ident'>KObj</span>,<span class='ident'>SharedMemBlock</span>};
 <span class='kw'>use</span> <span class='ident'>singleton</span>::{<span class='ident'>DropSingleton</span>,<span class='ident'>Singleton</span>};
-<span class='kw'>use</span> <span class='ident'>syscall</span>::{<span class='self'>self</span>,<span class='ident'>ErrNum</span>,<span class='ident'>FileHandle</span>,<span class='ident'>Handle</span>,<span class='ident'>HandleSyscall</span>,<span class='ident'>PackedArgs</span>,<span class='ident'>ProcessHandle</span>,<span class='prelude-ty'>Result</span>};
+<span class='kw'>use</span> <span class='ident'>syscall</span>::{<span class='self'>self</span>,<span class='ident'>ErrNum</span>,<span class='ident'>Handle</span>,<span class='ident'>HandleSyscall</span>,<span class='ident'>PackedArgs</span>,<span class='prelude-ty'>Result</span>};
 <span class='kw'>use</span> <span class='ident'>thread</span>;
 
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>SyscallHandler</span> {
@@ -190,15 +195,13 @@
         <span class='ident'>thread</span>::<span class='ident'>exit</span>(<span class='ident'>code</span>)
     }
 
-    <span class='kw'>fn</span> <span class='ident'>write</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>file</span>: <span class='ident'>FileHandle</span>, <span class='ident'>bytes</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>kobj</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>file</span>).<span class='ident'>ok_or</span>(<span class='ident'>ErrNum</span>::<span class='ident'>InvalidHandle</span>));
-        <span class='kw'>let</span> <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='ident'>Write</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>kobj</span>.<span class='ident'>write</span>().<span class='ident'>ok_or</span>(<span class='ident'>ErrNum</span>::<span class='ident'>NotSupported</span>));
+    <span class='kw'>fn</span> <span class='ident'>write</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>file</span>: <span class='ident'>Handle</span>, <span class='ident'>bytes</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>file</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>file</span>, <span class='op'>|</span><span class='ident'>kobj</span><span class='op'>|</span> <span class='ident'>kobj</span>.<span class='ident'>write</span>()));
         <span class='ident'>file</span>.<span class='ident'>write</span>(<span class='ident'>bytes</span>)
     }
 
-    <span class='kw'>fn</span> <span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>file</span>: <span class='ident'>FileHandle</span>, <span class='ident'>buf</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>kobj</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>file</span>).<span class='ident'>ok_or</span>(<span class='ident'>ErrNum</span>::<span class='ident'>InvalidHandle</span>));
-        <span class='kw'>let</span> <span class='ident'>file</span>: <span class='kw-2'>&amp;</span><span class='ident'>Read</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>kobj</span>.<span class='ident'>read</span>().<span class='ident'>ok_or</span>(<span class='ident'>ErrNum</span>::<span class='ident'>NotSupported</span>));
+    <span class='kw'>fn</span> <span class='ident'>read</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>file</span>: <span class='ident'>Handle</span>, <span class='ident'>buf</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> [<span class='ident'>u8</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>file</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>file</span>, <span class='op'>|</span><span class='ident'>kobj</span><span class='op'>|</span> <span class='ident'>kobj</span>.<span class='ident'>read</span>()));
         <span class='ident'>file</span>.<span class='ident'>read</span>(<span class='ident'>buf</span>)
     }
 
@@ -213,7 +216,7 @@
         <span class='prelude-val'>Ok</span>(<span class='ident'>process</span>::<span class='ident'>free</span>(<span class='ident'>p</span>))
     }
 
-    <span class='kw'>fn</span> <span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>filename</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>FileHandle</span><span class='op'>&gt;</span> {
+    <span class='kw'>fn</span> <span class='ident'>open</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>filename</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Handle</span><span class='op'>&gt;</span> {
         <span class='kw'>let</span> <span class='ident'>file</span>: <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>KObj</span><span class='op'>&gt;</span> <span class='op'>=</span>
             <span class='kw'>match</span> <span class='ident'>filename</span> {
                 <span class='string'>&quot;stdin&quot;</span> <span class='op'>=&gt;</span> <span class='self'>self</span>.<span class='ident'>console</span>.<span class='ident'>clone</span>(),
@@ -237,16 +240,25 @@
         <span class='prelude-val'>Ok</span>(<span class='ident'>slice</span>.<span class='ident'>as_mut_ptr</span>())
     }
 
-    <span class='kw'>fn</span> <span class='ident'>spawn</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>executable</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>ProcessHandle</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>executable</span> <span class='op'>=</span> <span class='ident'>String</span>::<span class='ident'>from</span>(<span class='ident'>executable</span>);
-        <span class='kw'>let</span> (_, <span class='ident'>deferred</span>) <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>spawn</span>(<span class='ident'>executable</span>));
+    <span class='kw'>fn</span> <span class='ident'>spawn</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>executable</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>, <span class='ident'>inherit</span>: <span class='kw-2'>&amp;</span>[<span class='ident'>Handle</span>]) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Handle</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>inherit</span> <span class='op'>=</span> <span class='ident'>inherit</span>.<span class='ident'>iter</span>().<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>handle</span><span class='op'>|</span> <span class='op'>*</span><span class='ident'>handle</span>);
+        <span class='kw'>let</span> (_, <span class='ident'>deferred</span>) <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>spawn</span>(<span class='ident'>String</span>::<span class='ident'>from</span>(<span class='ident'>executable</span>), <span class='ident'>inherit</span>));
         <span class='prelude-val'>Ok</span>(<span class='ident'>process</span>::<span class='ident'>make_handle</span>(<span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>deferred</span>)))
     }
 
-    <span class='kw'>fn</span> <span class='ident'>wait_for_exit</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>process</span>: <span class='ident'>ProcessHandle</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>i32</span><span class='op'>&gt;</span> {
-        <span class='kw'>let</span> <span class='ident'>kobj</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>process</span>).<span class='ident'>ok_or</span>(<span class='ident'>ErrNum</span>::<span class='ident'>InvalidHandle</span>));
-        <span class='kw'>let</span> <span class='ident'>deferred</span>: <span class='kw-2'>&amp;</span><span class='ident'>Deferred</span><span class='op'>&lt;</span><span class='ident'>i32</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>kobj</span>.<span class='ident'>deferred_i32</span>().<span class='ident'>ok_or</span>(<span class='ident'>ErrNum</span>::<span class='ident'>NotSupported</span>));
+    <span class='kw'>fn</span> <span class='ident'>wait_for_exit</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>process</span>: <span class='ident'>Handle</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>i32</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>deferred</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>process</span>, <span class='op'>|</span><span class='ident'>kobj</span><span class='op'>|</span> <span class='ident'>kobj</span>.<span class='ident'>deferred_i32</span>()));
         <span class='prelude-val'>Ok</span>((<span class='op'>*</span><span class='ident'>deferred</span>).<span class='ident'>clone</span>().<span class='ident'>get</span>())
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>create_shared_mem</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Handle</span><span class='op'>&gt;</span> {
+        <span class='prelude-val'>Ok</span>(<span class='ident'>process</span>::<span class='ident'>make_handle</span>(<span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>SharedMemBlock</span>::<span class='ident'>new</span>())))
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>map_shared_mem</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>block</span>: <span class='ident'>Handle</span>, <span class='ident'>len</span>: <span class='ident'>usize</span>, <span class='ident'>writable</span>: <span class='ident'>bool</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='op'>*</span><span class='kw-2'>mut</span> <span class='ident'>u8</span><span class='op'>&gt;</span> {
+        <span class='kw'>let</span> <span class='ident'>block</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>resolve_handle</span>(<span class='ident'>block</span>, <span class='op'>|</span><span class='ident'>kobj</span><span class='op'>|</span> <span class='ident'>kobj</span>.<span class='ident'>shared_mem_block</span>()));
+        <span class='kw'>let</span> <span class='ident'>slice</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>process</span>::<span class='ident'>map_shared</span>(<span class='ident'>block</span>, <span class='ident'>len</span>, <span class='boolval'>true</span>, <span class='ident'>writable</span>));
+        <span class='prelude-val'>Ok</span>(<span class='ident'>slice</span>.<span class='ident'>as_mut_ptr</span>())
     }
 }
 </pre>
