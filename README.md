@@ -24,3 +24,12 @@ Features:
   - Syscall interface (via SYSCALL/SYSRET instructions)
   - C runtime (Newlib)
   - Cairo graphics
+
+Works in progress:
+ - Graphics compositor
+
+Todo:
+ - Mouse
+ - Window system
+ - File system
+ - Networking
