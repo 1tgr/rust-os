@@ -1,0 +1,3 @@
+: main.rs | $(LIBS) |> !RUSTC_OBJ |> %d.o {objs}
+: {objs} $(LIBS) $(LIBS1) | $(ROOT)/libsyscall/arch/@(ARCH)/link.ld |> !LD |> %d-debug {bins_debug}
+: {bins_debug} |> $(OBJCOPY) -S %f %o |> %d

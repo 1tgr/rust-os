@@ -37,7 +37,7 @@ test! {
                     KObjRef::new(Arc::new(Vga::new()), |kobj| kobj.write()).unwrap())));
 
             let _x = ksyscall::register_handler(handler);
-            let (_, deferred) = process::spawn(String::from("hello"), Vec::new()).unwrap();
+            let (_, deferred) = process::spawn(String::from("graphics_server"), Vec::new()).unwrap();
             deferred.poll();
         });
     }

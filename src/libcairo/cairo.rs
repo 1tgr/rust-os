@@ -27,27 +27,27 @@ pub struct Struct__cairo_matrix {
     pub x0: ::libc::c_double,
     pub y0: ::libc::c_double,
 }
-impl ::std::clone::Clone for Struct__cairo_matrix {
+impl ::core::clone::Clone for Struct__cairo_matrix {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct__cairo_matrix {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct__cairo_matrix {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_matrix_t = Struct__cairo_matrix;
 pub enum Struct__cairo_pattern { }
 pub type cairo_pattern_t = Struct__cairo_pattern;
 pub type cairo_destroy_func_t =
-    ::std::option::Option<extern "C" fn(data: *mut ::libc::c_void) -> ()>;
+    ::core::option::Option<extern "C" fn(data: *mut ::libc::c_void) -> ()>;
 #[repr(C)]
 #[derive(Copy)]
 pub struct Struct__cairo_user_data_key {
     pub unused: ::libc::c_int,
 }
-impl ::std::clone::Clone for Struct__cairo_user_data_key {
+impl ::core::clone::Clone for Struct__cairo_user_data_key {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct__cairo_user_data_key {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct__cairo_user_data_key {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_user_data_key_t = Struct__cairo_user_data_key;
 pub type Enum__cairo_status = ::libc::c_uint;
@@ -107,12 +107,12 @@ pub const CAIRO_FORMAT_RGB16_565: ::libc::c_int = 4;
 pub const CAIRO_FORMAT_RGB30: ::libc::c_int = 5;
 pub type cairo_format_t = Enum__cairo_format;
 pub type cairo_write_func_t =
-    ::std::option::Option<extern "C" fn(closure: *mut ::libc::c_void,
+    ::core::option::Option<extern "C" fn(closure: *mut ::libc::c_void,
                                         data: *const ::libc::c_uchar,
                                         length: ::libc::c_uint)
                               -> cairo_status_t>;
 pub type cairo_read_func_t =
-    ::std::option::Option<extern "C" fn(closure: *mut ::libc::c_void,
+    ::core::option::Option<extern "C" fn(closure: *mut ::libc::c_void,
                                         data: *mut ::libc::c_uchar,
                                         length: ::libc::c_uint)
                               -> cairo_status_t>;
@@ -124,11 +124,11 @@ pub struct Struct__cairo_rectangle_int {
     pub width: ::libc::c_int,
     pub height: ::libc::c_int,
 }
-impl ::std::clone::Clone for Struct__cairo_rectangle_int {
+impl ::core::clone::Clone for Struct__cairo_rectangle_int {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct__cairo_rectangle_int {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct__cairo_rectangle_int {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_rectangle_int_t = Struct__cairo_rectangle_int;
 pub type Enum__cairo_operator = ::libc::c_uint;
@@ -193,11 +193,11 @@ pub struct Struct__cairo_rectangle {
     pub width: ::libc::c_double,
     pub height: ::libc::c_double,
 }
-impl ::std::clone::Clone for Struct__cairo_rectangle {
+impl ::core::clone::Clone for Struct__cairo_rectangle {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct__cairo_rectangle {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct__cairo_rectangle {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_rectangle_t = Struct__cairo_rectangle;
 #[repr(C)]
@@ -207,11 +207,11 @@ pub struct Struct__cairo_rectangle_list {
     pub rectangles: *mut cairo_rectangle_t,
     pub num_rectangles: ::libc::c_int,
 }
-impl ::std::clone::Clone for Struct__cairo_rectangle_list {
+impl ::core::clone::Clone for Struct__cairo_rectangle_list {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct__cairo_rectangle_list {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct__cairo_rectangle_list {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_rectangle_list_t = Struct__cairo_rectangle_list;
 pub enum Struct__cairo_scaled_font { }
@@ -225,11 +225,11 @@ pub struct Struct_Unnamed1 {
     pub x: ::libc::c_double,
     pub y: ::libc::c_double,
 }
-impl ::std::clone::Clone for Struct_Unnamed1 {
+impl ::core::clone::Clone for Struct_Unnamed1 {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_Unnamed1 {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_Unnamed1 {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_glyph_t = Struct_Unnamed1;
 #[repr(C)]
@@ -238,11 +238,11 @@ pub struct Struct_Unnamed2 {
     pub num_bytes: ::libc::c_int,
     pub num_glyphs: ::libc::c_int,
 }
-impl ::std::clone::Clone for Struct_Unnamed2 {
+impl ::core::clone::Clone for Struct_Unnamed2 {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_Unnamed2 {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_Unnamed2 {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_text_cluster_t = Struct_Unnamed2;
 pub type Enum__cairo_text_cluster_flags = ::libc::c_uint;
@@ -258,11 +258,11 @@ pub struct Struct_Unnamed3 {
     pub x_advance: ::libc::c_double,
     pub y_advance: ::libc::c_double,
 }
-impl ::std::clone::Clone for Struct_Unnamed3 {
+impl ::core::clone::Clone for Struct_Unnamed3 {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_Unnamed3 {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_Unnamed3 {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_text_extents_t = Struct_Unnamed3;
 #[repr(C)]
@@ -274,11 +274,11 @@ pub struct Struct_Unnamed4 {
     pub max_x_advance: ::libc::c_double,
     pub max_y_advance: ::libc::c_double,
 }
-impl ::std::clone::Clone for Struct_Unnamed4 {
+impl ::core::clone::Clone for Struct_Unnamed4 {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_Unnamed4 {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_Unnamed4 {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_font_extents_t = Struct_Unnamed4;
 pub type Enum__cairo_font_slant = ::libc::c_uint;
@@ -319,18 +319,18 @@ pub const CAIRO_FONT_TYPE_QUARTZ: ::libc::c_uint = 3;
 pub const CAIRO_FONT_TYPE_USER: ::libc::c_uint = 4;
 pub type cairo_font_type_t = Enum__cairo_font_type;
 pub type cairo_user_scaled_font_init_func_t =
-    ::std::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
+    ::core::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
                                         cr: *mut cairo_t,
                                         extents: *mut cairo_font_extents_t)
                               -> cairo_status_t>;
 pub type cairo_user_scaled_font_render_glyph_func_t =
-    ::std::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
+    ::core::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
                                         glyph: ::libc::c_ulong,
                                         cr: *mut cairo_t,
                                         extents: *mut cairo_text_extents_t)
                               -> cairo_status_t>;
 pub type cairo_user_scaled_font_text_to_glyphs_func_t =
-    ::std::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
+    ::core::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
                                         utf8: *const ::libc::c_char,
                                         utf8_len: ::libc::c_int,
                                         glyphs: *mut *mut cairo_glyph_t,
@@ -342,7 +342,7 @@ pub type cairo_user_scaled_font_text_to_glyphs_func_t =
                                             *mut cairo_text_cluster_flags_t)
                               -> cairo_status_t>;
 pub type cairo_user_scaled_font_unicode_to_glyph_func_t =
-    ::std::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
+    ::core::option::Option<extern "C" fn(scaled_font: *mut cairo_scaled_font_t,
                                         unicode: ::libc::c_ulong,
                                         glyph_index: *mut ::libc::c_ulong)
                               -> cairo_status_t>;
@@ -360,19 +360,19 @@ pub struct Union__cairo_path_data_t {
 }
 impl Union__cairo_path_data_t {
     pub unsafe fn header(&mut self) -> *mut Struct_Unnamed5 {
-        let raw: *mut u8 = ::std::mem::transmute(&self._bindgen_data_);
-        ::std::mem::transmute(raw.offset(0))
+        let raw: *mut u8 = ::core::mem::transmute(&self._bindgen_data_);
+        ::core::mem::transmute(raw.offset(0))
     }
     pub unsafe fn point(&mut self) -> *mut Struct_Unnamed6 {
-        let raw: *mut u8 = ::std::mem::transmute(&self._bindgen_data_);
-        ::std::mem::transmute(raw.offset(0))
+        let raw: *mut u8 = ::core::mem::transmute(&self._bindgen_data_);
+        ::core::mem::transmute(raw.offset(0))
     }
 }
-impl ::std::clone::Clone for Union__cairo_path_data_t {
+impl ::core::clone::Clone for Union__cairo_path_data_t {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Union__cairo_path_data_t {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Union__cairo_path_data_t {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -380,11 +380,11 @@ pub struct Struct_Unnamed5 {
     pub _type: cairo_path_data_type_t,
     pub length: ::libc::c_int,
 }
-impl ::std::clone::Clone for Struct_Unnamed5 {
+impl ::core::clone::Clone for Struct_Unnamed5 {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_Unnamed5 {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_Unnamed5 {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -392,11 +392,11 @@ pub struct Struct_Unnamed6 {
     pub x: ::libc::c_double,
     pub y: ::libc::c_double,
 }
-impl ::std::clone::Clone for Struct_Unnamed6 {
+impl ::core::clone::Clone for Struct_Unnamed6 {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_Unnamed6 {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_Unnamed6 {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -405,11 +405,11 @@ pub struct Struct_cairo_path {
     pub data: *mut cairo_path_data_t,
     pub num_data: ::libc::c_int,
 }
-impl ::std::clone::Clone for Struct_cairo_path {
+impl ::core::clone::Clone for Struct_cairo_path {
     fn clone(&self) -> Self { *self }
 }
-impl ::std::default::Default for Struct_cairo_path {
-    fn default() -> Self { unsafe { ::std::mem::zeroed() } }
+impl ::core::default::Default for Struct_cairo_path {
+    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
 }
 pub type cairo_path_t = Struct_cairo_path;
 pub type Enum__cairo_device_type = ::libc::c_int;
@@ -428,7 +428,7 @@ pub const CAIRO_SURFACE_OBSERVER_NORMAL: ::libc::c_uint = 0;
 pub const CAIRO_SURFACE_OBSERVER_RECORD_OPERATIONS: ::libc::c_uint = 1;
 pub type cairo_surface_observer_mode_t = Enum_Unnamed7;
 pub type cairo_surface_observer_callback_t =
-    ::std::option::Option<extern "C" fn(observer: *mut cairo_surface_t,
+    ::core::option::Option<extern "C" fn(observer: *mut cairo_surface_t,
                                         target: *mut cairo_surface_t,
                                         data: *mut ::libc::c_void) -> ()>;
 pub type Enum__cairo_surface_type = ::libc::c_uint;
@@ -459,26 +459,26 @@ pub const CAIRO_SURFACE_TYPE_SUBSURFACE: ::libc::c_uint = 23;
 pub const CAIRO_SURFACE_TYPE_COGL: ::libc::c_uint = 24;
 pub type cairo_surface_type_t = Enum__cairo_surface_type;
 pub type cairo_raster_source_acquire_func_t =
-    ::std::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
+    ::core::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
                                         callback_data: *mut ::libc::c_void,
                                         target: *mut cairo_surface_t,
                                         extents: *const cairo_rectangle_int_t)
                               -> *mut cairo_surface_t>;
 pub type cairo_raster_source_release_func_t =
-    ::std::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
+    ::core::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
                                         callback_data: *mut ::libc::c_void,
                                         surface: *mut cairo_surface_t) -> ()>;
 pub type cairo_raster_source_snapshot_func_t =
-    ::std::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
+    ::core::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
                                         callback_data: *mut ::libc::c_void)
                               -> cairo_status_t>;
 pub type cairo_raster_source_copy_func_t =
-    ::std::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
+    ::core::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
                                         callback_data: *mut ::libc::c_void,
                                         other: *const cairo_pattern_t)
                               -> cairo_status_t>;
 pub type cairo_raster_source_finish_func_t =
-    ::std::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
+    ::core::option::Option<extern "C" fn(pattern: *mut cairo_pattern_t,
                                         callback_data: *mut ::libc::c_void)
                               -> ()>;
 pub type Enum__cairo_pattern_type = ::libc::c_uint;

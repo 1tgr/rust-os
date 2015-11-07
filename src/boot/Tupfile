@@ -6,6 +6,8 @@ ISO += menu.lst
 ISO += stage2_eltorito
 
 INITRD += ../apps/cairo_demo/cairo_demo
+INITRD += ../apps/graphics_client/graphics_client
+INITRD += ../apps/graphics_server/graphics_server
 INITRD += ../apps/hello/hello
 
 : $(INITRD) |> tar --transform 's/.*\///g' -cf %o %f |> initrd.tar
