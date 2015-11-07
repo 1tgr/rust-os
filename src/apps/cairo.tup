@@ -1,5 +1,7 @@
 RUSTFLAGS += --extern cairo=$(ROOT)/libcairo/libcairo.rlib
+RUSTFLAGS += --extern graphics=$(ROOT)/libgraphics/libgraphics.rlib
 
+LIBS += $(ROOT)/libgraphics/libgraphics.rlib
 LIBS += $(ROOT)/libcairo/libcairo.rlib
 
 LIBS += $(ROOT)/cairo/lib/libcairo.a

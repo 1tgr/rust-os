@@ -4,7 +4,10 @@ extern crate cairo;
 extern crate libc;
 extern crate syscall;
 
-use cairo::*;
+use cairo::bindings::*;
+use cairo::cairo::Cairo;
+use cairo::{CairoFunc,CairoObj};
+use cairo::surface::CairoSurface;
 use std::f64::consts;
 use std::mem;
 use std::ptr;
@@ -12,11 +15,10 @@ use std::ptr;
 #[no_mangle]
 pub unsafe fn main() -> i32 {
     let lfb = syscall::init_video_mode(800, 600, 32).unwrap();
-    let stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-    let surface = CairoObj::wrap(cairo_image_surface_create_for_data(lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride));
-    assert_eq!(CAIRO_STATUS_SUCCESS, cairo_surface_status(*surface));
+    let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
+    let surface = CairoSurface::for_data(lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride);
 
-    let cr = CairoObj::wrap(cairo_create(*surface));
+    let cr = Cairo::new(surface);
     let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0));
     cairo_pattern_add_color_stop_rgba(*pat, 1.0, 0.0, 0.0, 0.0, 1.0);
     cairo_pattern_add_color_stop_rgba(*pat, 0.0, 1.0, 1.0, 1.0, 1.0);

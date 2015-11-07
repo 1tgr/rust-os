@@ -7,13 +7,19 @@
 
 extern crate libc;
 
-mod cairo;
+pub mod cairo;
+pub mod bindings;
+pub mod surface;
 
-pub use cairo::*;
-
+use bindings::*;
 use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::Unique;
+use libc::c_int;
+
+pub fn stride_for_width(format: cairo_format_t, width: u16) -> usize {
+    unsafe { cairo_format_stride_for_width(format, width as c_int) as usize }
+}
 
 pub trait CairoDrop {
     unsafe fn drop_cairo(ptr: *mut Self);

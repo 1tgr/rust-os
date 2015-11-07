@@ -1,0 +1,16 @@
+include_rules
+
+RUSTFLAGS += -L ../liblibc
+
+RUSTFLAGS += --extern cairo=../libcairo/libcairo.rlib
+RUSTFLAGS += --extern core=../libcore/libcore.rlib
+RUSTFLAGS += --extern libc=../liblibc/liblibc.rlib
+RUSTFLAGS += --extern syscall=../libsyscall/libsyscall.rlib
+
+LIBS += ../libcairo/libcairo.rlib
+LIBS += ../libcore/libcore.rlib
+LIBS += ../liblibc/liblibc.rlib
+LIBS += ../libsyscall/libsyscall.rlib
+
+: lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> %d.rlib
+: lib.rs |> !RUSTDOC_CMD |> rustdoc

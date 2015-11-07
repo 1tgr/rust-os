@@ -1,14 +1,12 @@
-#![feature(libc)]
-
 extern crate cairo;
-extern crate libc;
+extern crate graphics;
 extern crate syscall;
 
-use cairo::*;
-use libc::c_int;
+use cairo::bindings::*;
+use cairo::cairo::Cairo;
 use std::mem;
-use syscall::libc_helpers::{stdin,stdout};
 use syscall::{Handle,Result};
+use syscall::libc_helpers::{stdin,stdout};
 
 fn run_client(shared_mem: Handle) -> Result<()> {
     let inherit = unsafe { [ stdin, stdout, shared_mem ] };
@@ -25,34 +23,14 @@ fn run_client(shared_mem: Handle) -> Result<()> {
 
 fn run() -> Result<()> {
     let shared_mem = try!(syscall::create_shared_mem());
-    const WIDTH: c_int = 100;
-    const HEIGHT: c_int = 100;
     const FORMAT: cairo_format_t = CAIRO_FORMAT_ARGB32;
 
-    unsafe {
-        let shared_stride = cairo_format_stride_for_width(FORMAT, WIDTH);
-        let shared_ptr = try!(syscall::map_shared_mem(2, shared_stride as usize * HEIGHT as usize, true));
-        {
-            let shared_surface = CairoObj::wrap(cairo_image_surface_create_for_data(shared_ptr, FORMAT, WIDTH, HEIGHT, shared_stride));
-            try!(run_client(shared_mem));
+    let shared_surface = try!(graphics::create_shared_mem_surface(2, FORMAT, 100, 100));
+    try!(run_client(shared_mem));
 
-            let lfb_ptr = try!(syscall::init_video_mode(800, 600, 32));
-            {
-                let lfb_surface = {
-                    let lfb_stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-                    CairoObj::wrap(cairo_image_surface_create_for_data(lfb_ptr, FORMAT, WIDTH, HEIGHT, lfb_stride))
-                };
-
-                let cr = CairoObj::wrap(cairo_create(*lfb_surface));
-                cairo_set_source_surface(*cr, *shared_surface, 0.0, 0.0);
-                cairo_paint(*cr);
-            }
-
-            let _ = syscall::free_pages(lfb_ptr);
-        }
-
-        let _ = syscall::free_pages(shared_ptr);
-    }
+    Cairo::new(try!(graphics::create_lfb_surface(FORMAT, 800, 600, 32)))
+        .set_source_surface(shared_surface, 100.0, 100.0)
+        .paint();
 
     Ok(())
 }
