@@ -26,5 +26,6 @@ syscalls! {
     fn spawn(executable: &str, inherit: &'a [Handle]) -> Handle => 8,
     fn wait_for_exit(process: Handle) -> i32 => 9,
     fn create_shared_mem() -> Handle => 10,
-    fn map_shared_mem(block: Handle, len: usize, writable: bool) -> *mut u8 => 11
+    fn map_shared_mem(block: Handle, len: usize, writable: bool) -> *mut u8 => 11,
+    fn create_pipe() -> Handle => 12
 }

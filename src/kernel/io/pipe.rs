@@ -1,9 +1,10 @@
 use collections::vec_deque::VecDeque;
 use core::cmp;
 use deferred::Deferred;
-use io::{AsyncRead,Promise,Write};
+use io::{AsyncRead,Promise,Read,Write};
 use mutex::Mutex;
 use prelude::*;
+use process::KObj;
 use syscall::Result;
 
 struct IoRequest {
@@ -95,6 +96,20 @@ impl Write for Pipe {
         lock!(self.data).extend(buf);
         self.fulfil();
         Ok(buf.len())
+    }
+}
+
+impl KObj for Pipe {
+    fn async_read(&self) -> Option<&AsyncRead> {
+        Some(self)
+    }
+
+    fn read(&self) -> Option<&Read> {
+        Some(self)
+    }
+
+    fn write(&self) -> Option<&Write> {
+        Some(self)
     }
 }
 

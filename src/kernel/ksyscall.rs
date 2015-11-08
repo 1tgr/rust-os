@@ -1,7 +1,7 @@
 use alloc::arc::Arc;
 use arch::vga_bochs;
 use console::Console;
-use io::{Read,Write};
+use io::{Pipe,Read,Write};
 use logging::Writer;
 use prelude::*;
 use process::{self,KObj,SharedMemBlock};
@@ -106,5 +106,9 @@ impl HandleSyscall for SyscallHandler {
         let block = try!(process::resolve_handle(block, |kobj| kobj.shared_mem_block()));
         let slice = try!(process::map_shared(block, len, true, writable));
         Ok(slice.as_mut_ptr())
+    }
+
+    fn create_pipe(&self) -> Result<Handle> {
+        Ok(process::make_handle(Arc::new(Pipe::new())))
     }
 }

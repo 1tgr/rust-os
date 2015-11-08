@@ -291,7 +291,7 @@ impl Keyboard {
                 let mut state = lock!(state);
                 let code = unsafe { cpu::inb(0x60) };
                 let bytes = state.translate(code);
-                let _ = device.write(&bytes[..]);
+                let _ = Write::write(&*device, &bytes[..]);
             }
         };
 
