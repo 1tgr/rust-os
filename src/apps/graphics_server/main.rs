@@ -42,19 +42,19 @@ impl Window {
         self.shared_mem.resize(new_len)
     }
 
-    pub fn draw_to(&mut self, cr: &Cairo) {
+    pub fn draw_to(&self, cr: &Cairo) {
         let surface = CairoSurface::from_raw(&*self.shared_mem, self.format, (self.width + 0.5) as u16, (self.height + 0.5) as u16, self.stride());
         cr.set_source_surface(surface, self.x, self.y).paint();
     }
 }
 
-fn start_client(window: &Window, server2client: &File, client2server: &File) -> Result<OSHandle> {
+fn start_client(window: &Window, client2server: &File) -> Result<OSHandle> {
     let (stdin, stdout) = unsafe { (libc_helpers::stdin, libc_helpers::stdout) };
     let inherit = [
         stdin,
         stdout,
         **window.shared_mem.handle(),
-        **server2client.handle(),
+        stdin,
         **client2server.handle()
     ];
 
@@ -63,9 +63,8 @@ fn start_client(window: &Window, server2client: &File, client2server: &File) -> 
 
 fn run() -> Result<()> {
     let mut window = try!(Window::new(CAIRO_FORMAT_ARGB32, 50.0, 50.0, 100.0, 100.0));
-    let mut server2client = try!(File::create_pipe());
     let mut client2server = try!(File::create_pipe());
-    let _process = try!(start_client(&window, &server2client, &client2server));
+    let _process = try!(start_client(&window, &client2server));
 
     let lfb_mem = OSMem::from_raw(try!(syscall::init_video_mode(800, 600, 32)));
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
@@ -77,8 +76,6 @@ fn run() -> Result<()> {
         let len = try!(client2server.read(&mut buf[..]));
         buf.truncate(len);
         window.draw_to(&cr);
-
-        try!(server2client.write(b"."));
     }
 }
 
