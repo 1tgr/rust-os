@@ -8,11 +8,12 @@ RUSTFLAGS += -L $(ROOT)/libsyscall
 RUSTFLAGS += -L $(ROOT)/modules
 
 LIBS += $(ROOT)/liballoc/liballoc.rlib
-LIBS += $(ROOT)/liballoc_system/liballoc_system.rlib
 LIBS += $(ROOT)/libcollections/libcollections.rlib
 LIBS += $(ROOT)/libcore/libcore.rlib
 LIBS += $(ROOT)/libstd/libstd.rlib
 LIBS += $(ROOT)/libsyscall/libsyscall.rlib
+
+LIBS += $(ROOT)/liballoc_system/liballoc_system.rlib
 
 LIBS1 += $(ROOT)/newlib/$(TARGET)/lib/libc.a
 

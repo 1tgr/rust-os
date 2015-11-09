@@ -1,10 +1,14 @@
 #![crate_name = "cairo"]
 
+#![feature(collections)]
+#![feature(convert)]
 #![feature(libc)]
 #![feature(no_std)]
+#![feature(str_char)]
 #![feature(unique)]
 #![no_std]
 
+extern crate collections;
 extern crate libc;
 
 pub mod cairo;
@@ -23,11 +27,16 @@ pub fn stride_for_width(format: cairo_format_t, width: u16) -> usize {
 
 pub trait CairoDrop {
     unsafe fn drop_cairo(ptr: *mut Self);
+    unsafe fn reference_cairo(ptr: *mut Self) -> *mut Self;
 }
 
 impl CairoDrop for cairo_t {
     unsafe fn drop_cairo(ptr: *mut Self) {
         cairo_destroy(ptr)
+    }
+
+    unsafe fn reference_cairo(ptr: *mut Self) -> *mut Self {
+        cairo_reference(ptr)
     }
 }
 
@@ -35,11 +44,19 @@ impl CairoDrop for cairo_pattern_t {
     unsafe fn drop_cairo(ptr: *mut Self) {
         cairo_pattern_destroy(ptr)
     }
+
+    unsafe fn reference_cairo(ptr: *mut Self) -> *mut Self {
+        cairo_pattern_reference(ptr)
+    }
 }
 
 impl CairoDrop for cairo_surface_t {
     unsafe fn drop_cairo(ptr: *mut Self) {
         cairo_surface_destroy(ptr)
+    }
+
+    unsafe fn reference_cairo(ptr: *mut Self) -> *mut Self {
+        cairo_surface_reference(ptr)
     }
 }
 
@@ -49,6 +66,12 @@ impl<T: CairoDrop> CairoObj<T> {
     pub fn wrap(ptr: *mut T) -> CairoObj<T> {
         assert!(ptr as usize != 0);
         CairoObj(unsafe { Unique::new(ptr) })
+    }
+}
+
+impl<T: CairoDrop> Clone for CairoObj<T> {
+    fn clone(&self) -> Self {
+        CairoObj(unsafe { Unique::new(CairoDrop::reference_cairo(*self.0)) })
     }
 }
 

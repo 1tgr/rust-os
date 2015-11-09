@@ -4,19 +4,20 @@ extern crate cairo;
 extern crate libc;
 extern crate syscall;
 
+use cairo::{CairoFunc,CairoObj};
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
-use cairo::{CairoFunc,CairoObj};
 use cairo::surface::CairoSurface;
 use std::f64::consts;
 use std::mem;
+use std::os::OSMem;
 use std::ptr;
 
 #[no_mangle]
 pub unsafe fn main() -> i32 {
-    let lfb = syscall::init_video_mode(800, 600, 32).unwrap();
+    let lfb = OSMem::from_raw(syscall::init_video_mode(800, 600, 32).unwrap());
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-    let surface = CairoSurface::for_data(lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride);
+    let surface = CairoSurface::from_raw(&lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride);
 
     let cr = Cairo::new(surface);
     let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0));
@@ -53,7 +54,7 @@ pub unsafe fn main() -> i32 {
     cairo_set_source_surface(*cr, *image, (128 - cairo_image_surface_get_width(*image) / 2) as f64, (128 - cairo_image_surface_get_height(*image) / 2) as f64);
     cairo_paint(*cr);
 
-    let message = b"Hello, world\0".as_ptr() as *const libc::c_char;
+    let message = b"Hello, world\0".as_ptr() as *const i8;
     let mut extents = mem::uninitialized();
     cairo_text_extents(*cr, message, &mut extents);
     cairo_set_source_rgb(*cr, 0.0, 0.0, 0.0);

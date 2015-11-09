@@ -9,12 +9,13 @@
 // except according to those terms.
 
 use boxed::Box;
-use convert::Into;
+use convert::{From,Into};
 use error;
 use fmt;
 use marker::{Send, Sync};
 use option::Option::{self, Some, None};
 use result;
+use syscall::ErrNum;
 
 /// A specialized [`Result`][result] type for I/O operations.
 ///
@@ -234,6 +235,41 @@ impl error::Error for Error {
         match self.repr {
             Repr::Os(..) => None,
             Repr::Custom(ref c) => c.error.cause(),
+        }
+    }
+}
+
+impl From<ErrNum> for ErrorKind {
+    fn from(num: ErrNum) -> Self {
+        match num {
+            ErrNum::InvalidArgument => ErrorKind::InvalidInput,
+            ErrNum::FileNotFound => ErrorKind::NotFound,
+            _ => ErrorKind::Other
+        }
+    }
+}
+
+impl From<ErrorKind> for ErrNum {
+    fn from(kind: ErrorKind) -> Self {
+        match kind {
+            ErrorKind::InvalidInput => ErrNum::InvalidArgument,
+            ErrorKind::NotFound => ErrNum::FileNotFound,
+            _ => ErrNum::NotSupported
+        }
+    }
+}
+
+impl From<ErrNum> for Error {
+    fn from(num: ErrNum) -> Self {
+        Error { repr: Repr::Os(ErrorKind::from(num)) }
+    }
+}
+
+impl From<Error> for ErrNum {
+    fn from(error: Error) -> Self {
+        match error.repr {
+            Repr::Os(kind) => ErrNum::from(kind),
+            _ => ErrNum::NotSupported
         }
     }
 }

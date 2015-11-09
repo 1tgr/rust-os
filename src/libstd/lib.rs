@@ -20,6 +20,7 @@
 #![feature(reflect_marker)]
 #![feature(str_char)]
 #![feature(unicode)]
+#![feature(unique)]
 #![feature(vec_push_all)]
 #![feature(wrapping)]
 #![feature(zero_one)]
@@ -27,16 +28,27 @@
 #![no_std]
 
 #[macro_use]
-#[macro_reexport(assert, assert_eq, try, write, writeln)]
+#[macro_reexport(assert, assert_eq, write, writeln)]
 extern crate core as __core;
 
 #[macro_use]
 #[macro_reexport(vec, format)]
 extern crate collections as core_collections;
 
+#[macro_export]
+macro_rules! try {
+    ($expr:expr) => (match $expr {
+        $crate::result::Result::Ok(val) => val,
+        $crate::result::Result::Err(err) => {
+            return $crate::result::Result::Err($crate::convert::From::from(err))
+        }
+    })
+}
+
 extern crate alloc;
 extern crate libc;
 extern crate rustc_unicode;
+extern crate syscall;
 
 pub mod prelude {
     pub mod v1 {
@@ -114,6 +126,7 @@ pub use core::u64;
 
 pub mod error;
 pub mod io;
+pub mod os;
 
 pub mod sync {
     pub use alloc::arc::{Arc, Weak};
