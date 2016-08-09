@@ -1,8 +1,0 @@
-#!/bin/sh
-ROOT=$(cd $0/../.. && pwd)
-RUSTC_ROOT=$ROOT/rust-nightly-x86_64-unknown-linux-gnu
-PROG=$1
-shift
-export LD_LIBRARY_PATH=$RUSTC_ROOT/rustc/lib
-export RUST_TARGET_PATH=$ROOT/src/libsyscall/arch
-$RUSTC_ROOT/rustc/bin/$PROG $*

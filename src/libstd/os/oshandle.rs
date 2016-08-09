@@ -1,14 +1,17 @@
 use ops::Deref;
 use syscall::{self,Handle};
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 pub struct OSHandle(Handle);
 
 impl OSHandle {
+    #[stable(feature = "rust-os", since = "1.0.0")]
     pub fn from_raw(handle: Handle) -> Self {
         OSHandle(handle)
     }
 }
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 impl Deref for OSHandle {
     type Target = Handle;
 
@@ -17,6 +20,7 @@ impl Deref for OSHandle {
     }
 }
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 impl Drop for OSHandle {
     fn drop(&mut self) {
         let _ = syscall::close(self.0);

@@ -13,6 +13,7 @@
 //! These are implemented for the primitive numeric types in `std::{u8, u16,
 //! u32, u64, usize, i8, i16, i32, i64, isize, f32, f64}`.
 
+#![stable(feature = "rust1", since = "1.0.0")]
 #![allow(missing_docs)]
 
 pub use core::num::{Zero, One};

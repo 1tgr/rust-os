@@ -34,6 +34,8 @@
 //! particular implementation, but also reveal some of its implementation for
 //! debugging via `cause` chains.
 
+#![stable(feature = "rust1", since = "1.0.0")]
+
 // A note about crates and the facade:
 //
 // Originally, the `Error` trait was defined in libcore, and the impls
@@ -59,36 +61,45 @@ use str;
 use string::{self, String};
 
 /// Base functionality for all errors in Rust.
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Error: Debug + Display + Reflect {
     /// A short description of the error.
     ///
     /// The description should not contain newlines or sentence-ending
     /// punctuation, to facilitate embedding in larger user-facing
     /// strings.
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn description(&self) -> &str;
 
     /// The lower-level cause of this error, if any.
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn cause(&self) -> Option<&Error> { None }
 
     /// Get the `TypeId` of `self`
     #[doc(hidden)]
+    #[unstable(feature = "error_type_id",
+               reason = "unclear whether to commit to this public implementation detail",
+               issue = "27745")]
     fn type_id(&self) -> TypeId where Self: 'static {
         TypeId::of::<Self>()
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, E: Error + 'a> From<E> for Box<Error + 'a> {
     fn from(err: E) -> Box<Error + 'a> {
         Box::new(err)
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, E: Error + Send + Sync + 'a> From<E> for Box<Error + Send + Sync + 'a> {
     fn from(err: E) -> Box<Error + Send + Sync + 'a> {
         Box::new(err)
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl From<String> for Box<Error + Send + Sync> {
     fn from(err: String) -> Box<Error + Send + Sync> {
         #[derive(Debug)]
@@ -108,40 +119,47 @@ impl From<String> for Box<Error + Send + Sync> {
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, 'b> From<&'b str> for Box<Error + Send + Sync + 'a> {
     fn from(err: &'b str) -> Box<Error + Send + Sync + 'a> {
         From::from(String::from(err))
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Error for str::ParseBoolError {
     fn description(&self) -> &str { "failed to parse bool" }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Error for str::Utf8Error {
     fn description(&self) -> &str {
         "invalid utf-8: corrupt contents"
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Error for num::ParseIntError {
     fn description(&self) -> &str {
         self.__description()
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Error for num::ParseFloatError {
     fn description(&self) -> &str {
         self.__description()
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Error for string::FromUtf8Error {
     fn description(&self) -> &str {
         "invalid utf-8"
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl Error for string::FromUtf16Error {
     fn description(&self) -> &str {
         "invalid utf-16"
@@ -151,6 +169,7 @@ impl Error for string::FromUtf16Error {
 // copied from any.rs
 impl Error + 'static {
     /// Returns true if the boxed type is the same as `T`
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     #[inline]
     pub fn is<T: Error + 'static>(&self) -> bool {
         // Get TypeId of the type this function is instantiated with
@@ -165,6 +184,7 @@ impl Error + 'static {
 
     /// Returns some reference to the boxed value if it is of type `T`, or
     /// `None` if it isn't.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     #[inline]
     pub fn downcast_ref<T: Error + 'static>(&self) -> Option<&T> {
         if self.is::<T>() {
@@ -173,7 +193,7 @@ impl Error + 'static {
                 let to: TraitObject = transmute(self);
 
                 // Extract the data pointer
-                Some(transmute(to.data))
+                Some(&*(to.data as *const T))
             }
         } else {
             None
@@ -182,6 +202,7 @@ impl Error + 'static {
 
     /// Returns some mutable reference to the boxed value if it is of type `T`, or
     /// `None` if it isn't.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     #[inline]
     pub fn downcast_mut<T: Error + 'static>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
@@ -190,7 +211,7 @@ impl Error + 'static {
                 let to: TraitObject = transmute(self);
 
                 // Extract the data pointer
-                Some(transmute(to.data))
+                Some(&mut *(to.data as *const T as *mut T))
             }
         } else {
             None
@@ -200,18 +221,44 @@ impl Error + 'static {
 
 impl Error + 'static + Send {
     /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     #[inline]
     pub fn is<T: Error + 'static>(&self) -> bool {
         <Error + 'static>::is::<T>(self)
     }
 
     /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     #[inline]
     pub fn downcast_ref<T: Error + 'static>(&self) -> Option<&T> {
         <Error + 'static>::downcast_ref::<T>(self)
     }
 
     /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
+    #[inline]
+    pub fn downcast_mut<T: Error + 'static>(&mut self) -> Option<&mut T> {
+        <Error + 'static>::downcast_mut::<T>(self)
+    }
+}
+
+impl Error + 'static + Send + Sync {
+    /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
+    #[inline]
+    pub fn is<T: Error + 'static>(&self) -> bool {
+        <Error + 'static>::is::<T>(self)
+    }
+
+    /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
+    #[inline]
+    pub fn downcast_ref<T: Error + 'static>(&self) -> Option<&T> {
+        <Error + 'static>::downcast_ref::<T>(self)
+    }
+
+    /// Forwards to the method defined on the type `Any`.
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     #[inline]
     pub fn downcast_mut<T: Error + 'static>(&mut self) -> Option<&mut T> {
         <Error + 'static>::downcast_mut::<T>(self)
@@ -220,6 +267,7 @@ impl Error + 'static + Send {
 
 impl Error {
     #[inline]
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     /// Attempt to downcast the box to a concrete type.
     pub fn downcast<T: Error + 'static>(self: Box<Self>) -> Result<Box<T>, Box<Error>> {
         if self.is::<T>() {
@@ -240,12 +288,74 @@ impl Error {
 
 impl Error + Send {
     #[inline]
+    #[stable(feature = "error_downcast", since = "1.3.0")]
     /// Attempt to downcast the box to a concrete type.
-    pub fn downcast<T: Error + 'static>(self: Box<Self>) -> Result<Box<T>, Box<Error + Send>> {
+    pub fn downcast<T: Error + 'static>(self: Box<Self>)
+                                        -> Result<Box<T>, Box<Error + Send>> {
         let err: Box<Error> = self;
         <Error>::downcast(err).map_err(|s| unsafe {
             // reapply the Send marker
             transmute::<Box<Error>, Box<Error + Send>>(s)
         })
+    }
+}
+
+impl Error + Send + Sync {
+    #[inline]
+    #[stable(feature = "error_downcast", since = "1.3.0")]
+    /// Attempt to downcast the box to a concrete type.
+    pub fn downcast<T: Error + 'static>(self: Box<Self>)
+                                        -> Result<Box<T>, Box<Self>> {
+        let err: Box<Error> = self;
+        <Error>::downcast(err).map_err(|s| unsafe {
+            // reapply the Send+Sync marker
+            transmute::<Box<Error>, Box<Error + Send + Sync>>(s)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use prelude::v1::*;
+    use super::Error;
+    use fmt;
+
+    #[derive(Debug, PartialEq)]
+    struct A;
+    #[derive(Debug, PartialEq)]
+    struct B;
+
+    impl fmt::Display for A {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "A")
+        }
+    }
+    impl fmt::Display for B {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "B")
+        }
+    }
+
+    impl Error for A {
+        fn description(&self) -> &str { "A-desc" }
+    }
+    impl Error for B {
+        fn description(&self) -> &str { "A-desc" }
+    }
+
+    #[test]
+    fn downcasting() {
+        let mut a = A;
+        let mut a = &mut a as &mut (Error + 'static);
+        assert_eq!(a.downcast_ref::<A>(), Some(&A));
+        assert_eq!(a.downcast_ref::<B>(), None);
+        assert_eq!(a.downcast_mut::<A>(), Some(&mut A));
+        assert_eq!(a.downcast_mut::<B>(), None);
+
+        let a: Box<Error> = Box::new(A);
+        match a.downcast::<B>() {
+            Ok(..) => panic!("expected error"),
+            Err(e) => assert_eq!(*e.downcast::<A>().unwrap(), A),
+        }
     }
 }

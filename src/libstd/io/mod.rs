@@ -20,11 +20,11 @@
 //!
 //! # Read and Write
 //!
-//! Because they are traits, they're implemented by a number of other types,
-//! and you can implement them for your types too. As such, you'll see a
-//! few different types of I/O throughout the documentation in this module:
-//! `File`s, `TcpStream`s, and somtimes even `Vec<T>`s. For example, `Read`
-//! adds a `read()` method, which we can use on `File`s:
+//! Because they are traits, `Read` and `Write` are implemented by a number
+//! of other types, and you can implement them for your types too. As such,
+//! you'll see a few different types of I/O throughout the documentation in
+//! this module: `File`s, `TcpStream`s, and sometimes even `Vec<T>`s. For
+//! example, `Read` adds a `read()` method, which we can use on `File`s:
 //!
 //! ```
 //! use std::io;
@@ -111,7 +111,7 @@
 //! # }
 //! ```
 //!
-//! `BufWriter` doesn't add any new ways of writing, it just buffers every call
+//! `BufWriter` doesn't add any new ways of writing; it just buffers every call
 //! to [`write()`][write]:
 //!
 //! ```
@@ -165,7 +165,7 @@
 //! # }
 //! ```
 //!
-//! Of course, using `io::stdout()` directly is less comon than something like
+//! Of course, using `io::stdout()` directly is less common than something like
 //! `println!`.
 //!
 //! ## Iterator types
@@ -234,10 +234,12 @@
 //! The return type of `read_input()`, `io::Result<()>`, is a very common type
 //! for functions which don't have a 'real' return value, but do want to return
 //! errors if they happen. In this case, the only purpose of this function is
-//! to read the line and print it, so we use use `()`.
+//! to read the line and print it, so we use `()`.
 //!
 //! [result]: type.Result.html
 //! [try]: macro.try!.html
+
+#![stable(feature = "rust1", since = "1.0.0")]
 
 use cmp;
 use rustc_unicode::str as core_str;
@@ -353,6 +355,13 @@ fn read_to_end<R: Read + ?Sized>(r: &mut R, buf: &mut Vec<u8>) -> Result<usize> 
 /// throughout `std::io` take and provide types which implement the `Read`
 /// trait.
 ///
+/// Please note that each call to `read` may involve a system call, and
+/// therefore, using something that implements [`BufRead`][bufread], such as
+/// [`BufReader`][bufreader], will be more efficient.
+///
+/// [bufread]: trait.BufRead.html
+/// [bufreader]: struct.BufReader.html
+///
 /// # Examples
 ///
 /// [`File`][file]s implement `Read`:
@@ -383,6 +392,7 @@ fn read_to_end<R: Read + ?Sized>(r: &mut R, buf: &mut Vec<u8>) -> Result<usize> 
 /// # Ok(())
 /// # }
 /// ```
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Read {
     /// Pull some bytes from this source into the specified buffer, returning
     /// how many bytes were read.
@@ -432,6 +442,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn read(&mut self, buf: &mut [u8]) -> Result<usize>;
 
     /// Read all bytes until EOF in this source, placing them into `buf`.
@@ -473,6 +484,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn read_to_end(&mut self, buf: &mut Vec<u8>) -> Result<usize> {
         read_to_end(self, buf)
     }
@@ -510,6 +522,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn read_to_string(&mut self, buf: &mut String) -> Result<usize> {
         // Note that we do *not* call `.read_to_end()` here. We are passing
         // `&mut Vec<u8>` (the raw contents of `buf`) into the `read_to_end`
@@ -521,6 +534,72 @@ pub trait Read {
         // we pass it to our hardcoded `read_to_end` implementation which we
         // know is guaranteed to only read data into the end of the buffer.
         append_to_string(buf, |b| read_to_end(self, b))
+    }
+
+    /// Read the exact number of bytes required to fill `buf`.
+    ///
+    /// This function reads as many bytes as necessary to completely fill the
+    /// specified buffer `buf`.
+    ///
+    /// No guarantees are provided about the contents of `buf` when this
+    /// function is called, implementations cannot rely on any property of the
+    /// contents of `buf` being true. It is recommended that implementations
+    /// only write data to `buf` instead of reading its contents.
+    ///
+    /// # Errors
+    ///
+    /// If this function encounters an error of the kind
+    /// `ErrorKind::Interrupted` then the error is ignored and the operation
+    /// will continue.
+    ///
+    /// If this function encounters an "end of file" before completely filling
+    /// the buffer, it returns an error of the kind `ErrorKind::UnexpectedEOF`.
+    /// The contents of `buf` are unspecified in this case.
+    ///
+    /// If any other read error is encountered then this function immediately
+    /// returns. The contents of `buf` are unspecified in this case.
+    ///
+    /// If this function returns an error, it is unspecified how many bytes it
+    /// has read, but it will never read more than would be necessary to
+    /// completely fill the buffer.
+    ///
+    /// # Examples
+    ///
+    /// [`File`][file]s implement `Read`:
+    ///
+    /// [file]: ../std/fs/struct.File.html
+    ///
+    /// ```
+    /// #![feature(read_exact)]
+    /// use std::io;
+    /// use std::io::prelude::*;
+    /// use std::fs::File;
+    ///
+    /// # fn foo() -> io::Result<()> {
+    /// let mut f = try!(File::open("foo.txt"));
+    /// let mut buffer = [0; 10];
+    ///
+    /// // read exactly 10 bytes
+    /// try!(f.read_exact(&mut buffer));
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[unstable(feature = "read_exact", reason = "recently added", issue = "27585")]
+    fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => break,
+                Ok(n) => { let tmp = buf; buf = &mut tmp[n..]; }
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
+            }
+        }
+        if !buf.is_empty() {
+            Err(Error::new(ErrorKind::UnexpectedEOF,
+                           "failed to fill whole buffer"))
+        } else {
+            Ok(())
+        }
     }
 
     /// Creates a "by reference" adaptor for this instance of `Read`.
@@ -557,6 +636,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn by_ref(&mut self) -> &mut Self where Self: Sized { self }
 
     /// Transforms this `Read` instance to an `Iterator` over its bytes.
@@ -586,6 +666,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn bytes(self) -> Bytes<Self> where Self: Sized {
         Bytes { inner: self }
     }
@@ -622,6 +703,10 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[unstable(feature = "io", reason = "the semantics of a partial read/write \
+                                         of where errors happen is currently \
+                                         unclear and may change",
+               issue = "27802")]
     fn chars(self) -> Chars<Self> where Self: Sized {
         Chars { inner: self }
     }
@@ -656,6 +741,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn chain<R: Read>(self, next: R) -> Chain<Self, R> where Self: Sized {
         Chain { first: self, second: next, done_first: false }
     }
@@ -680,7 +766,7 @@ pub trait Read {
     ///
     /// # fn foo() -> io::Result<()> {
     /// let mut f = try!(File::open("foo.txt"));
-    /// let mut buffer = [0; 10];
+    /// let mut buffer = [0; 5];
     ///
     /// // read at most five bytes
     /// let mut handle = f.take(5);
@@ -689,6 +775,7 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn take(self, limit: u64) -> Take<Self> where Self: Sized {
         Take { inner: self, limit: limit }
     }
@@ -724,6 +811,10 @@ pub trait Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[unstable(feature = "io", reason = "the semantics of a partial read/write \
+                                         of where errors happen is currently \
+                                         unclear and may change",
+               issue = "27802")]
     fn tee<W: Write>(self, out: W) -> Tee<Self, W> where Self: Sized {
         Tee { reader: self, writer: out }
     }
@@ -759,6 +850,7 @@ pub trait Read {
 /// # Ok(())
 /// # }
 /// ```
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Write {
     /// Write a buffer into this object, returning how many bytes were written.
     ///
@@ -798,6 +890,7 @@ pub trait Write {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn write(&mut self, buf: &[u8]) -> Result<usize>;
 
     /// Flush this output stream, ensuring that all intermediately buffered
@@ -823,6 +916,7 @@ pub trait Write {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn flush(&mut self) -> Result<()>;
 
     /// Attempts to write an entire buffer into this write.
@@ -849,6 +943,7 @@ pub trait Write {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
         while !buf.is_empty() {
             match self.write(buf) {
@@ -900,6 +995,7 @@ pub trait Write {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn write_fmt(&mut self, fmt: fmt::Arguments) -> Result<()> {
         // Create a shim which translates a Write to a fmt::Write and saves
         // off I/O errors. instead of discarding them
@@ -948,6 +1044,7 @@ pub trait Write {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn by_ref(&mut self) -> &mut Self where Self: Sized { self }
 
     /// Creates a new writer which will write all data to both this writer and
@@ -977,6 +1074,10 @@ pub trait Write {
     /// # Ok(())
     /// # }
     /// ```
+    #[unstable(feature = "io", reason = "the semantics of a partial read/write \
+                                         of where errors happen is currently \
+                                         unclear and may change",
+               issue = "27802")]
     fn broadcast<W: Write>(self, other: W) -> Broadcast<Self, W>
         where Self: Sized
     {
@@ -1010,28 +1111,30 @@ pub trait Write {
 /// # Ok(())
 /// # }
 /// ```
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait Seek {
     /// Seek to an offset, in bytes, in a stream.
     ///
     /// A seek beyond the end of a stream is allowed, but implementation
     /// defined.
     ///
-    /// The behavior when seeking past the end of the stream is implementation
-    /// defined.
-    ///
-    /// This method returns the new position within the stream if the seek
-    /// operation completed successfully.
+    /// If the seek operation completed successfully,
+    /// this method returns the new position from the start of the stream.
+    /// That position can be used later with `SeekFrom::Start`.
     ///
     /// # Errors
     ///
     /// Seeking to a negative offset is considered an error.
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn seek(&mut self, pos: SeekFrom) -> Result<u64>;
 }
 
 /// Enumeration of possible methods to seek within an I/O object.
 #[derive(Copy, PartialEq, Eq, Clone, Debug)]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub enum SeekFrom {
     /// Set the offset to the provided number of bytes.
+    #[stable(feature = "rust1", since = "1.0.0")]
     Start(u64),
 
     /// Set the offset to the size of this object plus the specified number of
@@ -1039,6 +1142,7 @@ pub enum SeekFrom {
     ///
     /// It is possible to seek beyond the end of an object, but is an error to
     /// seek before byte 0.
+    #[stable(feature = "rust1", since = "1.0.0")]
     End(i64),
 
     /// Set the offset to the current position plus the specified number of
@@ -1046,6 +1150,7 @@ pub enum SeekFrom {
     ///
     /// It is possible to seek beyond the end of an object, but is an error to
     /// seek before byte 0.
+    #[stable(feature = "rust1", since = "1.0.0")]
     Current(i64),
 }
 
@@ -1059,7 +1164,7 @@ fn read_until<R: BufRead + ?Sized>(r: &mut R, delim: u8, buf: &mut Vec<u8>)
                 Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
                 Err(e) => return Err(e)
             };
-            match available.position_elem(&delim) {
+            match available.iter().position(|x| *x == delim) {
                 Some(i) => {
                     buf.push_all(&available[..i + 1]);
                     (true, i + 1)
@@ -1128,6 +1233,7 @@ fn read_until<R: BufRead + ?Sized>(r: &mut R, delim: u8, buf: &mut Vec<u8>)
 /// # }
 /// ```
 ///
+#[stable(feature = "rust1", since = "1.0.0")]
 pub trait BufRead: Read {
     /// Fills the internal buffer of this object, returning the buffer contents.
     ///
@@ -1172,6 +1278,7 @@ pub trait BufRead: Read {
     /// // ensure the bytes we worked with aren't returned again later
     /// stdin.consume(length);
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn fill_buf(&mut self) -> Result<&[u8]>;
 
     /// Tells this buffer that `amt` bytes have been consumed from the buffer,
@@ -1193,6 +1300,7 @@ pub trait BufRead: Read {
     ///
     /// Since `consume()` is meant to be used with [`fill_buf()`][fillbuf],
     /// that method's example includes an example of `consume()`.
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn consume(&mut self, amt: usize);
 
     /// Read all bytes into `buf` until the delimiter `byte` is reached.
@@ -1233,6 +1341,7 @@ pub trait BufRead: Read {
     /// # Ok(())
     /// # }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> Result<usize> {
         read_until(self, byte, buf)
     }
@@ -1280,6 +1389,7 @@ pub trait BufRead: Read {
     ///     buffer.clear();
     /// }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn read_line(&mut self, buf: &mut String) -> Result<usize> {
         // Note that we are not calling the `.read_until` method here, but
         // rather our hardcoded implementation. For more details as to why, see
@@ -1312,6 +1422,7 @@ pub trait BufRead: Read {
     ///     println!("{:?}", content.unwrap());
     /// }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn split(self, byte: u8) -> Split<Self> where Self: Sized {
         Split { buf: self, delim: byte }
     }
@@ -1320,7 +1431,7 @@ pub trait BufRead: Read {
     ///
     /// The iterator returned from this function will yield instances of
     /// `io::Result<String>`. Each string returned will *not* have a newline
-    /// byte (the 0xA byte) at the end.
+    /// byte (the 0xA byte) or CRLF (0xD, 0xA bytes) at the end.
     ///
     /// # Examples
     ///
@@ -1336,6 +1447,7 @@ pub trait BufRead: Read {
     ///     println!("{}", line.unwrap());
     /// }
     /// ```
+    #[stable(feature = "rust1", since = "1.0.0")]
     fn lines(self) -> Lines<Self> where Self: Sized {
         Lines { buf: self }
     }
@@ -1347,11 +1459,15 @@ pub trait BufRead: Read {
 /// writer. Please see the documentation of `broadcast()` for more details.
 ///
 /// [broadcast]: trait.Write.html#method.broadcast
+#[unstable(feature = "io", reason = "awaiting stability of Write::broadcast",
+           issue = "27802")]
 pub struct Broadcast<T, U> {
     first: T,
     second: U,
 }
 
+#[unstable(feature = "io", reason = "awaiting stability of Write::broadcast",
+           issue = "27802")]
 impl<T: Write, U: Write> Write for Broadcast<T, U> {
     fn write(&mut self, data: &[u8]) -> Result<usize> {
         let n = try!(self.first.write(data));
@@ -1371,12 +1487,14 @@ impl<T: Write, U: Write> Write for Broadcast<T, U> {
 /// Please see the documentation of `chain()` for more details.
 ///
 /// [chain]: trait.Read.html#method.chain
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Chain<T, U> {
     first: T,
     second: U,
     done_first: bool,
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: Read, U: Read> Read for Chain<T, U> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         if !self.done_first {
@@ -1395,11 +1513,13 @@ impl<T: Read, U: Read> Read for Chain<T, U> {
 /// Please see the documentation of `take()` for more details.
 ///
 /// [take]: trait.Read.html#method.take
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Take<T> {
     inner: T,
     limit: u64,
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Take<T> {
     /// Returns the number of bytes that can be read before this instance will
     /// return EOF.
@@ -1408,9 +1528,11 @@ impl<T> Take<T> {
     ///
     /// This instance may reach EOF after reading fewer bytes than indicated by
     /// this method if the underlying `Read` instance reaches EOF.
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub fn limit(&self) -> u64 { self.limit }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: Read> Read for Take<T> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         // Don't call into inner reader at all at EOF because it may still block
@@ -1425,6 +1547,7 @@ impl<T: Read> Read for Take<T> {
     }
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: BufRead> BufRead for Take<T> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
         let buf = try!(self.inner.fill_buf());
@@ -1446,11 +1569,15 @@ impl<T: BufRead> BufRead for Take<T> {
 /// Please see the documentation of `tee()` for more details.
 ///
 /// [tee]: trait.Read.html#method.tee
+#[unstable(feature = "io", reason = "awaiting stability of Read::tee",
+           issue = "27802")]
 pub struct Tee<R, W> {
     reader: R,
     writer: W,
 }
 
+#[unstable(feature = "io", reason = "awaiting stability of Read::tee",
+           issue = "27802")]
 impl<R: Read, W: Write> Read for Tee<R, W> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let n = try!(self.reader.read(buf));
@@ -1466,10 +1593,12 @@ impl<R: Read, W: Write> Read for Tee<R, W> {
 /// Please see the documentation of `bytes()` for more details.
 ///
 /// [bytes]: trait.Read.html#method.bytes
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Bytes<R> {
     inner: R,
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<R: Read> Iterator for Bytes<R> {
     type Item = Result<u8>;
 
@@ -1489,6 +1618,8 @@ impl<R: Read> Iterator for Bytes<R> {
 /// Please see the documentation of `chars()` for more details.
 ///
 /// [chars]: trait.Read.html#method.chars
+#[unstable(feature = "io", reason = "awaiting stability of Read::chars",
+           issue = "27802")]
 pub struct Chars<R> {
     inner: R,
 }
@@ -1496,6 +1627,8 @@ pub struct Chars<R> {
 /// An enumeration of possible errors that can be generated from the `Chars`
 /// adapter.
 #[derive(Debug)]
+#[unstable(feature = "io", reason = "awaiting stability of Read::chars",
+           issue = "27802")]
 pub enum CharsError {
     /// Variant representing that the underlying stream was read successfully
     /// but it did not contain valid utf8 data.
@@ -1505,6 +1638,8 @@ pub enum CharsError {
     Other(Error),
 }
 
+#[unstable(feature = "io", reason = "awaiting stability of Read::chars",
+           issue = "27802")]
 impl<R: Read> Iterator for Chars<R> {
     type Item = result::Result<char, CharsError>;
 
@@ -1536,6 +1671,8 @@ impl<R: Read> Iterator for Chars<R> {
     }
 }
 
+#[unstable(feature = "io", reason = "awaiting stability of Read::chars",
+           issue = "27802")]
 impl std_error::Error for CharsError {
     fn description(&self) -> &str {
         match *self {
@@ -1551,6 +1688,8 @@ impl std_error::Error for CharsError {
     }
 }
 
+#[unstable(feature = "io", reason = "awaiting stability of Read::chars",
+           issue = "27802")]
 impl fmt::Display for CharsError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -1569,11 +1708,13 @@ impl fmt::Display for CharsError {
 /// `BufRead`. Please see the documentation of `split()` for more details.
 ///
 /// [split]: trait.BufRead.html#method.split
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Split<B> {
     buf: B,
     delim: u8,
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<B: BufRead> Iterator for Split<B> {
     type Item = Result<Vec<u8>>;
 
@@ -1598,10 +1739,12 @@ impl<B: BufRead> Iterator for Split<B> {
 /// `BufRead`. Please see the documentation of `lines()` for more details.
 ///
 /// [lines]: trait.BufRead.html#method.lines
+#[stable(feature = "rust1", since = "1.0.0")]
 pub struct Lines<B> {
     buf: B,
 }
 
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<B: BufRead> Iterator for Lines<B> {
     type Item = Result<String>;
 
@@ -1612,6 +1755,9 @@ impl<B: BufRead> Iterator for Lines<B> {
             Ok(_n) => {
                 if buf.ends_with("\n") {
                     buf.pop();
+                    if buf.ends_with("\r") {
+                        buf.pop();
+                    }
                 }
                 Some(Ok(buf))
             }
@@ -1683,12 +1829,12 @@ mod tests {
 
     #[test]
     fn lines() {
-        let buf = Cursor::new(&b"12"[..]);
+        let buf = Cursor::new(&b"12\r"[..]);
         let mut s = buf.lines();
-        assert_eq!(s.next().unwrap().unwrap(), "12".to_string());
+        assert_eq!(s.next().unwrap().unwrap(), "12\r".to_string());
         assert!(s.next().is_none());
 
-        let buf = Cursor::new(&b"12\n\n"[..]);
+        let buf = Cursor::new(&b"12\r\n\n"[..]);
         let mut s = buf.lines();
         assert_eq!(s.next().unwrap().unwrap(), "12".to_string());
         assert_eq!(s.next().unwrap().unwrap(), "".to_string());
@@ -1731,6 +1877,47 @@ mod tests {
         let mut c = Cursor::new(&b"\xff"[..]);
         let mut v = String::new();
         assert!(c.read_to_string(&mut v).is_err());
+    }
+
+    #[test]
+    fn read_exact() {
+        let mut buf = [0; 4];
+
+        let mut c = Cursor::new(&b""[..]);
+        assert_eq!(c.read_exact(&mut buf).unwrap_err().kind(),
+                   io::ErrorKind::UnexpectedEOF);
+
+        let mut c = Cursor::new(&b"123"[..]).chain(Cursor::new(&b"456789"[..]));
+        c.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf, b"1234");
+        c.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf, b"5678");
+        assert_eq!(c.read_exact(&mut buf).unwrap_err().kind(),
+                   io::ErrorKind::UnexpectedEOF);
+    }
+
+    #[test]
+    fn read_exact_slice() {
+        let mut buf = [0; 4];
+
+        let mut c = &b""[..];
+        assert_eq!(c.read_exact(&mut buf).unwrap_err().kind(),
+                   io::ErrorKind::UnexpectedEOF);
+
+        let mut c = &b"123"[..];
+        assert_eq!(c.read_exact(&mut buf).unwrap_err().kind(),
+                   io::ErrorKind::UnexpectedEOF);
+        // make sure the optimized (early returning) method is being used
+        assert_eq!(&buf, &[0; 4]);
+
+        let mut c = &b"1234"[..];
+        c.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf, b"1234");
+
+        let mut c = &b"56789"[..];
+        c.read_exact(&mut buf).unwrap();
+        assert_eq!(&buf, b"5678");
+        assert_eq!(c, b"9");
     }
 
     #[test]

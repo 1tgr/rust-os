@@ -1,0 +1,179 @@
+diff --git a/src/libstd/io/error.rs b/src/libstd/io/error.rs
+index cf5d062..6f18aad 100644
+--- a/src/libstd/io/error.rs
++++ b/src/libstd/io/error.rs
+@@ -9,13 +9,13 @@
+ // except according to those terms.
+ 
+ use boxed::Box;
+-use convert::{From,Into};
++use convert::Into;
+ use error;
+ use fmt;
+ use marker::{Send, Sync};
+ use option::Option::{self, Some, None};
+ use result;
+-use syscall::ErrNum;
++use sys;
+ 
+ /// A specialized [`Result`](../result/enum.Result.html) type for I/O
+ /// operations.
+@@ -63,7 +63,7 @@ pub struct Error {
+ }
+ 
+ enum Repr {
+-    Os(ErrorKind),
++    Os(i32),
+     Custom(Box<Custom>),
+ }
+ 
+@@ -197,11 +197,40 @@ impl Error {
+         Error {
+             repr: Repr::Custom(Box::new(Custom {
+                 kind: kind,
+-                error: error.into(),
++                error: error,
+             }))
+         }
+     }
+ 
++    /// Returns an error representing the last OS error which occurred.
++    ///
++    /// This function reads the value of `errno` for the target platform (e.g.
++    /// `GetLastError` on Windows) and will return a corresponding instance of
++    /// `Error` for the error code.
++    #[stable(feature = "rust1", since = "1.0.0")]
++    pub fn last_os_error() -> Error {
++        Error::from_raw_os_error(sys::os::errno() as i32)
++    }
++
++    /// Creates a new instance of an `Error` from a particular OS error code.
++    #[stable(feature = "rust1", since = "1.0.0")]
++    pub fn from_raw_os_error(code: i32) -> Error {
++        Error { repr: Repr::Os(code) }
++    }
++
++    /// Returns the OS error that this error represents (if any).
++    ///
++    /// If this `Error` was constructed via `last_os_error` or
++    /// `from_raw_os_error`, then this function will return `Some`, otherwise
++    /// it will return `None`.
++    #[stable(feature = "rust1", since = "1.0.0")]
++    pub fn raw_os_error(&self) -> Option<i32> {
++        match self.repr {
++            Repr::Os(i) => Some(i),
++            Repr::Custom(..) => None,
++        }
++    }
++
+     /// Returns a reference to the inner error wrapped by this error (if any).
+     ///
+     /// If this `Error` was constructed via `new` then this function will
+@@ -243,7 +272,7 @@ impl Error {
+     #[stable(feature = "rust1", since = "1.0.0")]
+     pub fn kind(&self) -> ErrorKind {
+         match self.repr {
+-            Repr::Os(kind) => kind,
++            Repr::Os(code) => sys::decode_error_kind(code),
+             Repr::Custom(ref c) => c.kind,
+         }
+     }
+@@ -251,9 +280,11 @@ impl Error {
+ 
+ impl fmt::Debug for Repr {
+     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+-        match self {
+-            &Repr::Os(ref kind) => fmt.debug_struct("Os").field("kind", kind).finish(),
+-            &Repr::Custom(ref c) => fmt.debug_tuple("Custom").field(c).finish(),
++        match *self {
++            Repr::Os(ref code) =>
++                fmt.debug_struct("Os").field("code", code)
++                   .field("message", &sys::os::error_string(*code)).finish(),
++            Repr::Custom(ref c) => fmt.debug_tuple("Custom").field(c).finish(),
+         }
+     }
+ }
+@@ -262,7 +293,10 @@ impl fmt::Debug for Repr {
+ impl fmt::Display for Error {
+     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+         match self.repr {
+-            Repr::Os(kind) => <fmt::Debug>::fmt(&kind, fmt),
++            Repr::Os(code) => {
++                let detail = sys::os::error_string(code);
++                write!(fmt, "{} (os error {})", detail, code)
++            }
+             Repr::Custom(ref c) => c.error.fmt(fmt),
+         }
+     }
+@@ -285,41 +319,6 @@ impl error::Error for Error {
+     }
+ }
+ 
+-impl From<ErrNum> for ErrorKind {
+-    fn from(num: ErrNum) -> Self {
+-        match num {
+-            ErrNum::InvalidArgument => ErrorKind::InvalidInput,
+-            ErrNum::FileNotFound => ErrorKind::NotFound,
+-            _ => ErrorKind::Other
+-        }
+-    }
+-}
+-
+-impl From<ErrorKind> for ErrNum {
+-    fn from(kind: ErrorKind) -> Self {
+-        match kind {
+-            ErrorKind::InvalidInput => ErrNum::InvalidArgument,
+-            ErrorKind::NotFound => ErrNum::FileNotFound,
+-            _ => ErrNum::NotSupported
+-        }
+-    }
+-}
+-
+-impl From<ErrNum> for Error {
+-    fn from(num: ErrNum) -> Self {
+-        Error { repr: Repr::Os(ErrorKind::from(num)) }
+-    }
+-}
+-
+-impl From<Error> for ErrNum {
+-    fn from(error: Error) -> Self {
+-        match error.repr {
+-            Repr::Os(kind) => ErrNum::from(kind),
+-            _ => ErrNum::NotSupported
+-        }
+-    }
+-}
+-
+ fn _assert_error_is_sync_send() {
+     fn _is_sync_send<T: Sync+Send>() {}
+     _is_sync_send::<Error>();
+diff --git a/src/libstd/io/mod.rs b/src/libstd/io/mod.rs
+index 1d76674..ebe50a6 100644
+--- a/src/libstd/io/mod.rs
++++ b/src/libstd/io/mod.rs
+@@ -255,9 +255,24 @@ use string::String;
+ use str;
+ use vec::Vec;
+ 
++pub use self::buffered::{BufReader, BufWriter, LineWriter};
++pub use self::buffered::IntoInnerError;
++pub use self::cursor::Cursor;
+ pub use self::error::{Result, Error, ErrorKind};
+-
++pub use self::util::{copy, sink, Sink, empty, Empty, repeat, Repeat};
++pub use self::stdio::{stdin, stdout, stderr, _print, Stdin, Stdout, Stderr};
++pub use self::stdio::{StdoutLock, StderrLock, StdinLock};
++#[doc(no_inline, hidden)]
++pub use self::stdio::{set_panic, set_print};
++
++pub mod prelude;
++mod buffered;
++mod cursor;
+ mod error;
++mod impls;
++mod lazy;
++mod util;
++mod stdio;
+ 
+ const DEFAULT_BUF_SIZE: usize = 64 * 1024;
+ 
