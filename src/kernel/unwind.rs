@@ -1,6 +1,6 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * unwind.rs
  * - Stack unwind (panic) handling
@@ -23,14 +23,6 @@ pub extern fn rust_begin_unwind(msg: Arguments, file: &'static str, line: u32) -
     unsafe { debug::print_stack_trace(frame) };
 	loop {}
 }
-
-#[lang="stack_exhausted"]
-#[no_mangle]
-pub fn __morestack() -> !
-{
-	loop {}
-}
-
 
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -59,7 +51,6 @@ static _UA_SEARCH_PHASE: _Unwind_Action = 1;
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone,Copy)]
-#[allow(raw_pointer_derive)]
 pub struct _Unwind_Exception
 {
 	exception_class: u64,
@@ -83,4 +74,3 @@ pub fn _Unwind_Resume()
 {
 	loop{}
 }
-

@@ -17,11 +17,31 @@
 //! Like many traits, these are often used as bounds for generic functions, to
 //! support arguments of multiple types.
 //!
+//! - Impl the `As*` traits for reference-to-reference conversions
+//! - Impl the `Into` trait when you want to consume the value in the conversion
+//! - The `From` trait is the most flexible, useful for value _and_ reference conversions
+//! - The `TryFrom` and `TryInto` traits behave like `From` and `Into`, but allow for the
+//!   conversion to fail
+//!
+//! As a library author, you should prefer implementing `From<T>` or `TryFrom<T>` rather than
+//! `Into<U>` or `TryInto<U>`, as `From` and `TryFrom` provide greater flexibility and offer
+//! equivalent `Into` or `TryInto` implementations for free, thanks to a blanket implementation
+//! in the standard library.
+//!
+//! # Generic impl
+//!
+//! - `AsRef` and `AsMut` auto-dereference if the inner type is a reference
+//! - `From<U> for T` implies `Into<T> for U`
+//! - `TryFrom<U> for T` implies `TryInto<T> for U`
+//! - `From` and `Into` are reflexive, which means that all types can `into()`
+//!   themselves and `from()` themselves
+//!
 //! See each trait for usage examples.
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
 use marker::Sized;
+use result::Result;
 
 /// A cheap, reference-to-reference conversion.
 ///
@@ -29,6 +49,9 @@ use marker::Sized;
 /// [the book][book] for more.
 ///
 /// [book]: ../../book/borrow-and-asref.html
+///
+/// **Note: this trait must not fail**. If the conversion can fail, use a dedicated method which
+/// returns an `Option<T>` or a `Result<T, E>`.
 ///
 /// # Examples
 ///
@@ -45,6 +68,12 @@ use marker::Sized;
 /// let s = "hello".to_string();
 /// is_hello(s);
 /// ```
+///
+/// # Generic Impls
+///
+/// - `AsRef` auto-dereference if the inner type is a reference or a mutable
+/// reference (eg: `foo.as_ref()` will work the same if `foo` has type `&mut Foo` or `&&mut Foo`)
+///
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait AsRef<T: ?Sized> {
     /// Performs the conversion.
@@ -53,6 +82,15 @@ pub trait AsRef<T: ?Sized> {
 }
 
 /// A cheap, mutable reference-to-mutable reference conversion.
+///
+/// **Note: this trait must not fail**. If the conversion can fail, use a dedicated method which
+/// returns an `Option<T>` or a `Result<T, E>`.
+///
+/// # Generic Impls
+///
+/// - `AsMut` auto-dereference if the inner type is a reference or a mutable
+/// reference (eg: `foo.as_ref()` will work the same if `foo` has type `&mut Foo` or `&&mut Foo`)
+///
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait AsMut<T: ?Sized> {
     /// Performs the conversion.
@@ -61,6 +99,13 @@ pub trait AsMut<T: ?Sized> {
 }
 
 /// A conversion that consumes `self`, which may or may not be expensive.
+///
+/// **Note: this trait must not fail**. If the conversion can fail, use `TryInto` or a dedicated
+/// method which returns an `Option<T>` or a `Result<T, E>`.
+///
+/// Library authors should not directly implement this trait, but should prefer implementing
+/// the `From` trait, which offers greater flexibility and provides an equivalent `Into`
+/// implementation for free, thanks to a blanket implementation in the standard library.
 ///
 /// # Examples
 ///
@@ -75,6 +120,12 @@ pub trait AsMut<T: ?Sized> {
 /// let s = "hello".to_string();
 /// is_hello(s);
 /// ```
+///
+/// # Generic Impls
+///
+/// - `From<T> for U` implies `Into<U> for T`
+/// - `into()` is reflexive, which means that `Into<T> for T` is implemented
+///
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Into<T>: Sized {
     /// Performs the conversion.
@@ -83,6 +134,9 @@ pub trait Into<T>: Sized {
 }
 
 /// Construct `Self` via a conversion.
+///
+/// **Note: this trait must not fail**. If the conversion can fail, use `TryFrom` or a dedicated
+/// method which returns an `Option<T>` or a `Result<T, E>`.
 ///
 /// # Examples
 ///
@@ -94,11 +148,40 @@ pub trait Into<T>: Sized {
 ///
 /// assert_eq!(string, other_string);
 /// ```
+/// # Generic impls
+///
+/// - `From<T> for U` implies `Into<U> for T`
+/// - `from()` is reflexive, which means that `From<T> for T` is implemented
+///
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait From<T>: Sized {
     /// Performs the conversion.
     #[stable(feature = "rust1", since = "1.0.0")]
     fn from(T) -> Self;
+}
+
+/// An attempted conversion that consumes `self`, which may or may not be expensive.
+///
+/// Library authors should not directly implement this trait, but should prefer implementing
+/// the `TryFrom` trait, which offers greater flexibility and provides an equivalent `TryInto`
+/// implementation for free, thanks to a blanket implementation in the standard library.
+#[unstable(feature = "try_from", issue = "33417")]
+pub trait TryInto<T>: Sized {
+    /// The type returned in the event of a conversion error.
+    type Err;
+
+    /// Performs the conversion.
+    fn try_into(self) -> Result<T, Self::Err>;
+}
+
+/// Attempt to construct `Self` via a conversion.
+#[unstable(feature = "try_from", issue = "33417")]
+pub trait TryFrom<T>: Sized {
+    /// The type returned in the event of a conversion error.
+    type Err;
+
+    /// Performs the conversion.
+    fn try_from(T) -> Result<Self, Self::Err>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -157,6 +240,17 @@ impl<T, U> Into<U> for T where U: From<T> {
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T> From<T> for T {
     fn from(t: T) -> T { t }
+}
+
+
+// TryFrom implies TryInto
+#[unstable(feature = "try_from", issue = "33417")]
+impl<T, U> TryInto<U> for T where U: TryFrom<T> {
+    type Err = U::Err;
+
+    fn try_into(self) -> Result<U, U::Err> {
+        U::try_from(self)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

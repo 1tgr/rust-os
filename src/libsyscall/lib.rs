@@ -1,13 +1,9 @@
 #![crate_name = "syscall"]
 
 #![feature(asm)]
-#![feature(core_slice_ext)]
 #![feature(core_str_ext)]
 #![feature(lang_items)]
-#![feature(no_std)]
 #![no_std]
-
-#![cfg_attr(not(feature = "kernel"), feature(libc))]
 
 #[cfg(not(feature = "kernel"))]
 extern crate libc;

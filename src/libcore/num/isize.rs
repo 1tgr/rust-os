@@ -10,10 +10,12 @@
 
 //! The pointer-sized signed integer type.
 //!
-//! *[See also the `isize` primitive type](../primitive.isize.html).*
+//! *[See also the `isize` primitive type](../../std/primitive.isize.html).*
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
+#[cfg(target_pointer_width = "16")]
+int_module! { isize, 16 }
 #[cfg(target_pointer_width = "32")]
 int_module! { isize, 32 }
 #[cfg(target_pointer_width = "64")]

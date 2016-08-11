@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Optional values
+//! Optional values.
 //!
 //! Type `Option` represents an optional value: every `Option`
 //! is either `Some` and contains a value, or `None`, and
@@ -93,16 +93,12 @@
 //! let msg = Some("howdy");
 //!
 //! // Take a reference to the contained string
-//! match msg {
-//!     Some(ref m) => println!("{}", *m),
-//!     None => (),
+//! if let Some(ref m) = msg {
+//!     println!("{}", *m);
 //! }
 //!
 //! // Remove the contained string, destroying the Option
-//! let unwrapped_msg = match msg {
-//!     Some(m) => m,
-//!     None => "default message",
-//! };
+//! let unwrapped_msg = msg.unwrap_or("default message");
 //! ```
 //!
 //! Initialize a result to `None` before a loop:
@@ -146,7 +142,7 @@
 use self::Option::*;
 
 use clone::Clone;
-use cmp::{Eq, Ord};
+use convert::From;
 use default::Default;
 use iter::ExactSizeIterator;
 use iter::{Iterator, DoubleEndedIterator, FromIterator, IntoIterator};
@@ -154,7 +150,6 @@ use mem;
 use ops::FnOnce;
 use result::Result::{Ok, Err};
 use result::Result;
-use slice;
 
 // Note that this is not a lang item per se, but it has a hidden dependency on
 // `Iterator`, which is one. The compiler assumes that the `next` method of
@@ -170,7 +165,7 @@ pub enum Option<T> {
     None,
     /// Some value `T`
     #[stable(feature = "rust1", since = "1.0.0")]
-    Some(T)
+    Some(#[stable(feature = "rust1", since = "1.0.0")] T)
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -269,46 +264,11 @@ impl<T> Option<T> {
         }
     }
 
-    /// Converts from `Option<T>` to `&mut [T]` (without copying)
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// #![feature(as_slice)]
-    ///
-    /// let mut x = Some("Diamonds");
-    /// {
-    ///     let v = x.as_mut_slice();
-    ///     assert!(v == ["Diamonds"]);
-    ///     v[0] = "Dirt";
-    ///     assert!(v == ["Dirt"]);
-    /// }
-    /// assert_eq!(x, Some("Dirt"));
-    /// ```
-    #[inline]
-    #[unstable(feature = "as_slice",
-               reason = "waiting for mut conventions",
-               issue = "27776")]
-    #[deprecated(since = "1.4.0", reason = "niche API, unclear of usefulness")]
-    #[allow(deprecated)]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        match *self {
-            Some(ref mut x) => {
-                let result: &mut [T] = slice::mut_ref_slice(x);
-                result
-            }
-            None => {
-                let result: &mut [T] = &mut [];
-                result
-            }
-        }
-    }
-
     /////////////////////////////////////////////////////////////////////////
     // Getting to contained values
     /////////////////////////////////////////////////////////////////////////
 
-    /// Unwraps an option, yielding the content of a `Some`
+    /// Unwraps an option, yielding the content of a `Some`.
     ///
     /// # Panics
     ///
@@ -331,7 +291,7 @@ impl<T> Option<T> {
     pub fn expect(self, msg: &str) -> T {
         match self {
             Some(val) => val,
-            None => panic!("{}", msg),
+            None => expect_failed(msg),
         }
     }
 
@@ -689,22 +649,6 @@ impl<T> Option<T> {
     pub fn take(&mut self) -> Option<T> {
         mem::replace(self, None)
     }
-
-    /// Converts from `Option<T>` to `&[T]` (without copying)
-    #[inline]
-    #[unstable(feature = "as_slice", reason = "unsure of the utility here",
-               issue = "27776")]
-    #[deprecated(since = "1.4.0", reason = "niche API, unclear of usefulness")]
-    #[allow(deprecated)]
-    pub fn as_slice(&self) -> &[T] {
-        match *self {
-            Some(ref x) => slice::ref_slice(x),
-            None => {
-                let result: &[_] = &[];
-                result
-            }
-        }
-    }
 }
 
 impl<'a, T: Clone> Option<&'a T> {
@@ -749,6 +693,14 @@ impl<T: Default> Option<T> {
     }
 }
 
+// This is a separate function to reduce the code size of .expect() itself.
+#[inline(never)]
+#[cold]
+fn expect_failed(msg: &str) -> ! {
+    panic!("{}", msg)
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 // Trait implementations
 /////////////////////////////////////////////////////////////////////////////
@@ -756,7 +708,6 @@ impl<T: Default> Option<T> {
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Default for Option<T> {
     #[inline]
-    #[stable(feature = "rust1", since = "1.0.0")]
     fn default() -> Option<T> { None }
 }
 
@@ -804,11 +755,18 @@ impl<'a, T> IntoIterator for &'a mut Option<T> {
     }
 }
 
+#[stable(since = "1.12.0", feature = "option_from")]
+impl<T> From<T> for Option<T> {
+    fn from(val: T) -> Option<T> {
+        Some(val)
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////
 // The Option Iterators
 /////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Item<A> {
     opt: Option<A>
 }
@@ -841,6 +799,7 @@ impl<A> ExactSizeIterator for Item<A> {}
 
 /// An iterator over a reference of the contained item in an Option.
 #[stable(feature = "rust1", since = "1.0.0")]
+#[derive(Debug)]
 pub struct Iter<'a, A: 'a> { inner: Item<&'a A> }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -871,6 +830,7 @@ impl<'a, A> Clone for Iter<'a, A> {
 
 /// An iterator over a mutable reference of the contained item in an Option.
 #[stable(feature = "rust1", since = "1.0.0")]
+#[derive(Debug)]
 pub struct IterMut<'a, A: 'a> { inner: Item<&'a mut A> }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -893,7 +853,7 @@ impl<'a, A> DoubleEndedIterator for IterMut<'a, A> {
 impl<'a, A> ExactSizeIterator for IterMut<'a, A> {}
 
 /// An iterator over the item contained inside an Option.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct IntoIter<A> { inner: Item<A> }
 
@@ -940,7 +900,6 @@ impl<A, V: FromIterator<A>> FromIterator<Option<A>> for Option<V> {
     /// assert!(res == Some(vec!(2, 3)));
     /// ```
     #[inline]
-    #[stable(feature = "rust1", since = "1.0.0")]
     fn from_iter<I: IntoIterator<Item=Option<A>>>(iter: I) -> Option<V> {
         // FIXME(#11084): This could be replaced with Iterator::scan when this
         // performance bug is closed.

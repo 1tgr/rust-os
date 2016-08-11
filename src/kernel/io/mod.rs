@@ -6,7 +6,6 @@ pub mod pipe;
 mod nodes;
 
 use core::result;
-use core::slice::bytes;
 use deferred::Deferred;
 use io::nodes::PromiseNode;
 use prelude::*;
@@ -74,7 +73,7 @@ impl<T: AsyncRead> Read for T {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let p = self.read_async(vec![0; buf.len()]);
         let v = try!(p.get());
-        bytes::copy_memory(&v[..], buf);
+        buf.copy_from_slice(&v);
         Ok(v.len())
     }
 }

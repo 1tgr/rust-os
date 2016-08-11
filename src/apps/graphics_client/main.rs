@@ -1,5 +1,3 @@
-#![feature(convert)]
-
 extern crate cairo;
 extern crate graphics;
 extern crate syscall;

@@ -12,10 +12,9 @@
 
 use core::any::Any;
 use core::ops::Deref;
-use core::result::Result::{Ok, Err};
+use core::result::Result::{Err, Ok};
 use core::clone::Clone;
 
-use std::boxed;
 use std::boxed::Box;
 
 #[test]
@@ -74,8 +73,7 @@ fn test_show() {
 
 #[test]
 fn deref() {
-    fn homura<T: Deref<Target = i32>>(_: T) {
-    }
+    fn homura<T: Deref<Target = i32>>(_: T) {}
     homura(Box::new(765));
 }
 

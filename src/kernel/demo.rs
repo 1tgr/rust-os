@@ -6,7 +6,7 @@ use console::Console;
 use deferred::Deferred;
 use ksyscall::{self,SyscallHandler};
 use prelude::*;
-use process::{self,KObj,KObjRef};
+use process::{self,KObjRef};
 use thread;
 
 impl<A> Deferred<A> {

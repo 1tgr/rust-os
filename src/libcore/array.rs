@@ -12,7 +12,7 @@
 //! up to a certain length. Eventually we should able to generalize
 //! to all lengths.
 //!
-//! *[See also the array primitive type](../primitive.array.html).*
+//! *[See also the array primitive type](../../std/primitive.array.html).*
 
 #![unstable(feature = "fixed_size_array",
             reason = "traits and impls are better expressed through generic \
@@ -59,6 +59,38 @@ unsafe impl<T, A: Unsize<[T]>> FixedSizeArray<T> for A {
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
         self
+    }
+}
+
+macro_rules! __impl_slice_eq1 {
+    ($Lhs: ty, $Rhs: ty) => {
+        __impl_slice_eq1! { $Lhs, $Rhs, Sized }
+    };
+    ($Lhs: ty, $Rhs: ty, $Bound: ident) => {
+        #[stable(feature = "rust1", since = "1.0.0")]
+        impl<'a, 'b, A: $Bound, B> PartialEq<$Rhs> for $Lhs where A: PartialEq<B> {
+            #[inline]
+            fn eq(&self, other: &$Rhs) -> bool { self[..] == other[..] }
+            #[inline]
+            fn ne(&self, other: &$Rhs) -> bool { self[..] != other[..] }
+        }
+    }
+}
+
+macro_rules! __impl_slice_eq2 {
+    ($Lhs: ty, $Rhs: ty) => {
+        __impl_slice_eq2! { $Lhs, $Rhs, Sized }
+    };
+    ($Lhs: ty, $Rhs: ty, $Bound: ident) => {
+        __impl_slice_eq1!($Lhs, $Rhs, $Bound);
+
+        #[stable(feature = "rust1", since = "1.0.0")]
+        impl<'a, 'b, A: $Bound, B> PartialEq<$Lhs> for $Rhs where B: PartialEq<A> {
+            #[inline]
+            fn eq(&self, other: &$Lhs) -> bool { self[..] == other[..] }
+            #[inline]
+            fn ne(&self, other: &$Lhs) -> bool { self[..] != other[..] }
+        }
     }
 }
 

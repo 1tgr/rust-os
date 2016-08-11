@@ -1,33 +1,28 @@
 #![crate_name = "std"]
+#![stable(feature = "dummy", since = "1.0.0")]
 
 #![feature(alloc)]
 #![feature(allow_internal_unstable)]
 #![feature(collections_bound)]
 #![feature(collections)]
 #![feature(const_fn)]
-#![feature(core_float)]
 #![feature(core_intrinsics)]
 #![feature(core_panic)]
-#![feature(core_slice_ext)]
-#![feature(core)]
+#![feature(float_extras)]
 #![feature(int_error_internals)]
 #![feature(lang_items)]
-#![feature(libc)]
 #![feature(macro_reexport)]
 #![feature(no_core)]
-#![feature(no_std)]
+#![feature(question_mark)]
 #![feature(raw)]
 #![feature(reflect_marker)]
 #![feature(staged_api)]
-#![feature(str_char)]
+#![feature(stmt_expr_attributes)]
+#![feature(try_from)]
 #![feature(unicode)]
 #![feature(unique)]
-#![feature(vec_push_all)]
-#![feature(wrapping)]
 #![feature(zero_one)]
 
-#![staged_api]
-#![stable(feature = "rust-os", since = "1.0.0")]
 #![no_std]
 
 #[macro_use]
@@ -186,11 +181,13 @@ pub mod error;
 pub mod io;
 pub mod os;
 
-#[stable(feature = "rust-os", since = "1.0.0")]
+mod memchr;
+
+#[stable(feature = "dummy", since = "1.0.0")]
 pub mod sync {
-    #[stable(feature = "rust-os", since = "1.0.0")]
+    #[stable(feature = "dummy", since = "1.0.0")]
     pub use alloc::arc::{Arc, Weak};
-    #[stable(feature = "rust-os", since = "1.0.0")]
+    #[stable(feature = "dummy", since = "1.0.0")]
     pub use core::sync::atomic;
 }
 

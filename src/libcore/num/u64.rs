@@ -10,8 +10,8 @@
 
 //! The 64-bit unsigned integer type.
 //!
-//! *[See also the `u64` primitive type](../primitive.u64.html).*
+//! *[See also the `u64` primitive type](../../std/primitive.u64.html).*
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-uint_module! { u64, i64, 64 }
+uint_module! { u64, 64 }

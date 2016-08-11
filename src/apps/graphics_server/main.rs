@@ -5,7 +5,7 @@ extern crate syscall;
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
-use std::io::{Read,Write};
+use std::io::Read;
 use std::os::{File,OSHandle,OSMem,Result,SharedMem};
 use syscall::libc_helpers;
 
@@ -62,7 +62,7 @@ fn start_client(window: &Window, client2server: &File) -> Result<OSHandle> {
 }
 
 fn run() -> Result<()> {
-    let mut window = try!(Window::new(CAIRO_FORMAT_ARGB32, 50.0, 50.0, 100.0, 100.0));
+    let window = try!(Window::new(CAIRO_FORMAT_ARGB32, 50.0, 50.0, 100.0, 100.0));
     let mut client2server = try!(File::create_pipe());
     let _process = try!(start_client(&window, &client2server));
 

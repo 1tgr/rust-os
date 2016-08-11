@@ -33,7 +33,7 @@ use mem;
 use intrinsics;
 
 /// Arithmetic operations required by bignums.
-pub trait FullOps {
+pub trait FullOps: Sized {
     /// Returns `(carry', v')` such that `carry' * 2^W + v' = self + other + carry`,
     /// where `W` is the number of bits in `Self`.
     fn full_add(self, other: Self, carry: bool) -> (bool /*carry*/, Self);
@@ -58,8 +58,10 @@ macro_rules! impl_full_ops {
                 fn full_add(self, other: $ty, carry: bool) -> (bool, $ty) {
                     // this cannot overflow, the output is between 0 and 2*2^nbits - 1
                     // FIXME will LLVM optimize this into ADC or similar???
-                    let (v, carry1) = unsafe { $addfn(self, other) };
-                    let (v, carry2) = unsafe { $addfn(v, if carry {1} else {0}) };
+                    let (v, carry1) = unsafe { intrinsics::add_with_overflow(self, other) };
+                    let (v, carry2) = unsafe {
+                        intrinsics::add_with_overflow(v, if carry {1} else {0})
+                    };
                     (carry1 || carry2, v)
                 }
 

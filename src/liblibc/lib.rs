@@ -8,16 +8,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// Do not remove on snapshot creation. Needed for bootstrap. (Issue #22364)
-#![cfg_attr(stage0, feature(custom_attribute))]
 #![crate_name = "libc"]
 #![crate_type = "rlib"]
-#![cfg_attr(not(feature = "cargo-build"),
-            unstable(feature = "libc", reason = "use `libc` from crates.io",
-                     issue = "27783"))]
-#![cfg_attr(not(feature = "cargo-build"), feature(staged_api, no_std))]
-#![cfg_attr(not(feature = "cargo-build"), staged_api)]
-#![cfg_attr(not(feature = "cargo-build"), no_std)]
+#![no_std]
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/nightly/",
@@ -77,7 +70,7 @@
 //! in multiple derived systems. This is the 4.4BSD r2 / 1995 release, the final
 //! one from Berkeley after the lawsuits died down and the CSRG dissolved.
 
-#![allow(bad_style, raw_pointer_derive)]
+#![allow(bad_style)]
 #![cfg_attr(target_os = "nacl", allow(unused_imports))]
 #[cfg(feature = "cargo-build")] extern crate std as core;
 
@@ -754,6 +747,7 @@ pub mod funcs {
                 pub fn free(p: *mut c_void);
                 pub fn setjmp(env: *mut jmp_buf) -> c_int;
                 pub fn longjmp(env: *const jmp_buf, val: c_int) -> !;
+                pub fn memchr(cx: *const c_void, c: c_int, n: size_t) -> *mut c_void;
             }
         }
     }

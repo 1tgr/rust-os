@@ -9,7 +9,7 @@
 // except according to those terms.
 
 use prelude::v1::*;
-use fmt::{self, Write, FlagV1};
+use fmt::{self, FlagV1};
 
 struct PadAdapter<'a, 'b: 'a> {
     fmt: &'a mut fmt::Formatter<'b>,
@@ -29,7 +29,7 @@ impl<'a, 'b: 'a> fmt::Write for PadAdapter<'a, 'b> {
     fn write_str(&mut self, mut s: &str) -> fmt::Result {
         while !s.is_empty() {
             if self.on_newline {
-                try!(self.fmt.write_str("    "));
+                self.fmt.write_str("    ")?;
             }
 
             let split = match s.find('\n') {
@@ -42,7 +42,7 @@ impl<'a, 'b: 'a> fmt::Write for PadAdapter<'a, 'b> {
                     s.len()
                 }
             };
-            try!(self.fmt.write_str(&s[..split]));
+            self.fmt.write_str(&s[..split])?;
             s = &s[split..];
         }
 
@@ -54,6 +54,7 @@ impl<'a, 'b: 'a> fmt::Write for PadAdapter<'a, 'b> {
 ///
 /// Constructed by the `Formatter::debug_struct` method.
 #[must_use]
+#[allow(missing_debug_implementations)]
 #[stable(feature = "debug_builders", since = "1.2.0")]
 pub struct DebugStruct<'a, 'b: 'a> {
     fmt: &'a mut fmt::Formatter<'b>,
@@ -120,11 +121,13 @@ impl<'a, 'b: 'a> DebugStruct<'a, 'b> {
 ///
 /// Constructed by the `Formatter::debug_tuple` method.
 #[must_use]
+#[allow(missing_debug_implementations)]
 #[stable(feature = "debug_builders", since = "1.2.0")]
 pub struct DebugTuple<'a, 'b: 'a> {
     fmt: &'a mut fmt::Formatter<'b>,
     result: fmt::Result,
-    has_fields: bool,
+    fields: usize,
+    empty_name: bool,
 }
 
 pub fn debug_tuple_new<'a, 'b>(fmt: &'a mut fmt::Formatter<'b>, name: &str) -> DebugTuple<'a, 'b> {
@@ -132,7 +135,8 @@ pub fn debug_tuple_new<'a, 'b>(fmt: &'a mut fmt::Formatter<'b>, name: &str) -> D
     DebugTuple {
         fmt: fmt,
         result: result,
-        has_fields: false,
+        fields: 0,
+        empty_name: name.is_empty(),
     }
 }
 
@@ -141,7 +145,7 @@ impl<'a, 'b: 'a> DebugTuple<'a, 'b> {
     #[stable(feature = "debug_builders", since = "1.2.0")]
     pub fn field(&mut self, value: &fmt::Debug) -> &mut DebugTuple<'a, 'b> {
         self.result = self.result.and_then(|_| {
-            let (prefix, space) = if self.has_fields {
+            let (prefix, space) = if self.fields > 0 {
                 (",", " ")
             } else {
                 ("(", "")
@@ -155,20 +159,22 @@ impl<'a, 'b: 'a> DebugTuple<'a, 'b> {
             }
         });
 
-        self.has_fields = true;
+        self.fields += 1;
         self
     }
 
     /// Finishes output and returns any error encountered.
     #[stable(feature = "debug_builders", since = "1.2.0")]
     pub fn finish(&mut self) -> fmt::Result {
-        if self.has_fields {
+        if self.fields > 0 {
             self.result = self.result.and_then(|_| {
                 if self.is_pretty() {
-                    self.fmt.write_str("\n)")
-                } else {
-                    self.fmt.write_str(")")
+                    self.fmt.write_str("\n")?;
                 }
+                if self.fields == 1 && self.empty_name {
+                    self.fmt.write_str(",")?;
+                }
+                self.fmt.write_str(")")
             });
         }
         self.result
@@ -176,13 +182,6 @@ impl<'a, 'b: 'a> DebugTuple<'a, 'b> {
 
     fn is_pretty(&self) -> bool {
         self.fmt.flags() & (1 << (FlagV1::Alternate as usize)) != 0
-    }
-
-    /// Returns the wrapped `Formatter`.
-    #[unstable(feature = "debug_builder_formatter", reason = "recently added",
-               issue = "27782")]
-    pub fn formatter(&mut self) -> &mut fmt::Formatter<'b> {
-        &mut self.fmt
     }
 }
 
@@ -234,6 +233,7 @@ impl<'a, 'b: 'a> DebugInner<'a, 'b> {
 ///
 /// Constructed by the `Formatter::debug_set` method.
 #[must_use]
+#[allow(missing_debug_implementations)]
 #[stable(feature = "debug_builders", since = "1.2.0")]
 pub struct DebugSet<'a, 'b: 'a> {
     inner: DebugInner<'a, 'b>,
@@ -282,6 +282,7 @@ impl<'a, 'b: 'a> DebugSet<'a, 'b> {
 ///
 /// Constructed by the `Formatter::debug_list` method.
 #[must_use]
+#[allow(missing_debug_implementations)]
 #[stable(feature = "debug_builders", since = "1.2.0")]
 pub struct DebugList<'a, 'b: 'a> {
     inner: DebugInner<'a, 'b>,
@@ -330,6 +331,7 @@ impl<'a, 'b: 'a> DebugList<'a, 'b> {
 ///
 /// Constructed by the `Formatter::debug_map` method.
 #[must_use]
+#[allow(missing_debug_implementations)]
 #[stable(feature = "debug_builders", since = "1.2.0")]
 pub struct DebugMap<'a, 'b: 'a> {
     fmt: &'a mut fmt::Formatter<'b>,

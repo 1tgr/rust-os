@@ -10,24 +10,13 @@
 
 #![doc(hidden)]
 
-macro_rules! uint_module { ($T:ty, $T_SIGNED:ty, $bits:expr) => (
+macro_rules! uint_module { ($T:ident, $bits:expr) => (
 
-#[unstable(feature = "num_bits_bytes",
-           reason = "may want to be an associated function",
-           issue = "27753")]
-#[allow(missing_docs)]
-pub const BITS : usize = $bits;
-#[unstable(feature = "num_bits_bytes",
-           reason = "may want to be an associated function",
-           issue = "27753")]
-#[allow(missing_docs)]
-pub const BYTES : usize = ($bits / 8);
-
+/// The smallest value that can be represented by this integer type.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(missing_docs)]
-pub const MIN: $T = 0 as $T;
+pub const MIN: $T = $T::min_value();
+/// The largest value that can be represented by this integer type.
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(missing_docs)]
-pub const MAX: $T = !0 as $T;
+pub const MAX: $T = $T::max_value();
 
 ) }

@@ -1,7 +1,7 @@
 use alloc::arc::Arc;
 use arch::vga_bochs;
 use console::Console;
-use io::{Pipe,Read,Write};
+use io::Pipe;
 use logging::Writer;
 use prelude::*;
 use process::{self,KObj,SharedMemBlock};

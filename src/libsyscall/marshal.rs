@@ -3,7 +3,7 @@ use core::slice;
 use core::str::{self,StrExt};
 use super::{ErrNum,Result};
 
-struct TupleDeque6<T> {
+pub struct TupleDeque6<T> {
     tuple: (T, T, T, T, T, T),
     len: u8
 }

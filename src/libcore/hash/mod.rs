@@ -38,13 +38,14 @@
 //! ```
 //!
 //! If you need more control over how a value is hashed, you need to implement
-//! the trait `Hash`:
+//! the `Hash` trait:
 //!
 //! ```rust
 //! use std::hash::{Hash, Hasher, SipHasher};
 //!
 //! struct Person {
 //!     id: u32,
+//! # #[allow(dead_code)]
 //!     name: String,
 //!     phone: u64,
 //! }
@@ -72,9 +73,15 @@
 
 use prelude::v1::*;
 
+use fmt;
+use marker;
 use mem;
 
+#[stable(feature = "rust1", since = "1.0.0")]
 pub use self::sip::SipHasher;
+
+#[unstable(feature = "sip_hash_13", issue = "29754")]
+pub use self::sip::{SipHasher13, SipHasher24};
 
 mod sip;
 
@@ -92,6 +99,34 @@ mod sip;
 ///
 /// In other words, if two keys are equal, their hashes should also be equal.
 /// `HashMap` and `HashSet` both rely on this behavior.
+///
+/// ## Derivable
+///
+/// This trait can be used with `#[derive]` if all fields implement `Hash`.
+/// When `derive`d, the resulting hash will be the combination of the values
+/// from calling `.hash()` on each field.
+///
+/// ## How can I implement `Hash`?
+///
+/// If you need more control over how a value is hashed, you need to implement
+/// the `Hash` trait:
+///
+/// ```
+/// use std::hash::{Hash, Hasher};
+///
+/// struct Person {
+///     id: u32,
+///     name: String,
+///     phone: u64,
+/// }
+///
+/// impl Hash for Person {
+///     fn hash<H: Hasher>(&self, state: &mut H) {
+///         self.id.hash(state);
+///         self.phone.hash(state);
+///     }
+/// }
+/// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Hash {
     /// Feeds this value into the state given, updating the hasher as necessary.
@@ -186,11 +221,76 @@ pub trait Hasher {
     }
 }
 
+/// A `BuildHasher` is typically used as a factory for instances of `Hasher`
+/// which a `HashMap` can then use to hash keys independently.
+///
+/// Note that for each instance of `BuildHasher`, the created hashers should be
+/// identical. That is, if the same stream of bytes is fed into each hasher, the
+/// same output will also be generated.
+#[stable(since = "1.7.0", feature = "build_hasher")]
+pub trait BuildHasher {
+    /// Type of the hasher that will be created.
+    #[stable(since = "1.7.0", feature = "build_hasher")]
+    type Hasher: Hasher;
+
+    /// Creates a new hasher.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::hash_map::RandomState;
+    /// use std::hash::BuildHasher;
+    ///
+    /// let s = RandomState::new();
+    /// let new_s = s.build_hasher();
+    /// ```
+    #[stable(since = "1.7.0", feature = "build_hasher")]
+    fn build_hasher(&self) -> Self::Hasher;
+}
+
+/// A structure which implements `BuildHasher` for all `Hasher` types which also
+/// implement `Default`.
+///
+/// This struct is 0-sized and does not need construction.
+#[stable(since = "1.7.0", feature = "build_hasher")]
+pub struct BuildHasherDefault<H>(marker::PhantomData<H>);
+
+#[stable(since = "1.9.0", feature = "core_impl_debug")]
+impl<H> fmt::Debug for BuildHasherDefault<H> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("BuildHasherDefault")
+    }
+}
+
+#[stable(since = "1.7.0", feature = "build_hasher")]
+impl<H: Default + Hasher> BuildHasher for BuildHasherDefault<H> {
+    type Hasher = H;
+
+    fn build_hasher(&self) -> H {
+        H::default()
+    }
+}
+
+#[stable(since = "1.7.0", feature = "build_hasher")]
+impl<H> Clone for BuildHasherDefault<H> {
+    fn clone(&self) -> BuildHasherDefault<H> {
+        BuildHasherDefault(marker::PhantomData)
+    }
+}
+
+#[stable(since = "1.7.0", feature = "build_hasher")]
+impl<H> Default for BuildHasherDefault<H> {
+    fn default() -> BuildHasherDefault<H> {
+        BuildHasherDefault(marker::PhantomData)
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////////
 
 mod impls {
     use prelude::v1::*;
 
+    use mem;
     use slice;
     use super::*;
 
@@ -203,9 +303,7 @@ mod impls {
                 }
 
                 fn hash_slice<H: Hasher>(data: &[$ty], state: &mut H) {
-                    // FIXME(#23542) Replace with type ascription.
-                    #![allow(trivial_casts)]
-                    let newlen = data.len() * ::$ty::BYTES;
+                    let newlen = data.len() * mem::size_of::<$ty>();
                     let ptr = data.as_ptr() as *const u8;
                     state.write(unsafe { slice::from_raw_parts(ptr, newlen) })
                 }

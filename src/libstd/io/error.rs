@@ -9,7 +9,7 @@
 // except according to those terms.
 
 use boxed::Box;
-use convert::{From,Into};
+use convert::Into;
 use error;
 use fmt;
 use marker::{Send, Sync};
@@ -79,6 +79,7 @@ struct Custom {
 /// exhaustively match against it.
 #[derive(Copy, PartialEq, Eq, Clone, Debug)]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[allow(deprecated)]
 pub enum ErrorKind {
     /// An entity was not found, often a file.
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -155,8 +156,8 @@ pub enum ErrorKind {
     /// This typically means that an operation could only succeed if it read a
     /// particular number of bytes but only a smaller number of bytes could be
     /// read.
-    #[unstable(feature = "read_exact", reason = "recently added", issue = "27585")]
-    UnexpectedEOF,
+    #[stable(feature = "read_exact", since = "1.6.0")]
+    UnexpectedEof,
 
     /// Any I/O error not part of this list.
     #[unstable(feature = "io_error_internals",
@@ -197,7 +198,7 @@ impl Error {
         Error {
             repr: Repr::Custom(Box::new(Custom {
                 kind: kind,
-                error: error.into(),
+                error: error,
             }))
         }
     }
@@ -285,6 +286,7 @@ impl error::Error for Error {
     }
 }
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 impl From<ErrNum> for ErrorKind {
     fn from(num: ErrNum) -> Self {
         match num {
@@ -295,6 +297,7 @@ impl From<ErrNum> for ErrorKind {
     }
 }
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 impl From<ErrorKind> for ErrNum {
     fn from(kind: ErrorKind) -> Self {
         match kind {
@@ -305,12 +308,14 @@ impl From<ErrorKind> for ErrNum {
     }
 }
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 impl From<ErrNum> for Error {
     fn from(num: ErrNum) -> Self {
         Error { repr: Repr::Os(ErrorKind::from(num)) }
     }
 }
 
+#[stable(feature = "rust-os", since = "1.0.0")]
 impl From<Error> for ErrNum {
     fn from(error: Error) -> Self {
         match error.repr {
@@ -330,7 +335,6 @@ mod test {
     use prelude::v1::*;
     use super::{Error, ErrorKind};
     use error;
-    use error::Error as error_Error;
     use fmt;
     use sys::os::error_string;
 
@@ -349,7 +353,7 @@ mod test {
         struct TestError;
 
         impl fmt::Display for TestError {
-            fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+            fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
                 Ok(())
             }
         }

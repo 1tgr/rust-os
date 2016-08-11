@@ -20,6 +20,7 @@
 use prelude::v1::*;
 
 use cmp;
+use fmt;
 use usize;
 
 // Pattern
@@ -275,7 +276,7 @@ impl<'a> CharEq for &'a [char] {
 
 struct CharEqPattern<C: CharEq>(C);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct CharEqSearcher<'a, C: CharEq> {
     char_eq: C,
     haystack: &'a str,
@@ -309,9 +310,9 @@ unsafe impl<'a, C: CharEq> Searcher<'a> for CharEqSearcher<'a, C> {
         let s = &mut self.char_indices;
         // Compare lengths of the internal byte slice iterator
         // to find length of current char
-        let (pre_len, _) = s.iter.iter.size_hint();
+        let pre_len = s.iter.iter.len();
         if let Some((i, c)) = s.next() {
-            let (len, _) = s.iter.iter.size_hint();
+            let len = s.iter.iter.len();
             let char_len = pre_len - len;
             if self.char_eq.matches(c) {
                 return SearchStep::Match(i, i + char_len);
@@ -329,9 +330,9 @@ unsafe impl<'a, C: CharEq> ReverseSearcher<'a> for CharEqSearcher<'a, C> {
         let s = &mut self.char_indices;
         // Compare lengths of the internal byte slice iterator
         // to find length of current char
-        let (pre_len, _) = s.iter.iter.size_hint();
+        let pre_len = s.iter.iter.len();
         if let Some((i, c)) = s.next_back() {
-            let (len, _) = s.iter.iter.size_hint();
+            let len = s.iter.iter.len();
             let char_len = pre_len - len;
             if self.char_eq.matches(c) {
                 return SearchStep::Match(i, i + char_len);
@@ -415,7 +416,7 @@ macro_rules! searcher_methods {
 /////////////////////////////////////////////////////////////////////////////
 
 /// Associated type for `<char as Pattern<'a>>::Searcher`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CharSearcher<'a>(<CharEqPattern<char> as Pattern<'a>>::Searcher);
 
 unsafe impl<'a> Searcher<'a> for CharSearcher<'a> {
@@ -440,7 +441,7 @@ impl<'a> Pattern<'a> for char {
 // Todo: Change / Remove due to ambiguity in meaning.
 
 /// Associated type for `<&[char] as Pattern<'a>>::Searcher`.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CharSliceSearcher<'a, 'b>(<CharEqPattern<&'b [char]> as Pattern<'a>>::Searcher);
 
 unsafe impl<'a, 'b> Searcher<'a> for CharSliceSearcher<'a, 'b> {
@@ -467,6 +468,17 @@ impl<'a, 'b> Pattern<'a> for &'b [char] {
 pub struct CharPredicateSearcher<'a, F>(<CharEqPattern<F> as Pattern<'a>>::Searcher)
     where F: FnMut(char) -> bool;
 
+impl<'a, F> fmt::Debug for CharPredicateSearcher<'a, F>
+    where F: FnMut(char) -> bool
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("CharPredicateSearcher")
+            .field("haystack", &self.0.haystack)
+            .field("char_indices", &self.0.char_indices)
+            .field("ascii_only", &self.0.ascii_only)
+            .finish()
+    }
+}
 unsafe impl<'a, F> Searcher<'a> for CharPredicateSearcher<'a, F>
     where F: FnMut(char) -> bool
 {
@@ -492,7 +504,7 @@ impl<'a, F> Pattern<'a> for F where F: FnMut(char) -> bool {
 /////////////////////////////////////////////////////////////////////////////
 
 /// Delegates to the `&str` impl.
-impl<'a, 'b> Pattern<'a> for &'b &'b str {
+impl<'a, 'b, 'c> Pattern<'a> for &'c &'b str {
     pattern_methods!(StrSearcher<'a, 'b>, |&s| s, |s| s);
 }
 

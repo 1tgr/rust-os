@@ -10,13 +10,10 @@
 
 //! Collection types.
 //!
-//! See [std::collections](../std/collections) for a detailed discussion of
+//! See [std::collections](../std/collections/index.html) for a detailed discussion of
 //! collections in Rust.
 
-// Do not remove on snapshot creation. Needed for bootstrap. (Issue #22364)
-#![cfg_attr(stage0, feature(custom_attribute))]
 #![crate_name = "collections"]
-#![staged_api]
 #![crate_type = "rlib"]
 #![unstable(feature = "collections",
             reason = "library is unlikely to be stabilized with the current \
@@ -27,63 +24,62 @@
        html_root_url = "https://doc.rust-lang.org/nightly/",
        html_playground_url = "https://play.rust-lang.org/",
        issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
-       test(no_crate_inject))]
+       test(no_crate_inject, attr(allow(unused_variables), deny(warnings))))]
 
-#![allow(trivial_casts)]
 #![cfg_attr(test, allow(deprecated))] // rand
-
-// SNAP 1af31d4
-#![allow(unused_features)]
-// SNAP 1af31d4
-#![allow(unused_attributes)]
+#![cfg_attr(not(stage0), deny(warnings))]
 
 #![feature(alloc)]
+#![feature(allow_internal_unstable)]
 #![feature(box_patterns)]
 #![feature(box_syntax)]
+#![cfg_attr(not(test), feature(char_escape_debug))]
 #![feature(core_intrinsics)]
-#![feature(core_slice_ext)]
-#![feature(core_str_ext)]
+#![feature(dropck_parametricity)]
 #![feature(fmt_internals)]
-#![feature(fmt_radix)]
 #![feature(heap_api)]
-#![feature(iter_arith)]
-#![feature(iter_arith)]
+#![feature(inclusive_range)]
 #![feature(lang_items)]
-#![feature(num_bits_bytes)]
-#![feature(oom)]
+#![feature(nonzero)]
 #![feature(pattern)]
-#![feature(ptr_as_ref)]
-#![feature(ref_slice)]
-#![feature(slice_bytes)]
+#![feature(placement_in)]
+#![feature(placement_new_protocol)]
+#![feature(shared)]
 #![feature(slice_patterns)]
+#![feature(specialization)]
 #![feature(staged_api)]
 #![feature(step_by)]
-#![feature(str_char)]
-#![feature(unboxed_closures)]
 #![feature(unicode)]
 #![feature(unique)]
-#![feature(dropck_parametricity)]
-#![feature(unsafe_no_drop_flag, filling_drop)]
-#![feature(decode_utf16)]
-#![feature(drop_in_place)]
-#![cfg_attr(test, feature(clone_from_slice, rand, test))]
+#![feature(unsafe_no_drop_flag)]
+#![cfg_attr(test, feature(rand, test))]
 
-#![feature(no_std)]
 #![no_std]
 
 extern crate rustc_unicode;
 extern crate alloc;
 
-#[cfg(test)] #[macro_use] extern crate std;
-#[cfg(test)] extern crate test;
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+#[cfg(test)]
+extern crate test;
 
+#[doc(no_inline)]
 pub use binary_heap::BinaryHeap;
+#[doc(no_inline)]
 pub use btree_map::BTreeMap;
+#[doc(no_inline)]
 pub use btree_set::BTreeSet;
+#[doc(no_inline)]
 pub use linked_list::LinkedList;
+#[doc(no_inline)]
 pub use enum_set::EnumSet;
+#[doc(no_inline)]
 pub use vec_deque::VecDeque;
+#[doc(no_inline)]
 pub use string::String;
+#[doc(no_inline)]
 pub use vec::Vec;
 
 // Needed for the vec! macro
@@ -107,11 +103,15 @@ pub mod vec_deque;
 
 #[stable(feature = "rust1", since = "1.0.0")]
 pub mod btree_map {
+    //! A map based on a B-Tree.
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub use btree::map::*;
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
 pub mod btree_set {
+    //! A set based on a B-Tree.
+    #[stable(feature = "rust1", since = "1.0.0")]
     pub use btree::set::*;
 }
 
@@ -130,4 +130,11 @@ pub enum Bound<T> {
     Excluded(T),
     /// An infinite endpoint. Indicates that there is no bound in this direction.
     Unbounded,
+}
+
+/// An intermediate trait for specialization of `Extend`.
+#[doc(hidden)]
+trait SpecExtend<I: IntoIterator> {
+    /// Extends `self` with the contents of the given iterator.
+    fn spec_extend(&mut self, iter: I);
 }

@@ -96,7 +96,7 @@ use core::iter::{DoubleEndedIterator, ExactSizeIterator};
 use core::iter::{Iterator, Extend, IntoIterator};
 use core::marker::Copy;
 use core::option::Option::{self, Some, None};
-use core::result::Result::{self, Ok};
+use core::result::Result::Ok;
 use core::slice;
 use core::{u8, usize};
 

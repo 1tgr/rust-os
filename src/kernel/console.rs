@@ -20,10 +20,7 @@ impl Console {
                 if keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
                     Vec::new()
                 } else if let Some(c) = char::from_u32(c) {
-                    let mut bytes = vec![0; 4];
-                    let len = char::encode_utf8(c, &mut bytes).unwrap();
-                    bytes.truncate(len);
-
+                    let bytes : Vec<u8> = char::encode_utf8(c).collect();
                     let _ = output.write(&bytes[..]);
                     bytes
                 } else {

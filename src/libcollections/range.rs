@@ -8,8 +8,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![unstable(feature = "collections_range", reason = "was just added",
-            issue = "27711")]
+#![unstable(feature = "collections_range",
+            reason = "waiting for dust to settle on inclusive ranges",
+            issue = "30877")]
 
 //! Range syntax.
 
@@ -22,26 +23,71 @@ pub trait RangeArgument<T> {
     /// Start index (inclusive)
     ///
     /// Return start value if present, else `None`.
-    fn start(&self) -> Option<&T> { None }
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(collections)]
+    /// #![feature(collections_range)]
+    ///
+    /// extern crate collections;
+    ///
+    /// # fn main() {
+    /// use collections::range::RangeArgument;
+    ///
+    /// assert_eq!((..10).start(), None);
+    /// assert_eq!((3..10).start(), Some(&3));
+    /// # }
+    /// ```
+    fn start(&self) -> Option<&T> {
+        None
+    }
 
     /// End index (exclusive)
     ///
     /// Return end value if present, else `None`.
-    fn end(&self) -> Option<&T> { None }
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// #![feature(collections)]
+    /// #![feature(collections_range)]
+    ///
+    /// extern crate collections;
+    ///
+    /// # fn main() {
+    /// use collections::range::RangeArgument;
+    ///
+    /// assert_eq!((3..).end(), None);
+    /// assert_eq!((3..10).end(), Some(&10));
+    /// # }
+    /// ```
+    fn end(&self) -> Option<&T> {
+        None
+    }
 }
 
+// FIXME add inclusive ranges to RangeArgument
 
 impl<T> RangeArgument<T> for RangeFull {}
 
 impl<T> RangeArgument<T> for RangeFrom<T> {
-    fn start(&self) -> Option<&T> { Some(&self.start) }
+    fn start(&self) -> Option<&T> {
+        Some(&self.start)
+    }
 }
 
 impl<T> RangeArgument<T> for RangeTo<T> {
-    fn end(&self) -> Option<&T> { Some(&self.end) }
+    fn end(&self) -> Option<&T> {
+        Some(&self.end)
+    }
 }
 
 impl<T> RangeArgument<T> for Range<T> {
-    fn start(&self) -> Option<&T> { Some(&self.start) }
-    fn end(&self) -> Option<&T> { Some(&self.end) }
+    fn start(&self) -> Option<&T> {
+        Some(&self.start)
+    }
+    fn end(&self) -> Option<&T> {
+        Some(&self.end)
+    }
 }

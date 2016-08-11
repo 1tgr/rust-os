@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Basic functions for dealing with memory
+//! Basic functions for dealing with memory.
 //!
 //! This module contains functions for querying the size and alignment of
 //! types, initializing and manipulating memory.
@@ -92,6 +92,7 @@ pub use intrinsics::transmute;
 /// use std::mem;
 /// use std::ptr;
 ///
+/// # #[allow(dead_code)]
 /// fn swap<T>(x: &mut T, y: &mut T) {
 ///     unsafe {
 ///         // Give ourselves some scratch space to work with
@@ -109,12 +110,16 @@ pub use intrinsics::transmute;
 ///     }
 /// }
 /// ```
+#[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn forget<T>(t: T) {
     unsafe { intrinsics::forget(t) }
 }
 
 /// Returns the size of a type in bytes.
+///
+/// More specifically, this is the offset in bytes between successive
+/// items of the same type, including alignment padding.
 ///
 /// # Examples
 ///
@@ -129,7 +134,7 @@ pub fn size_of<T>() -> usize {
     unsafe { intrinsics::size_of::<T>() }
 }
 
-/// Returns the size of the type that `val` points to in bytes.
+/// Returns the size of the given value in bytes.
 ///
 /// # Examples
 ///
@@ -151,13 +156,14 @@ pub fn size_of_val<T: ?Sized>(val: &T) -> usize {
 /// # Examples
 ///
 /// ```
+/// # #![allow(deprecated)]
 /// use std::mem;
 ///
 /// assert_eq!(4, mem::min_align_of::<i32>());
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
-#[deprecated(reason = "use `align_of` instead", since = "1.2.0")]
+#[rustc_deprecated(reason = "use `align_of` instead", since = "1.2.0")]
 pub fn min_align_of<T>() -> usize {
     unsafe { intrinsics::min_align_of::<T>() }
 }
@@ -167,13 +173,14 @@ pub fn min_align_of<T>() -> usize {
 /// # Examples
 ///
 /// ```
+/// # #![allow(deprecated)]
 /// use std::mem;
 ///
 /// assert_eq!(4, mem::min_align_of_val(&5i32));
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
-#[deprecated(reason = "use `align_of_val` instead", since = "1.2.0")]
+#[rustc_deprecated(reason = "use `align_of_val` instead", since = "1.2.0")]
 pub fn min_align_of_val<T: ?Sized>(val: &T) -> usize {
     unsafe { intrinsics::min_align_of_val(val) }
 }
@@ -414,6 +421,7 @@ pub fn swap<T>(x: &mut T, y: &mut T) {
 /// `self`, allowing it to be returned:
 ///
 /// ```
+/// # #![allow(dead_code)]
 /// use std::mem;
 /// # struct Buffer<T> { buf: Vec<T> }
 /// impl<T> Buffer<T> {
@@ -510,6 +518,10 @@ pub fn replace<T>(dest: &mut T, mut src: T) -> T {
 #[stable(feature = "rust1", since = "1.0.0")]
 pub fn drop<T>(_x: T) { }
 
+macro_rules! repeat_u8_as_u16 {
+    ($name:expr) => { (($name as u16) <<  8 |
+                       ($name as u16)) }
+}
 macro_rules! repeat_u8_as_u32 {
     ($name:expr) => { (($name as u32) << 24 |
                        ($name as u32) << 16 |
@@ -535,11 +547,18 @@ macro_rules! repeat_u8_as_u64 {
 pub const POST_DROP_U8: u8 = 0x1d;
 #[unstable(feature = "filling_drop", issue = "5016")]
 #[allow(missing_docs)]
+pub const POST_DROP_U16: u16 = repeat_u8_as_u16!(POST_DROP_U8);
+#[unstable(feature = "filling_drop", issue = "5016")]
+#[allow(missing_docs)]
 pub const POST_DROP_U32: u32 = repeat_u8_as_u32!(POST_DROP_U8);
 #[unstable(feature = "filling_drop", issue = "5016")]
 #[allow(missing_docs)]
 pub const POST_DROP_U64: u64 = repeat_u8_as_u64!(POST_DROP_U8);
 
+#[cfg(target_pointer_width = "16")]
+#[unstable(feature = "filling_drop", issue = "5016")]
+#[allow(missing_docs)]
+pub const POST_DROP_USIZE: usize = POST_DROP_U16 as usize;
 #[cfg(target_pointer_width = "32")]
 #[unstable(feature = "filling_drop", issue = "5016")]
 #[allow(missing_docs)]
@@ -567,14 +586,28 @@ pub const POST_DROP_USIZE: usize = POST_DROP_U64 as usize;
 /// ```
 /// use std::mem;
 ///
-/// let one = unsafe { mem::transmute_copy(&1) };
+/// #[repr(packed)]
+/// struct Foo {
+///     bar: u8,
+/// }
 ///
-/// assert_eq!(1, one);
+/// let foo_slice = [10u8];
+///
+/// unsafe {
+///     // Copy the data from 'foo_slice' and treat it as a 'Foo'
+///     let mut foo_struct: Foo = mem::transmute_copy(&foo_slice);
+///     assert_eq!(foo_struct.bar, 10);
+///
+///     // Modify the copied data
+///     foo_struct.bar = 20;
+///     assert_eq!(foo_struct.bar, 20);
+/// }
+///
+/// // The contents of 'foo_slice' should not have changed
+/// assert_eq!(foo_slice, [10]);
 /// ```
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn transmute_copy<T, U>(src: &T) -> U {
-    // FIXME(#23542) Replace with type ascription.
-    #![allow(trivial_casts)]
     ptr::read(src as *const T as *const U)
 }

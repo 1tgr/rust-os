@@ -8,7 +8,7 @@ pub fn bytes_between<T>(ptr1: *const T, ptr2: *const T) -> usize {
     }
 }
 
-pub trait Align {
+pub trait Align: Sized {
     fn down(value: Self, round: usize) -> Self;
     fn up(value: Self, round: usize) -> Self;
     fn range(base: Self, len: usize, round: usize) -> (Self, usize);

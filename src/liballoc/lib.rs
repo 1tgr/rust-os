@@ -56,11 +56,8 @@
 //! The [`heap`](heap/index.html) module defines the low-level interface to the
 //! default global allocator. It is not compatible with the libc allocator API.
 
-// Do not remove on snapshot creation. Needed for bootstrap. (Issue #22364)
-#![cfg_attr(stage0, feature(custom_attribute))]
 #![crate_name = "alloc"]
 #![crate_type = "rlib"]
-#![staged_api]
 #![allow(unused_attributes)]
 #![unstable(feature = "alloc",
             reason = "this library is unlikely to be stabilized in its current \
@@ -70,57 +67,38 @@
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/nightly/",
        issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
-       test(no_crate_inject))]
+       test(no_crate_inject, attr(allow(unused_variables), deny(warnings))))]
 #![no_std]
-#![cfg_attr(not(stage0), needs_allocator)]
+#![needs_allocator]
+#![cfg_attr(not(stage0), deny(warnings))]
 
 #![feature(allocator)]
 #![feature(box_syntax)]
 #![feature(coerce_unsized)]
-#![feature(core)]
+#![feature(const_fn)]
 #![feature(core_intrinsics)]
-#![feature(core_slice_ext)]
 #![feature(custom_attribute)]
+#![feature(dropck_parametricity)]
 #![feature(fundamental)]
 #![feature(lang_items)]
-#![feature(no_std)]
-#![feature(nonzero)]
-#![feature(num_bits_bytes)]
+#![feature(needs_allocator)]
 #![feature(optin_builtin_traits)]
 #![feature(placement_in_syntax)]
-#![feature(placement_new_protocol)]
-#![feature(raw)]
 #![feature(shared)]
 #![feature(staged_api)]
 #![feature(unboxed_closures)]
 #![feature(unique)]
 #![feature(unsafe_no_drop_flag, filling_drop)]
-// SNAP 1af31d4
-#![allow(unused_features)]
-// SNAP 1af31d4
-#![allow(unused_attributes)]
-#![feature(dropck_parametricity)]
 #![feature(unsize)]
-#![feature(core_slice_ext)]
-#![feature(core_str_ext)]
-#![feature(drop_in_place)]
 
-#![cfg_attr(stage0, feature(alloc_system))]
-#![cfg_attr(not(stage0), feature(needs_allocator))]
-
-#![cfg_attr(test, feature(test, rustc_private, box_heap))]
-
-#[cfg(stage0)]
-extern crate alloc_system;
+#![cfg_attr(not(test), feature(raw, fn_traits, placement_new_protocol))]
+#![cfg_attr(test, feature(test, box_heap))]
 
 // Allow testing this library
 
 #[cfg(test)]
 #[macro_use]
 extern crate std;
-#[cfg(test)]
-#[macro_use]
-extern crate log;
 
 // Heaps provided for low-level allocation strategies
 
@@ -143,15 +121,6 @@ mod boxed_test;
 pub mod arc;
 pub mod rc;
 pub mod raw_vec;
+pub mod oom;
 
-/// Common out-of-memory routine
-#[cold]
-#[inline(never)]
-#[unstable(feature = "oom", reason = "not a scrutinized interface",
-           issue = "27700")]
-pub fn oom() -> ! {
-    // FIXME(#14674): This really needs to do something other than just abort
-    //                here, but any printing done must be *guaranteed* to not
-    //                allocate.
-    unsafe { core::intrinsics::abort() }
-}
+pub use oom::oom;

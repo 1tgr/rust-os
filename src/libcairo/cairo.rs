@@ -44,7 +44,7 @@ impl Cairo {
     pub fn show_text(&self, text: &str) -> &Self {
         let mut buf;
         let text =
-            if text.len() == 0 || text.char_at_reverse(0) != '\0' {
+            if text.len() == 0 || !text.ends_with('\0') {
                 buf = text.to_string();
                 buf.push_str("\0");
                 buf.as_str()

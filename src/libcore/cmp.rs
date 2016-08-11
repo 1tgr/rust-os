@@ -14,12 +14,26 @@
 //! by the compiler to implement comparison operators. Rust programs may
 //! implement `PartialOrd` to overload the `<`, `<=`, `>`, and `>=` operators,
 //! and may implement `PartialEq` to overload the `==` and `!=` operators.
+//!
+//! # Examples
+//!
+//! ```
+//! let x: u32 = 0;
+//! let y: u32 = 1;
+//!
+//! // these two lines are equivalent
+//! assert_eq!(x < y, true);
+//! assert_eq!(x.lt(&y), true);
+//!
+//! // these two lines are also equivalent
+//! assert_eq!(x == y, false);
+//! assert_eq!(x.eq(&y), false);
+//! ```
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
 use self::Ordering::*;
 
-use mem;
 use marker::Sized;
 use option::Option::{self, Some};
 
@@ -39,10 +53,53 @@ use option::Option::{self, Some};
 /// symmetrically and transitively: if `T: PartialEq<U>` and `U: PartialEq<V>`
 /// then `U: PartialEq<T>` and `T: PartialEq<V>`.
 ///
+/// ## Derivable
+///
+/// This trait can be used with `#[derive]`. When `derive`d on structs, two
+/// instances are equal if all fields are equal, and not equal if any fields
+/// are not equal. When `derive`d on enums, each variant is equal to itself
+/// and not equal to the other variants.
+///
+/// ## How can I implement `PartialEq`?
+///
 /// PartialEq only requires the `eq` method to be implemented; `ne` is defined
 /// in terms of it by default. Any manual implementation of `ne` *must* respect
 /// the rule that `eq` is a strict inverse of `ne`; that is, `!(a == b)` if and
 /// only if `a != b`.
+///
+/// An example implementation for a domain in which two books are considered
+/// the same book if their ISBN matches, even if the formats differ:
+///
+/// ```
+/// enum BookFormat { Paperback, Hardback, Ebook }
+/// struct Book {
+///     isbn: i32,
+///     format: BookFormat,
+/// }
+///
+/// impl PartialEq for Book {
+///     fn eq(&self, other: &Book) -> bool {
+///         self.isbn == other.isbn
+///     }
+/// }
+///
+/// let b1 = Book { isbn: 3, format: BookFormat::Paperback };
+/// let b2 = Book { isbn: 3, format: BookFormat::Ebook };
+/// let b3 = Book { isbn: 10, format: BookFormat::Paperback };
+///
+/// assert!(b1 == b2);
+/// assert!(b1 != b3);
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// let x: u32 = 0;
+/// let y: u32 = 1;
+///
+/// assert_eq!(x == y, false);
+/// assert_eq!(x.eq(&y), false);
+/// ```
 #[lang = "eq"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait PartialEq<Rhs: ?Sized = Self> {
@@ -69,6 +126,33 @@ pub trait PartialEq<Rhs: ?Sized = Self> {
 ///
 /// This property cannot be checked by the compiler, and therefore `Eq` implies
 /// `PartialEq`, and has no extra methods.
+///
+/// ## Derivable
+///
+/// This trait can be used with `#[derive]`. When `derive`d, because `Eq` has
+/// no extra methods, it is only informing the compiler that this is an
+/// equivalence relation rather than a partial equivalence relation. Note that
+/// the `derive` strategy requires all fields are `PartialEq`, which isn't
+/// always desired.
+///
+/// ## How can I implement `Eq`?
+///
+/// If you cannot use the `derive` strategy, specify that your type implements
+/// `Eq`, which has no methods:
+///
+/// ```
+/// enum BookFormat { Paperback, Hardback, Ebook }
+/// struct Book {
+///     isbn: i32,
+///     format: BookFormat,
+/// }
+/// impl PartialEq for Book {
+///     fn eq(&self, other: &Book) -> bool {
+///         self.isbn == other.isbn
+///     }
+/// }
+/// impl Eq for Book {}
+/// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Eq: PartialEq<Self> {
     // FIXME #13101: this method is used solely by #[deriving] to
@@ -100,7 +184,7 @@ pub trait Eq: PartialEq<Self> {
 /// let result = 2.cmp(&1);
 /// assert_eq!(Ordering::Greater, result);
 /// ```
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Hash)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub enum Ordering {
     /// An ordering where a compared value is less [than another].
@@ -115,10 +199,6 @@ pub enum Ordering {
 }
 
 impl Ordering {
-    unsafe fn from_i8_unchecked(v: i8) -> Ordering {
-        mem::transmute(v)
-    }
-
     /// Reverse the `Ordering`.
     ///
     /// * `Less` becomes `Greater`.
@@ -140,8 +220,6 @@ impl Ordering {
     /// This method can be used to reverse a comparison:
     ///
     /// ```
-    /// use std::cmp::Ordering;
-    ///
     /// let mut data: &mut [_] = &mut [2, 10, 5, 8];
     ///
     /// // sort the array from largest to smallest.
@@ -153,14 +231,10 @@ impl Ordering {
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn reverse(self) -> Ordering {
-        unsafe {
-            // this compiles really nicely (to a single instruction);
-            // an explicit match has a pile of branches and
-            // comparisons.
-            //
-            // NB. it is safe because of the explicit discriminants
-            // given above.
-            Ordering::from_i8_unchecked(-(self as i8))
+        match self {
+            Less => Greater,
+            Equal => Equal,
+            Greater => Less,
         }
     }
 }
@@ -172,7 +246,49 @@ impl Ordering {
 /// - total and antisymmetric: exactly one of `a < b`, `a == b` or `a > b` is true; and
 /// - transitive, `a < b` and `b < c` implies `a < c`. The same must hold for both `==` and `>`.
 ///
-/// When this trait is `derive`d, it produces a lexicographic ordering.
+/// ## Derivable
+///
+/// This trait can be used with `#[derive]`. When `derive`d, it will produce a lexicographic
+/// ordering based on the top-to-bottom declaration order of the struct's members.
+///
+/// ## How can I implement `Ord`?
+///
+/// `Ord` requires that the type also be `PartialOrd` and `Eq` (which requires `PartialEq`).
+///
+/// Then you must define an implementation for `cmp()`. You may find it useful to use
+/// `cmp()` on your type's fields.
+///
+/// Here's an example where you want to sort people by height only, disregarding `id`
+/// and `name`:
+///
+/// ```
+/// use std::cmp::Ordering;
+///
+/// #[derive(Eq)]
+/// struct Person {
+///     id: u32,
+///     name: String,
+///     height: u32,
+/// }
+///
+/// impl Ord for Person {
+///     fn cmp(&self, other: &Person) -> Ordering {
+///         self.height.cmp(&other.height)
+///     }
+/// }
+///
+/// impl PartialOrd for Person {
+///     fn partial_cmp(&self, other: &Person) -> Option<Ordering> {
+///         Some(self.cmp(other))
+///     }
+/// }
+///
+/// impl PartialEq for Person {
+///     fn eq(&self, other: &Person) -> bool {
+///         self.height == other.height
+///     }
+/// }
+/// ```
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait Ord: Eq + PartialOrd<Self> {
     /// This method returns an `Ordering` between `self` and `other`.
@@ -199,7 +315,6 @@ impl Eq for Ordering {}
 #[stable(feature = "rust1", since = "1.0.0")]
 impl Ord for Ordering {
     #[inline]
-    #[stable(feature = "rust1", since = "1.0.0")]
     fn cmp(&self, other: &Ordering) -> Ordering {
         (*self as i32).cmp(&(*other as i32))
     }
@@ -208,7 +323,6 @@ impl Ord for Ordering {
 #[stable(feature = "rust1", since = "1.0.0")]
 impl PartialOrd for Ordering {
     #[inline]
-    #[stable(feature = "rust1", since = "1.0.0")]
     fn partial_cmp(&self, other: &Ordering) -> Option<Ordering> {
         (*self as i32).partial_cmp(&(*other as i32))
     }
@@ -225,12 +339,88 @@ impl PartialOrd for Ordering {
 /// transitively: if `T: PartialOrd<U>` and `U: PartialOrd<V>` then `U: PartialOrd<T>` and `T:
 /// PartialOrd<V>`.
 ///
+/// ## Derivable
+///
+/// This trait can be used with `#[derive]`. When `derive`d, it will produce a lexicographic
+/// ordering based on the top-to-bottom declaration order of the struct's members.
+///
+/// ## How can I implement `Ord`?
+///
 /// PartialOrd only requires implementation of the `partial_cmp` method, with the others generated
 /// from default implementations.
 ///
 /// However it remains possible to implement the others separately for types which do not have a
 /// total order. For example, for floating point numbers, `NaN < 0 == false` and `NaN >= 0 ==
 /// false` (cf. IEEE 754-2008 section 5.11).
+///
+/// `PartialOrd` requires your type to be `PartialEq`.
+///
+/// If your type is `Ord`, you can implement `partial_cmp()` by using `cmp()`:
+///
+/// ```
+/// use std::cmp::Ordering;
+///
+/// #[derive(Eq)]
+/// struct Person {
+///     id: u32,
+///     name: String,
+///     height: u32,
+/// }
+///
+/// impl PartialOrd for Person {
+///     fn partial_cmp(&self, other: &Person) -> Option<Ordering> {
+///         Some(self.cmp(other))
+///     }
+/// }
+///
+/// impl Ord for Person {
+///     fn cmp(&self, other: &Person) -> Ordering {
+///         self.height.cmp(&other.height)
+///     }
+/// }
+///
+/// impl PartialEq for Person {
+///     fn eq(&self, other: &Person) -> bool {
+///         self.height == other.height
+///     }
+/// }
+/// ```
+///
+/// You may also find it useful to use `partial_cmp()` on your type`s fields. Here
+/// is an example of `Person` types who have a floating-point `height` field that
+/// is the only field to be used for sorting:
+///
+/// ```
+/// use std::cmp::Ordering;
+///
+/// struct Person {
+///     id: u32,
+///     name: String,
+///     height: f64,
+/// }
+///
+/// impl PartialOrd for Person {
+///     fn partial_cmp(&self, other: &Person) -> Option<Ordering> {
+///         self.height.partial_cmp(&other.height)
+///     }
+/// }
+///
+/// impl PartialEq for Person {
+///     fn eq(&self, other: &Person) -> bool {
+///         self.height == other.height
+///     }
+/// }
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// let x : u32 = 0;
+/// let y : u32 = 1;
+///
+/// assert_eq!(x < y, true);
+/// assert_eq!(x.lt(&y), true);
+/// ```
 #[lang = "ord"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
@@ -265,8 +455,6 @@ pub trait PartialOrd<Rhs: ?Sized = Self>: PartialEq<Rhs> {
     /// # Examples
     ///
     /// ```
-    /// use std::cmp::Ordering;
-    ///
     /// let result = 1.0 < 2.0;
     /// assert_eq!(result, true);
     ///

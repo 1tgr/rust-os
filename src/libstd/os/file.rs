@@ -1,3 +1,5 @@
+#![stable(feature = "rust-os", since = "1.0.0")]
+
 use io::{self,Read,Write};
 use os::{OSHandle,Result};
 use syscall;

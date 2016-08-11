@@ -1,10 +1,6 @@
 #![crate_name = "cairo"]
 
 #![feature(collections)]
-#![feature(convert)]
-#![feature(libc)]
-#![feature(no_std)]
-#![feature(str_char)]
 #![feature(unique)]
 #![no_std]
 

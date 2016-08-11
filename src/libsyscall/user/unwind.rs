@@ -20,15 +20,6 @@ pub extern fn rust_begin_unwind(_msg: Arguments, _file: &'static str, _line: u32
 	loop {}
 }
 
-#[cfg(not(test))]
-#[lang="stack_exhausted"]
-#[no_mangle]
-pub fn __morestack() -> !
-{
-	loop {}
-}
-
-
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone,Copy)]
@@ -56,7 +47,6 @@ static _UA_SEARCH_PHASE: _Unwind_Action = 1;
 #[allow(non_camel_case_types)]
 #[repr(C)]
 #[derive(Clone,Copy)]
-#[allow(raw_pointer_derive)]
 pub struct _Unwind_Exception
 {
 	exception_class: u64,

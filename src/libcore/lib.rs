@@ -10,23 +10,22 @@
 
 //! # The Rust Core Library
 //!
-//! The Rust Core Library is the dependency-free foundation of [The
+//! The Rust Core Library is the dependency-free[^free] foundation of [The
 //! Rust Standard Library](../std/index.html). It is the portable glue
 //! between the language and its libraries, defining the intrinsic and
 //! primitive building blocks of all Rust code. It links to no
 //! upstream libraries, no system libraries, and no libc.
 //!
+//! [^free]: Strictly speaking, there are some symbols which are needed but
+//!          they aren't always necessary.
+//!
 //! The core library is *minimal*: it isn't even aware of heap allocation,
 //! nor does it provide concurrency or I/O. These things require
 //! platform integration, and this library is platform-agnostic.
 //!
-//! *It is not recommended to use the core library*. The stable
-//! functionality of libcore is reexported from the
-//! [standard library](../std/index.html). The composition of this library is
-//! subject to change over time; only the interface exposed through libstd is
-//! intended to be stable.
-//!
 //! # How to use the core library
+//!
+//! Please note that all of these details are currently not considered stable.
 //!
 // FIXME: Fill me in with more detail when the interface settles
 //! This library is built on the assumption of a few existing symbols:
@@ -37,59 +36,60 @@
 //!   These functions are often provided by the system libc, but can also be
 //!   provided by the [rlibc crate](https://crates.io/crates/rlibc).
 //!
-//! * `rust_begin_unwind` - This function takes three arguments, a
-//!   `fmt::Arguments`, a `&str`, and a `u32`. These three arguments dictate
-//!   the panic message, the file at which panic was invoked, and the line.
-//!   It is up to consumers of this core library to define this panic
-//!   function; it is only required to never return.
+//! * `rust_begin_panic` - This function takes three arguments, a
+//!   `fmt::Arguments`, a `&'static str`, and a `u32`. These three arguments
+//!   dictate the panic message, the file at which panic was invoked, and the
+//!   line. It is up to consumers of this core library to define this panic
+//!   function; it is only required to never return. This requires a `lang`
+//!   attribute named `panic_fmt`.
 
 // Since libcore defines many fundamental lang items, all tests live in a
 // separate crate, libcoretest, to avoid bizarre issues.
 
-// Do not remove on snapshot creation. Needed for bootstrap. (Issue #22364)
-#![cfg_attr(stage0, feature(custom_attribute))]
 #![crate_name = "core"]
-#![unstable(feature = "core",
-            reason = "the libcore library has not yet been scrutinized for \
-                      stabilization in terms of structure and naming",
-            issue = "27701")]
-#![staged_api]
+#![stable(feature = "core", since = "1.6.0")]
 #![crate_type = "rlib"]
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
        html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
        html_root_url = "https://doc.rust-lang.org/nightly/",
        html_playground_url = "https://play.rust-lang.org/",
-       issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/")]
-#![doc(test(no_crate_inject))]
+       issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
+       test(no_crate_inject, attr(deny(warnings))),
+       test(attr(allow(dead_code, deprecated, unused_variables, unused_mut))))]
 
 #![no_core]
-#![allow(raw_pointer_derive)]
 #![deny(missing_docs)]
+#![deny(missing_debug_implementations)]
+#![cfg_attr(not(stage0), deny(warnings))]
+
+#![cfg_attr(stage0, allow(unused_attributes))]
 
 #![feature(allow_internal_unstable)]
+#![feature(asm)]
 #![feature(associated_type_defaults)]
+#![feature(cfg_target_feature)]
 #![feature(concat_idents)]
 #![feature(const_fn)]
+#![feature(cfg_target_has_atomic)]
 #![feature(custom_attribute)]
 #![feature(fundamental)]
+#![feature(inclusive_range_syntax)]
 #![feature(intrinsics)]
 #![feature(lang_items)]
 #![feature(no_core)]
 #![feature(on_unimplemented)]
 #![feature(optin_builtin_traits)]
 #![feature(reflect)]
-#![feature(rustc_attrs)]
 #![feature(unwind_attributes)]
-#![cfg_attr(stage0, feature(simd))]
-#![cfg_attr(not(stage0), feature(repr_simd, platform_intrinsics))]
+#![feature(repr_simd, platform_intrinsics)]
+#![feature(rustc_attrs)]
+#![feature(specialization)]
 #![feature(staged_api)]
 #![feature(unboxed_closures)]
+#![feature(question_mark)]
 
 #[macro_use]
 mod macros;
-
-#[macro_use]
-mod cmp_macros;
 
 #[path = "num/float_macros.rs"]
 #[macro_use]
@@ -103,17 +103,17 @@ mod int_macros;
 #[macro_use]
 mod uint_macros;
 
-#[path = "num/isize.rs"]  pub mod isize;
-#[path = "num/i8.rs"]   pub mod i8;
-#[path = "num/i16.rs"]  pub mod i16;
-#[path = "num/i32.rs"]  pub mod i32;
-#[path = "num/i64.rs"]  pub mod i64;
+#[path = "num/isize.rs"] pub mod isize;
+#[path = "num/i8.rs"]    pub mod i8;
+#[path = "num/i16.rs"]   pub mod i16;
+#[path = "num/i32.rs"]   pub mod i32;
+#[path = "num/i64.rs"]   pub mod i64;
 
 #[path = "num/usize.rs"] pub mod usize;
-#[path = "num/u8.rs"]   pub mod u8;
-#[path = "num/u16.rs"]  pub mod u16;
-#[path = "num/u32.rs"]  pub mod u32;
-#[path = "num/u64.rs"]  pub mod u64;
+#[path = "num/u8.rs"]    pub mod u8;
+#[path = "num/u16.rs"]   pub mod u16;
+#[path = "num/u32.rs"]   pub mod u32;
+#[path = "num/u64.rs"]   pub mod u64;
 
 #[path = "num/f32.rs"]   pub mod f32;
 #[path = "num/f64.rs"]   pub mod f64;
@@ -155,16 +155,12 @@ pub mod option;
 pub mod raw;
 pub mod result;
 
-#[cfg(stage0)]
-#[path = "simd_old.rs"]
-pub mod simd;
-#[cfg(not(stage0))]
-pub mod simd;
-
 pub mod slice;
 pub mod str;
 pub mod hash;
 pub mod fmt;
 
 // note: does not need to be public
+mod char_private;
+mod iter_private;
 mod tuple;

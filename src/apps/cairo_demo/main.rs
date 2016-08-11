@@ -1,5 +1,3 @@
-#![feature(libc)]
-
 extern crate cairo;
 extern crate libc;
 extern crate syscall;

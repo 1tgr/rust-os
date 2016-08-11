@@ -4,7 +4,7 @@ use arch::thread as arch_thread;
 use core::mem;
 use core::nonzero::NonZero;
 use core::ops::Deref;
-use core::slice::{self,bytes};
+use core::slice;
 use deferred::Deferred;
 use elf::*;
 use io::{AsyncRead,Read,Write};
@@ -293,7 +293,7 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
             assert!(phdr.p_memsz >= phdr.p_filesz);
             let slice = unsafe { process::alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
             let file_slice = &image_slice[phdr.p_offset as usize .. (phdr.p_offset + phdr.p_filesz) as usize];
-            bytes::copy_memory(file_slice, slice);
+            slice[..file_slice.len()].copy_from_slice(file_slice);
             slices.push(slice);
         }
 
@@ -308,7 +308,8 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
     };
 
     let deferred = thread::spawn_remote(process.clone(), move || {
-        match init_in_new_process() {
+        let result : Result<_> = init_in_new_process();
+        match result {
             Ok((entry, stack_slice)) => {
                 unsafe { arch_thread::jmp_user_mode(entry, stack_slice.as_mut_ptr().offset(stack_slice.len() as isize)) }
                 // TODO: free stack

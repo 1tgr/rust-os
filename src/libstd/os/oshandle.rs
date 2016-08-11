@@ -1,3 +1,5 @@
+#![stable(feature = "rust-os", since = "1.0.0")]
+
 use ops::Deref;
 use syscall::{self,Handle};
 
