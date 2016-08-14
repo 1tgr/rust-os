@@ -1,0 +1,14 @@
+[package]
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+name = "hello"
+version = "0.0.0"
+
+[[bin]]
+name = "hello"
+path = "main.rs"
+test = false
+
+[dependencies]
+alloc_system = { path = "../../liballoc_system" }
+std = { path = "../../libstd" }
+syscall = { path = "../../libsyscall" }

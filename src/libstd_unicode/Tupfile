@@ -1,3 +1,0 @@
-include_rules
-
-: lib.rs | ../libcore/libcore.rlib *.rs |> !RUSTC_LIB --extern core=../libcore/libcore.rlib |> %d.rlib

@@ -1,8 +1,0 @@
-include_rules
-
-RUSTFLAGS += --extern core=../libcore/libcore.rlib
-
-LIBS += ../libcore/libcore.rlib
-
-: lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> %d.rlib
-: lib.rs |> !RUSTDOC_CMD |> rustdoc

@@ -10,14 +10,14 @@
  * its use, and the author takes no liability.
  */
 use core::fmt::Arguments;
+use table;
 
 #[cfg(not(test))]
 #[lang="panic_fmt"]
 #[no_mangle]
-pub extern fn rust_begin_unwind(_msg: Arguments, _file: &'static str, _line: u32) -> ! {
-	// 'args' will print to the formatted string passed to panic!
-	//log!("file='{}', line={} :: {}", file, line, msg);
-	loop {}
+pub extern fn rust_begin_unwind(_msg: Arguments, _file: &'static str, line: u32) -> ! {
+    let _ = table::exit_thread(-(line as i32));
+    unreachable!()
 }
 
 #[allow(non_camel_case_types)]

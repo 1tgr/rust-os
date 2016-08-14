@@ -1,0 +1,63 @@
+[root]
+name = "kernel"
+version = "0.0.0"
+dependencies = [
+ "alloc 0.0.0",
+ "alloc_system 0.0.0",
+ "collections 0.0.0",
+ "core 0.0.0",
+ "libc 0.0.0",
+ "std_unicode 0.0.0",
+ "syscall 0.0.0",
+]
+
+[[package]]
+name = "alloc"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+]
+
+[[package]]
+name = "alloc_system"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+ "libc 0.0.0",
+]
+
+[[package]]
+name = "collections"
+version = "0.0.0"
+dependencies = [
+ "alloc 0.0.0",
+ "core 0.0.0",
+ "std_unicode 0.0.0",
+]
+
+[[package]]
+name = "core"
+version = "0.0.0"
+
+[[package]]
+name = "libc"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+]
+
+[[package]]
+name = "std_unicode"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+]
+
+[[package]]
+name = "syscall"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+ "libc 0.0.0",
+]
+

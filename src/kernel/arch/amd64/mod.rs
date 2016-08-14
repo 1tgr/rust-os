@@ -34,3 +34,11 @@ pub fn restore_interrupts(token: usize) {
         unsafe { asm!("sti" :::: "volatile") };
     }
 }
+
+#[link_args = "-T arch/amd64/link.ld"]
+#[link_args = "arch/amd64/setjmp.o"]
+#[link_args = "arch/amd64/start.o"]
+#[link_args = "../newlib/x86_64-elf/lib/libc.a"]
+#[link_args = "-z max-page-size=0x1000"]
+extern {
+}

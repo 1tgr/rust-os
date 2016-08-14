@@ -208,7 +208,7 @@ pub mod test {
 
     test! {
         fn can_interrupt() {
-            unsafe { cpu::int(48) }
+            unsafe { cpu::int48() }
         }
     }
 }

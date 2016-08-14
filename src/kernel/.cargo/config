@@ -1,0 +1,2 @@
+[build]
+target = "amd64-kernel"

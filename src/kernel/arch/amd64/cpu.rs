@@ -115,8 +115,8 @@ pub unsafe fn write_cr3(addr: usize) {
     asm!("mov $0, %cr3" :: "r"(addr) : "memory" : "volatile");
 }
 
-pub unsafe fn int(num: u8) {
-    asm!("int $0" :: "N"(num) : "memory");
+pub unsafe fn int48() {
+    asm!("int $$48" ::: "memory");
 }
 
 pub unsafe fn ltr(selector: u16) {

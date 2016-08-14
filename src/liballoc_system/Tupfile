@@ -1,9 +1,0 @@
-include_rules
-
-LIBS += ../libcore/libcore.rlib
-LIBS += ../liblibc/liblibc.rlib
-
-RUSTFLAGS += --extern core=../libcore/libcore.rlib
-RUSTFLAGS += --extern libc=../liblibc/liblibc.rlib
-
-: lib.rs | $(LIBS) *.rs |> !RUSTC_LIB |> %d.rlib

@@ -1,5 +1,5 @@
 OUTPUT_FORMAT(elf64-x86-64)
-ENTRY(start)
+ENTRY(entry)
 phys = 0x00001000;
 SECTIONS
 {

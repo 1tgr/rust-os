@@ -1,0 +1,13 @@
+[package]
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+name = "alloc_system"
+version = "0.0.0"
+
+[lib]
+name = "alloc_system"
+path = "lib.rs"
+test = false
+
+[dependencies]
+core = { path = "../../rust/src/libcore" }
+libc = { path = "../liblibc" }

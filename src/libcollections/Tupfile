@@ -1,3 +1,0 @@
-include_rules
-
-: lib.rs | ../liballoc/liballoc.rlib ../libcore/libcore.rlib ../libstd_unicode/libstd_unicode.rlib *.rs |> !RUSTC_LIB -L ../liblibc --extern alloc=../liballoc/liballoc.rlib --extern core=../libcore/libcore.rlib --extern std_unicode=../libstd_unicode/libstd_unicode.rlib |> %d.rlib

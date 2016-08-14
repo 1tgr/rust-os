@@ -1,4 +1,0 @@
-include_rules
-
-include ../cairo.tup
-include ../app.tup

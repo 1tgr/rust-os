@@ -12,5 +12,6 @@
     "executables": true,
     "linker": "x86_64-elf-ld",
     "linker-flavor": "ld",
-    "dynamic-linking-available": false
+    "dynamic-linking-available": false,
+    "code-model": "kernel"
 }

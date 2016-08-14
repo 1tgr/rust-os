@@ -8,8 +8,6 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
-#![crate_name = "kernel"]
-
 #![feature(alloc)]
 #![feature(asm)]	//< As a kernel, we need inline assembly
 #![feature(collections)]
@@ -18,7 +16,9 @@
 #![feature(fnbox)]
 #![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
+#![feature(link_args)]
 #![feature(nonzero)]
+#![feature(start)]
 
 #![no_std]
 
@@ -83,7 +83,7 @@ fn run_tests() {
         thread::test::TESTS,
 
         process::test::TESTS,
-        // demo::TESTS
+        demo::TESTS
     ];
 
     log!("begin kmain");
@@ -104,7 +104,6 @@ fn run_tests() {
 }
 
 // Kernel entrypoint
-#[lang="start"]
 #[no_mangle]
 pub unsafe fn kmain() -> ! {
     arch::isr::init_once();
@@ -114,3 +113,7 @@ pub unsafe fn kmain() -> ! {
         arch::cpu::wait_for_interrupt();
     }
 }
+
+#[lang="start"]
+#[start]
+fn main(_: isize, _: *const *const u8) -> isize { 0 }

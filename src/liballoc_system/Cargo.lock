@@ -1,0 +1,19 @@
+[root]
+name = "alloc_system"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+ "libc 0.0.0",
+]
+
+[[package]]
+name = "core"
+version = "0.0.0"
+
+[[package]]
+name = "libc"
+version = "0.0.0"
+dependencies = [
+ "core 0.0.0",
+]
+

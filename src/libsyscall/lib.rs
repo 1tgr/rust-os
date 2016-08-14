@@ -3,6 +3,8 @@
 #![feature(asm)]
 #![feature(core_str_ext)]
 #![feature(lang_items)]
+#![cfg_attr(not(feature = "kernel"), feature(start))]
+#![cfg_attr(not(feature = "kernel"), feature(link_args))]
 #![no_std]
 
 #[cfg(not(feature = "kernel"))]

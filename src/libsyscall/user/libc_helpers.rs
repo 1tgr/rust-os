@@ -117,21 +117,27 @@ unsafe fn init() -> Result<()> {
     Ok(())
 }
 
+#[lang = "start"]
+fn dummy_start(_main: *const u8, _argc: isize, _argv: *const *const u8) -> isize {
+    panic!("dummy_start was called")
+}
+
+
 extern {
-    fn main() -> i32;
+    fn start(argc: isize, argv: *const *const u8) -> isize;
 }
 
 #[no_mangle]
-pub unsafe extern fn start() {
-    let result = init().and_then(|()| Ok(main()));
+pub unsafe extern fn entry() {
+    let result = init().and_then(|()| Ok(start(0, 0 as *const _)));
     let _ = syscall::close(stdin);
     let _ = syscall::close(stdout);
 
     let code =
         match result {
             Ok(code) => code,
-            Err(num) => -(num as i32)
+            Err(num) => -(num as isize)
         };
 
-    let _ = syscall::exit_thread(code);
+    let _ = syscall::exit_thread(code as i32);
 }

@@ -277,6 +277,7 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
         let ehdr = unsafe { *(image_slice.as_ptr() as *const Elf64_Ehdr) };
         assert_eq!([ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT], &ehdr.e_ident[0..7]);
         assert_eq!((ET_EXEC, EM_X86_64), (ehdr.e_type, ehdr.e_machine));
+        assert!(ehdr.e_entry != 0);
 
         let entry = ehdr.e_entry as *const u8;
         log!("entry point is {:p}", entry);

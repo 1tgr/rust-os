@@ -1,3 +1,0 @@
-include_rules
-
-: lib.rs | *.rs |> !RUSTC_LIB |> %d.rlib
