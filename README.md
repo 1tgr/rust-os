@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/1tgr/rust-os.svg?branch=master)](https://travis-ci.org/1tgr/rust-os)
+
 A Rust operating system
 =======================
 

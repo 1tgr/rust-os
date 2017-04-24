@@ -1,37 +1,42 @@
+BINUTILS=binutils-2.27
 CAIRO=cairo-1.14.2
 LIBPNG=libpng-1.6.18
 NEWLIB=newlib-2.2.0.20150924
 PIXMAN=pixman-0.32.8
-ZLIB=zlib-1.2.8
+ZLIB=zlib-1.2.11
 
 ROOT=$(shell cd "$(CURDIR)/.." && pwd)
 SRC=$(ROOT)/src
 
+DOWNLAODS += $(BINUTILS).tar.gz
 DOWNLOADS += $(CAIRO).tar.xz
 DOWNLOADS += $(LIBPNG).tar.xz
 DOWNLOADS += $(NEWLIB).tar.gz
 DOWNLOADS += $(PIXMAN).tar.gz
 DOWNLOADS += $(ZLIB).tar.gz
 
+DIRS += $(BINUTILS)/
 DIRS += $(CAIRO)/
 DIRS += $(NEWLIB)/
 DIRS += $(PIXMAN)/
 DIRS += $(LIBPNG)/
 DIRS += $(ZLIB)/
 
+MAKEFILES += $(BINUTILS)/Makefile
 MAKEFILES += $(CAIRO)/Makefile
 MAKEFILES += $(NEWLIB)/newlib/Makefile
 MAKEFILES += $(PIXMAN)/pixman/Makefile
 MAKEFILES += $(LIBPNG)/Makefile
 MAKEFILES += $(ZLIB)/Makefile
 
+LIBS += $(ROOT)/bin/x86_64-elf-ld
 LIBS += $(SRC)/cairo/lib/libcairo.a
 LIBS += $(SRC)/cairo/lib/libpixman-1.a
 LIBS += $(SRC)/cairo/lib/libpng16.a
 LIBS += $(SRC)/cairo/lib/libz.a
 LIBS += $(SRC)/newlib/x86_64-elf/lib/libc.a
 
-.PHONY: all clean clean_libs clean_dirs clean_downloads download dirs configure
+.PHONY: all binutils clean clean_libs clean_dirs clean_downloads download dirs configure
 
 all: $(LIBS)
 
@@ -50,20 +55,26 @@ download: $(DOWNLOADS)
 dirs: $(DIRS)
 configure: $(MAKEFILES)
 
+$(BINUTILS).tar.gz:
+	curl --fail -Lo $@ https://ftp.gnu.org/gnu/binutils/$@
+
 $(CAIRO).tar.xz:
-	curl -Lo $@ http://cairographics.org/releases/$@
+	curl --fail -Lo $@ http://cairographics.org/releases/$@
 
 $(LIBPNG).tar.xz:
-	curl -Lo $@ http://prdownloads.sourceforge.net/libpng/$@?download
+	curl --fail -Lo $@ http://prdownloads.sourceforge.net/libpng/$@?download
 
 $(NEWLIB).tar.gz:
-	curl -Lo $@ ftp://sourceware.org/pub/newlib/$@
+	curl --fail -Lo $@ ftp://sourceware.org/pub/newlib/$@
 
 $(PIXMAN).tar.gz:
-	curl -Lo $@ http://cairographics.org/releases/$@
+	curl --fail -Lo $@ http://cairographics.org/releases/$@
 
 $(ZLIB).tar.gz:
-	curl -Lo $@ http://zlib.net/$@
+	curl --fail -Lo $@ http://zlib.net/$@
+
+$(BINUTILS)/: $(BINUTILS).tar.gz
+	tar -zxf $<
 
 $(CAIRO)/: $(CAIRO).tar.xz
 	tar -Jxf $<
@@ -79,6 +90,10 @@ $(NEWLIB)/: $(NEWLIB).tar.gz
 
 $(ZLIB)/: $(ZLIB).tar.gz
 	tar -zxf $<
+
+$(BINUTILS)/Makefile: $(BINUTILS)/
+	cd $(BINUTILS) && \
+    ./configure --prefix=$(ROOT)/3rdparty/binutils --target=x86_64-elf
 
 $(CAIRO)/Makefile: $(CAIRO)/ $(SRC)/newlib/x86_64-elf/lib/libc.a $(SRC)/cairo/lib/libpixman-1.a $(SRC)/cairo/lib/libpng16.a $(SRC)/cairo/lib/libz.a
 	cd $(CAIRO) && \
@@ -108,6 +123,12 @@ $(ZLIB)/Makefile: $(ZLIB)/ $(SRC)/newlib/x86_64-elf/lib/libc.a
 	CFLAGS="-O -g -mcmodel=kernel -ffreestanding -I $(SRC)/newlib/x86_64-elf/include" \
 	./configure --prefix=$(SRC)/cairo --64
 
+$(ROOT)/bin/x86_64-elf-ld: $(BINUTILS)/Makefile
+	make -C $(BINUTILS) && \
+	make -C $(BINUTILS) install
+
+binutils: $(ROOT)/bin/x86_64-elf-ld
+
 $(SRC)/cairo/lib/libcairo.a: $(SRC)/newlib/x86_64-elf/lib/libc.a $(SRC)/cairo/lib/libpixman-1.a $(SRC)/cairo/lib/libz.a $(CAIRO)/Makefile
 	make -C $(CAIRO)/src all install
 
@@ -115,7 +136,7 @@ $(SRC)/cairo/lib/libpixman-1.a: $(SRC)/newlib/x86_64-elf/lib/libc.a $(PIXMAN)/pi
 	make -C $(PIXMAN)/pixman all install
 
 $(SRC)/cairo/lib/libpng16.a: $(SRC)/newlib/x86_64-elf/lib/libc.a $(SRC)/cairo/lib/libz.a $(LIBPNG)/Makefile
-	make -C $(LIBPNG) .libs/libpng16.a install-libLTLIBRARIES install-data-am
+	make -C $(LIBPNG) install-libLTLIBRARIES install-data-am
 
 $(SRC)/cairo/lib/libz.a: $(SRC)/newlib/x86_64-elf/lib/libc.a $(ZLIB)/Makefile
 	make -C $(ZLIB) libz.a install
