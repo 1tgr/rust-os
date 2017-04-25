@@ -2,6 +2,8 @@ addons:
     apt:
         packages:
             - genisoimage
+            - python3-pip
+            - qemu
             - tup
         sources:
             - sourceline: 'deb http://ppa.launchpad.net/jonathonf/tup/ubuntu trusty main' 
@@ -12,10 +14,12 @@ cache:
     directories:
         - 3rdparty
 
+dist: trusty
+
 git:
     submodules: false
 
 language: c
-
 script: ./travis.sh
+sudo: false
 

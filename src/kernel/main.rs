@@ -83,7 +83,7 @@ fn run_tests() {
         thread::test::TESTS,
 
         process::test::TESTS,
-        demo::TESTS
+        // demo::TESTS
     ];
 
     log!("begin kmain");
