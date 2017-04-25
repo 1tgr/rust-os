@@ -93,35 +93,35 @@ $(ZLIB)/: $(ZLIB).tar.gz
 
 $(BINUTILS)/Makefile: $(BINUTILS)/
 	cd $(BINUTILS) && \
-    ./configure --prefix=$(ROOT)/3rdparty/binutils --target=x86_64-elf
+	./configure --silent --prefix=$(ROOT)/3rdparty/binutils --target=x86_64-elf
 
 $(CAIRO)/Makefile: $(CAIRO)/ $(SRC)/newlib/x86_64-elf/lib/libc.a $(SRC)/cairo/lib/libpixman-1.a $(SRC)/cairo/lib/libpng16.a $(SRC)/cairo/lib/libz.a
 	cd $(CAIRO) && \
 	CFLAGS="-O -g -mcmodel=kernel -ffreestanding -I $(SRC)/newlib/x86_64-elf/include -I $(SRC)/cairo/include -DCAIRO_NO_MUTEX=1" \
 	PKG_CONFIG_PATH=$(SRC)/cairo/lib/pkgconfig \
-	./configure --prefix=$(SRC)/cairo --host=x86_64-elf --enable-ps=no --enable-ft=no --enable-pdf=no --enable-svg=no --enable-script=no --enable-interpreter=no --enable-pthread=no
+	./configure --silent --prefix=$(SRC)/cairo --host=x86_64-elf --enable-ps=no --enable-ft=no --enable-pdf=no --enable-svg=no --enable-script=no --enable-interpreter=no --enable-pthread=no
 
 $(LIBPNG)/Makefile: $(LIBPNG)/ $(SRC)/newlib/x86_64-elf/lib/libc.a $(SRC)/cairo/lib/libz.a
 	cd $(LIBPNG) && \
 	CFLAGS="-O -g -mcmodel=kernel -ffreestanding -I $(SRC)/newlib/x86_64-elf/include -I $(SRC)/cairo/include" \
 	CPPFLAGS="-I $(SRC)/newlib/x86_64-elf/include -I $(SRC)/cairo/include" \
 	LDFLAGS="-L$(SRC)/cairo/lib" \
-	./configure --prefix=$(SRC)/cairo --host=x86_64-elf
+	./configure --silent --prefix=$(SRC)/cairo --host=x86_64-elf
 
 $(NEWLIB)/newlib/Makefile: $(NEWLIB)/
 	cd $(NEWLIB)/newlib && \
 	CFLAGS="-O -g -mcmodel=kernel" \
-	./configure --prefix=$(SRC)/newlib --host=x86_64-elf
+	./configure --silent --prefix=$(SRC)/newlib --host=x86_64-elf
 
 $(PIXMAN)/pixman/Makefile: $(PIXMAN)/ $(SRC)/newlib/x86_64-elf/lib/libc.a
 	cd $(PIXMAN) && \
 	CFLAGS="-O -g -mcmodel=kernel -ffreestanding -I $(SRC)/newlib/x86_64-elf/include -I $(SRC)/cairo/include -DPIXMAN_NO_TLS" \
-	./configure --prefix=$(SRC)/cairo --host=x86_64-elf
+	./configure --silent --prefix=$(SRC)/cairo --host=x86_64-elf
 
 $(ZLIB)/Makefile: $(ZLIB)/ $(SRC)/newlib/x86_64-elf/lib/libc.a
 	cd $(ZLIB) && \
 	CFLAGS="-O -g -mcmodel=kernel -ffreestanding -I $(SRC)/newlib/x86_64-elf/include" \
-	./configure --prefix=$(SRC)/cairo --64
+	./configure --silent --prefix=$(SRC)/cairo --64
 
 $(ROOT)/bin/x86_64-elf-ld: $(BINUTILS)/Makefile
 	make -C $(BINUTILS) && \

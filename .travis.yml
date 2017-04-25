@@ -1,13 +1,21 @@
-before_install:
-    - sudo apt-add-repository 'deb http://ppa.launchpad.net/anatol/tup/ubuntu precise main'
-    - sudo apt-key adv --keyserver ha.pool.sks-keyservers.net --recv-keys 2EA8F35793D8809A
-    - sudo apt-get update -qq
-    - sudo apt-get install -qq -y genisoimage
-    - sudo apt-get install -qq -y --allow-unauthenticated tup
-    - curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly-2016-08-10
+addons:
+    apt:
+        packages:
+            - genisoimage
+            - tup
+        sources:
+            - sourceline: 'deb http://ppa.launchpad.net/jonathonf/tup/ubuntu trusty main' 
 
-script:
-    - make -s -C 3rdparty binutils
-    - export PATH=$PATH:$(pwd)/3rdparty/binutils/bin:~/.cargo/bin
-    - (cd src && tup init && tup upd)
+before_install: ./travis-setup.sh
+
+cache:
+    directories:
+        - 3rdparty
+
+git:
+    submodules: false
+
+language: c
+
+script: ./travis.sh
 
