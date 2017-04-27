@@ -1,5 +1,5 @@
 #!/bin/bash
-libs='liballoc libcore libcollections librustc_unicode libstd/error.rs libstd/io/error.rs libstd/io/mod.rs libstd/num'
+libs='liballoc libcore libcollections libstd_unicode libstd/error.rs libstd/io/error.rs libstd/io/mod.rs libstd/num'
 echo rm -r $libs
 rm -r $libs
 
