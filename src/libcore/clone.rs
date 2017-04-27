@@ -14,10 +14,14 @@
 //! assign them or pass them as arguments, the receiver will get a copy,
 //! leaving the original value in place. These types do not require
 //! allocation to copy and do not have finalizers (i.e. they do not
-//! contain owned boxes or implement `Drop`), so the compiler considers
+//! contain owned boxes or implement [`Drop`]), so the compiler considers
 //! them cheap and safe to copy. For other types copies must be made
-//! explicitly, by convention implementing the `Clone` trait and calling
-//! the `clone` method.
+//! explicitly, by convention implementing the [`Clone`] trait and calling
+//! the [`clone`][clone] method.
+//!
+//! [`Clone`]: trait.Clone.html
+//! [clone]: trait.Clone.html#tymethod.clone
+//! [`Drop`]: ../../std/ops/trait.Drop.html
 //!
 //! Basic usage example:
 //!
@@ -44,26 +48,24 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use marker::Sized;
-
 /// A common trait for the ability to explicitly duplicate an object.
 ///
-/// Differs from `Copy` in that `Copy` is implicit and extremely inexpensive, while
+/// Differs from [`Copy`] in that [`Copy`] is implicit and extremely inexpensive, while
 /// `Clone` is always explicit and may or may not be expensive. In order to enforce
-/// these characteristics, Rust does not allow you to reimplement `Copy`, but you
+/// these characteristics, Rust does not allow you to reimplement [`Copy`], but you
 /// may reimplement `Clone` and run arbitrary code.
 ///
-/// Since `Clone` is more general than `Copy`, you can automatically make anything
-/// `Copy` be `Clone` as well.
+/// Since `Clone` is more general than [`Copy`], you can automatically make anything
+/// [`Copy`] be `Clone` as well.
 ///
 /// ## Derivable
 ///
 /// This trait can be used with `#[derive]` if all fields are `Clone`. The `derive`d
-/// implementation of `clone()` calls `clone()` on each field.
+/// implementation of [`clone`] calls [`clone`] on each field.
 ///
 /// ## How can I implement `Clone`?
 ///
-/// Types that are `Copy` should have a trivial implementation of `Clone`. More formally:
+/// Types that are [`Copy`] should have a trivial implementation of `Clone`. More formally:
 /// if `T: Copy`, `x: T`, and `y: &T`, then `let x = y.clone();` is equivalent to `let x = *y;`.
 /// Manual implementations should be careful to uphold this invariant; however, unsafe code
 /// must not rely on it to ensure memory safety.
@@ -71,6 +73,9 @@ use marker::Sized;
 /// An example is an array holding more than 32 elements of a type that is `Clone`; the standard
 /// library only implements `Clone` up until arrays of size 32. In this case, the implementation of
 /// `Clone` cannot be `derive`d, but can be implemented as:
+///
+/// [`Copy`]: ../../std/marker/trait.Copy.html
+/// [`clone`]: trait.Clone.html#tymethod.clone
 ///
 /// ```
 /// #[derive(Copy)]
@@ -108,16 +113,22 @@ pub trait Clone : Sized {
     }
 }
 
-// FIXME(aburka): this method is used solely by #[derive] to
-// assert that every component of a type implements Clone.
+// FIXME(aburka): these structs are used solely by #[derive] to
+// assert that every component of a type implements Clone or Copy.
 //
-// This should never be called by user code.
+// These structs should never appear in user code.
 #[doc(hidden)]
-#[inline(always)]
+#[allow(missing_debug_implementations)]
 #[unstable(feature = "derive_clone_copy",
            reason = "deriving hack, should not be public",
            issue = "0")]
-pub fn assert_receiver_is_clone<T: Clone + ?Sized>(_: &T) {}
+pub struct AssertParamIsClone<T: Clone + ?Sized> { _field: ::marker::PhantomData<T> }
+#[doc(hidden)]
+#[allow(missing_debug_implementations)]
+#[unstable(feature = "derive_clone_copy",
+           reason = "deriving hack, should not be public",
+           issue = "0")]
+pub struct AssertParamIsCopy<T: Copy + ?Sized> { _field: ::marker::PhantomData<T> }
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T: ?Sized> Clone for &'a T {
@@ -142,12 +153,14 @@ clone_impl! { i8 }
 clone_impl! { i16 }
 clone_impl! { i32 }
 clone_impl! { i64 }
+clone_impl! { i128 }
 
 clone_impl! { usize }
 clone_impl! { u8 }
 clone_impl! { u16 }
 clone_impl! { u32 }
 clone_impl! { u64 }
+clone_impl! { u128 }
 
 clone_impl! { f32 }
 clone_impl! { f64 }

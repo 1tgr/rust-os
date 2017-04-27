@@ -9,6 +9,7 @@ extern {
     static init_array_end: extern "C" fn();
 }
 
+#[allow(non_upper_case_globals)]
 static mut errno: c_int = 0;
 
 #[no_mangle]

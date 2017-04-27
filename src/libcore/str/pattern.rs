@@ -17,8 +17,6 @@
             reason = "API not fully fleshed out and ready to be stabilized",
             issue = "27721")]
 
-use prelude::v1::*;
-
 use cmp;
 use fmt;
 use usize;
@@ -242,7 +240,7 @@ pub trait DoubleEndedSearcher<'a>: ReverseSearcher<'a> {}
 
 #[doc(hidden)]
 trait CharEq {
-    fn matches(&mut self, char) -> bool;
+    fn matches(&mut self, c: char) -> bool;
     fn only_ascii(&self) -> bool;
 }
 
@@ -1180,8 +1178,8 @@ impl TwoWaySearcher {
 trait TwoWayStrategy {
     type Output;
     fn use_early_reject() -> bool;
-    fn rejecting(usize, usize) -> Self::Output;
-    fn matching(usize, usize) -> Self::Output;
+    fn rejecting(a: usize, b: usize) -> Self::Output;
+    fn matching(a: usize, b: usize) -> Self::Output;
 }
 
 /// Skip to match intervals as quickly as possible

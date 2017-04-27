@@ -72,12 +72,7 @@
 #![stable(feature = "rust1", since = "1.0.0")]
 
 use fmt;
-use marker::Send;
-use mem::transmute;
-use option::Option::{self, Some, None};
-use raw::TraitObject;
 use intrinsics;
-use marker::{Reflect, Sized};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Any trait
@@ -90,7 +85,7 @@ use marker::{Reflect, Sized};
 ///
 /// [mod]: index.html
 #[stable(feature = "rust1", since = "1.0.0")]
-pub trait Any: Reflect + 'static {
+pub trait Any: 'static {
     /// Gets the `TypeId` of `self`.
     ///
     /// # Examples
@@ -106,7 +101,7 @@ pub trait Any: Reflect + 'static {
     ///
     /// fn main() {
     ///     assert_eq!(is_string(&0), false);
-    ///     assert_eq!(is_string(&"cookie monster".to_owned()), true);
+    ///     assert_eq!(is_string(&"cookie monster".to_string()), true);
     /// }
     /// ```
     #[unstable(feature = "get_type_id",
@@ -116,7 +111,7 @@ pub trait Any: Reflect + 'static {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<T: Reflect + 'static + ?Sized > Any for T {
+impl<T: 'static + ?Sized > Any for T {
     fn get_type_id(&self) -> TypeId { TypeId::of::<T>() }
 }
 
@@ -142,7 +137,7 @@ impl fmt::Debug for Any + Send {
 }
 
 impl Any {
-    /// Returns true if the boxed type is the same as `T`.
+    /// Returns `true` if the boxed type is the same as `T`.
     ///
     /// # Examples
     ///
@@ -159,7 +154,7 @@ impl Any {
     ///
     /// fn main() {
     ///     is_string(&0);
-    ///     is_string(&"cookie monster".to_owned());
+    ///     is_string(&"cookie monster".to_string());
     /// }
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -193,7 +188,7 @@ impl Any {
     ///
     /// fn main() {
     ///     print_if_string(&0);
-    ///     print_if_string(&"cookie monster".to_owned());
+    ///     print_if_string(&"cookie monster".to_string());
     /// }
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -201,11 +196,7 @@ impl Any {
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         if self.is::<T>() {
             unsafe {
-                // Get the raw representation of the trait object
-                let to: TraitObject = transmute(self);
-
-                // Extract the data pointer
-                Some(&*(to.data as *const T))
+                Some(&*(self as *const Any as *const T))
             }
         } else {
             None
@@ -228,7 +219,7 @@ impl Any {
     ///
     /// fn main() {
     ///     let mut x = 10u32;
-    ///     let mut s = "starlord".to_owned();
+    ///     let mut s = "starlord".to_string();
     ///
     ///     modify_if_u32(&mut x);
     ///     modify_if_u32(&mut s);
@@ -242,11 +233,7 @@ impl Any {
     pub fn downcast_mut<T: Any>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
             unsafe {
-                // Get the raw representation of the trait object
-                let to: TraitObject = transmute(self);
-
-                // Extract the data pointer
-                Some(&mut *(to.data as *const T as *mut T))
+                Some(&mut *(self as *mut Any as *mut T))
             }
         } else {
             None
@@ -272,7 +259,7 @@ impl Any+Send {
     ///
     /// fn main() {
     ///     is_string(&0);
-    ///     is_string(&"cookie monster".to_owned());
+    ///     is_string(&"cookie monster".to_string());
     /// }
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -298,7 +285,7 @@ impl Any+Send {
     ///
     /// fn main() {
     ///     print_if_string(&0);
-    ///     print_if_string(&"cookie monster".to_owned());
+    ///     print_if_string(&"cookie monster".to_string());
     /// }
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -322,7 +309,7 @@ impl Any+Send {
     ///
     /// fn main() {
     ///     let mut x = 10u32;
-    ///     let mut s = "starlord".to_owned();
+    ///     let mut s = "starlord".to_string();
     ///
     ///     modify_if_u32(&mut x);
     ///     modify_if_u32(&mut s);
@@ -351,7 +338,11 @@ impl Any+Send {
 ///
 /// A `TypeId` is currently only available for types which ascribe to `'static`,
 /// but this limitation may be removed in the future.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+///
+/// While `TypeId` implements `Hash`, `PartialOrd`, and `Ord`, it is worth
+/// noting that the hashes and ordering will vary between Rust releases. Beware
+/// of relying on them outside of your code!
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct TypeId {
     t: u64,
@@ -364,21 +355,19 @@ impl TypeId {
     /// # Examples
     ///
     /// ```
-    /// #![feature(get_type_id)]
-    ///
     /// use std::any::{Any, TypeId};
     ///
-    /// fn is_string(s: &Any) -> bool {
-    ///     TypeId::of::<String>() == s.get_type_id()
+    /// fn is_string<T: ?Sized + Any>(_s: &T) -> bool {
+    ///     TypeId::of::<String>() == TypeId::of::<T>()
     /// }
     ///
     /// fn main() {
     ///     assert_eq!(is_string(&0), false);
-    ///     assert_eq!(is_string(&"cookie monster".to_owned()), true);
+    ///     assert_eq!(is_string(&"cookie monster".to_string()), true);
     /// }
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
-    pub fn of<T: ?Sized + Reflect + 'static>() -> TypeId {
+    pub fn of<T: ?Sized + 'static>() -> TypeId {
         TypeId {
             t: unsafe { intrinsics::type_id::<T>() },
         }

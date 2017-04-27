@@ -116,7 +116,6 @@ impl KObj for Pipe {
 #[cfg(feature = "test")]
 pub mod test {
     use io::{AsyncRead,Write};
-    use prelude::*;
     use super::*;
 
     fn test_read(pipe: &Pipe, expected: &[u8]) {
@@ -136,7 +135,7 @@ pub mod test {
 
         fn can_read_chunks() {
             let pipe = Pipe::new();
-            pipe.write(b"hello").unwrap();
+            Write::write(&pipe, b"hello").unwrap();
             test_read(&pipe, b"h");
             test_read(&pipe, b"ell");
             test_read(&pipe, b"o");
@@ -145,14 +144,14 @@ pub mod test {
 
         fn can_read_everything() {
             let pipe = Pipe::new();
-            pipe.write(b"hello").unwrap();
+            Write::write(&pipe, b"hello").unwrap();
             test_read(&pipe, b"hello");
             assert_eq!(0, pipe.queue_len());
         }
 
         fn blocks_when_out_of_data() {
             let pipe = Pipe::new();
-            pipe.write(b"hello").unwrap();
+            Write::write(&pipe, b"hello").unwrap();
 
             let d = pipe.read_async(vec![0; 10]);
             assert!(d.try_get().is_err());
@@ -160,9 +159,9 @@ pub mod test {
 
         fn can_write_twice() {
             let pipe = Pipe::new();
-            pipe.write(b"hello ").unwrap();
+            Write::write(&pipe, b"hello ").unwrap();
             test_read(&pipe, b"hel");
-            pipe.write(b"world").unwrap();
+            Write::write(&pipe, b"world").unwrap();
             test_read(&pipe, b"lo wo");
             test_read(&pipe, b"r");
             assert_eq!(2, pipe.queue_len());

@@ -41,14 +41,14 @@ impl PhysicalBitmap {
 
     pub fn parse_multiboot() -> PhysicalBitmap {
         let info = multiboot_info();
-        let kernel_len = ptr::bytes_between(&kernel_start, &kernel_end);
+        let kernel_len = ptr::bytes_between(unsafe { &kernel_start }, unsafe { &kernel_end });
         let lower_bytes = info.mem_lower as usize * 1024;
         let total_bytes = cmp::min(lower_bytes, 1024 * 1024) + (info.mem_upper as usize * 1024);
         let bitmap = PhysicalBitmap::new(total_bytes);
         bitmap.reserve_pages(0, 1);
-        bitmap.reserve_ptr(&kernel_start, kernel_len as usize);
+        bitmap.reserve_ptr(unsafe { &kernel_start }, kernel_len as usize);
         bitmap.reserve_addr(lower_bytes, cmp::max(0, 1024 * 1024 - lower_bytes));
-        bitmap.reserve_addr(mboot_ptr as usize, mem::size_of::<multiboot_info_t>());
+        bitmap.reserve_addr(unsafe { mboot_ptr } as usize, mem::size_of::<multiboot_info_t>());
         bitmap.reserve_addr(info.mods_addr as usize, info.mods_count as usize * mem::size_of::<multiboot_module_t>());
 
         {

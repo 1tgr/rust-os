@@ -10,8 +10,15 @@
 
 //! A doubly-linked list with owned nodes.
 //!
-//! The `LinkedList` allows pushing and popping elements at either end and is thus
-//! efficiently usable as a double-ended queue.
+//! The `LinkedList` allows pushing and popping elements at either end
+//! in constant time.
+//!
+//! Almost always it is better to use `Vec` or [`VecDeque`] instead of
+//! [`LinkedList`]. In general, array-based containers are faster,
+//! more memory efficient and make better use of CPU cache.
+//!
+//! [`LinkedList`]: ../linked_list/struct.LinkedList.html
+//! [`VecDeque`]: ../vec_deque/struct.VecDeque.html
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
@@ -19,7 +26,7 @@ use alloc::boxed::{Box, IntermediateBox};
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hasher, Hash};
-use core::iter::FromIterator;
+use core::iter::{FromIterator, FusedIterator};
 use core::marker::PhantomData;
 use core::mem;
 use core::ops::{BoxPlace, InPlace, Place, Placer};
@@ -27,7 +34,14 @@ use core::ptr::{self, Shared};
 
 use super::SpecExtend;
 
-/// A doubly-linked list.
+/// A doubly-linked list with owned nodes.
+///
+/// The `LinkedList` allows pushing and popping elements at either end
+/// in constant time.
+///
+/// Almost always it is better to use `Vec` or `VecDeque` instead of
+/// `LinkedList`. In general, array-based containers are faster,
+/// more memory efficient and make better use of CPU cache.
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct LinkedList<T> {
     head: Option<Shared<Node<T>>>,
@@ -42,13 +56,28 @@ struct Node<T> {
     element: T,
 }
 
-/// An iterator over references to the elements of a `LinkedList`.
+/// An iterator over the elements of a `LinkedList`.
+///
+/// This `struct` is created by the [`iter`] method on [`LinkedList`]. See its
+/// documentation for more.
+///
+/// [`iter`]: struct.LinkedList.html#method.iter
+/// [`LinkedList`]: struct.LinkedList.html
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct Iter<'a, T: 'a> {
     head: Option<Shared<Node<T>>>,
     tail: Option<Shared<Node<T>>>,
     len: usize,
     marker: PhantomData<&'a Node<T>>,
+}
+
+#[stable(feature = "collection_debug", since = "1.17.0")]
+impl<'a, T: 'a + fmt::Debug> fmt::Debug for Iter<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("Iter")
+         .field(&self.len)
+         .finish()
+    }
 }
 
 // FIXME #19839: deriving is too aggressive on the bounds (T doesn't need to be Clone).
@@ -59,7 +88,13 @@ impl<'a, T> Clone for Iter<'a, T> {
     }
 }
 
-/// An iterator over mutable references to the elements of a `LinkedList`.
+/// A mutable iterator over the elements of a `LinkedList`.
+///
+/// This `struct` is created by the [`iter_mut`] method on [`LinkedList`]. See its
+/// documentation for more.
+///
+/// [`iter_mut`]: struct.LinkedList.html#method.iter_mut
+/// [`LinkedList`]: struct.LinkedList.html
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct IterMut<'a, T: 'a> {
     list: &'a mut LinkedList<T>,
@@ -68,11 +103,36 @@ pub struct IterMut<'a, T: 'a> {
     len: usize,
 }
 
-/// An iterator over the elements of a `LinkedList`.
+#[stable(feature = "collection_debug", since = "1.17.0")]
+impl<'a, T: 'a + fmt::Debug> fmt::Debug for IterMut<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("IterMut")
+         .field(&self.list)
+         .field(&self.len)
+         .finish()
+    }
+}
+
+/// An owning iterator over the elements of a `LinkedList`.
+///
+/// This `struct` is created by the [`into_iter`] method on [`LinkedList`][`LinkedList`]
+/// (provided by the `IntoIterator` trait). See its documentation for more.
+///
+/// [`into_iter`]: struct.LinkedList.html#method.into_iter
+/// [`LinkedList`]: struct.LinkedList.html
 #[derive(Clone)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct IntoIter<T> {
     list: LinkedList<T>,
+}
+
+#[stable(feature = "collection_debug", since = "1.17.0")]
+impl<T: fmt::Debug> fmt::Debug for IntoIter<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("IntoIter")
+         .field(&self.list)
+         .finish()
+    }
 }
 
 impl<T> Node<T> {
@@ -101,7 +161,7 @@ impl<T> LinkedList<T> {
 
             match self.head {
                 None => self.tail = node,
-                Some(head) => (**head).prev = node,
+                Some(head) => (*head.as_mut_ptr()).prev = node,
             }
 
             self.head = node;
@@ -113,12 +173,12 @@ impl<T> LinkedList<T> {
     #[inline]
     fn pop_front_node(&mut self) -> Option<Box<Node<T>>> {
         self.head.map(|node| unsafe {
-            let node = Box::from_raw(*node);
+            let node = Box::from_raw(node.as_mut_ptr());
             self.head = node.next;
 
             match self.head {
                 None => self.tail = None,
-                Some(head) => (**head).prev = None,
+                Some(head) => (*head.as_mut_ptr()).prev = None,
             }
 
             self.len -= 1;
@@ -136,7 +196,7 @@ impl<T> LinkedList<T> {
 
             match self.tail {
                 None => self.head = node,
-                Some(tail) => (**tail).next = node,
+                Some(tail) => (*tail.as_mut_ptr()).next = node,
             }
 
             self.tail = node;
@@ -148,12 +208,12 @@ impl<T> LinkedList<T> {
     #[inline]
     fn pop_back_node(&mut self) -> Option<Box<Node<T>>> {
         self.tail.map(|node| unsafe {
-            let node = Box::from_raw(*node);
+            let node = Box::from_raw(node.as_mut_ptr());
             self.tail = node.prev;
 
             match self.tail {
                 None => self.head = None,
-                Some(tail) => (**tail).next = None,
+                Some(tail) => (*tail.as_mut_ptr()).next = None,
             }
 
             self.len -= 1;
@@ -164,6 +224,7 @@ impl<T> LinkedList<T> {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T> Default for LinkedList<T> {
+    /// Creates an empty `LinkedList<T>`.
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -224,15 +285,17 @@ impl<T> LinkedList<T> {
     pub fn append(&mut self, other: &mut Self) {
         match self.tail {
             None => mem::swap(self, other),
-            Some(tail) => if let Some(other_head) = other.head.take() {
-                unsafe {
-                    (**tail).next = Some(other_head);
-                    (**other_head).prev = Some(tail);
-                }
+            Some(tail) => {
+                if let Some(other_head) = other.head.take() {
+                    unsafe {
+                        (*tail.as_mut_ptr()).next = Some(other_head);
+                        (*other_head.as_mut_ptr()).prev = Some(tail);
+                    }
 
-                self.tail = other.tail.take();
-                self.len += mem::replace(&mut other.len, 0);
-            },
+                    self.tail = other.tail.take();
+                    self.len += mem::replace(&mut other.len, 0);
+                }
+            }
         }
     }
 
@@ -379,8 +442,6 @@ impl<T> LinkedList<T> {
     /// # Examples
     ///
     /// ```
-    /// #![feature(linked_list_contains)]
-    ///
     /// use std::collections::LinkedList;
     ///
     /// let mut list: LinkedList<u32> = LinkedList::new();
@@ -392,8 +453,7 @@ impl<T> LinkedList<T> {
     /// assert_eq!(list.contains(&0), true);
     /// assert_eq!(list.contains(&10), false);
     /// ```
-    #[unstable(feature = "linked_list_contains", reason = "recently added",
-               issue = "32630")]
+    #[stable(feature = "linked_list_contains", since = "1.12.0")]
     pub fn contains(&self, x: &T) -> bool
         where T: PartialEq<T>
     {
@@ -443,7 +503,7 @@ impl<T> LinkedList<T> {
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn front_mut(&mut self) -> Option<&mut T> {
-        self.head.map(|node| unsafe { &mut (**node).element })
+        self.head.map(|node| unsafe { &mut (*node.as_mut_ptr()).element })
     }
 
     /// Provides a reference to the back element, or `None` if the list is
@@ -489,7 +549,7 @@ impl<T> LinkedList<T> {
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
     pub fn back_mut(&mut self) -> Option<&mut T> {
-        self.tail.map(|node| unsafe { &mut (**node).element })
+        self.tail.map(|node| unsafe { &mut (*node.as_mut_ptr()).element })
     }
 
     /// Adds an element first in the list.
@@ -577,11 +637,11 @@ impl<T> LinkedList<T> {
     /// Splits the list into two at the given index. Returns everything after the given index,
     /// including the index.
     ///
+    /// This operation should compute in O(n) time.
+    ///
     /// # Panics
     ///
     /// Panics if `at > len`.
-    ///
-    /// This operation should compute in O(n) time.
     ///
     /// # Examples
     ///
@@ -634,9 +694,9 @@ impl<T> LinkedList<T> {
         let second_part_head;
 
         unsafe {
-            second_part_head = (**split_node.unwrap()).next.take();
+            second_part_head = (*split_node.unwrap().as_mut_ptr()).next.take();
             if let Some(head) = second_part_head {
-                (**head).prev = None;
+                (*head.as_mut_ptr()).prev = None;
             }
         }
 
@@ -656,8 +716,8 @@ impl<T> LinkedList<T> {
 
     /// Returns a place for insertion at the front of the list.
     ///
-    /// Using this method with placement syntax is equivalent to [`push_front`]
-    /// (#method.push_front), but may be more efficient.
+    /// Using this method with placement syntax is equivalent to
+    /// [`push_front`](#method.push_front), but may be more efficient.
     ///
     /// # Examples
     ///
@@ -676,7 +736,10 @@ impl<T> LinkedList<T> {
                reason = "method name and placement protocol are subject to change",
                issue = "30172")]
     pub fn front_place(&mut self) -> FrontPlace<T> {
-        FrontPlace { list: self, node: IntermediateBox::make_place() }
+        FrontPlace {
+            list: self,
+            node: IntermediateBox::make_place(),
+        }
     }
 
     /// Returns a place for insertion at the back of the list.
@@ -701,13 +764,15 @@ impl<T> LinkedList<T> {
                reason = "method name and placement protocol are subject to change",
                issue = "30172")]
     pub fn back_place(&mut self) -> BackPlace<T> {
-        BackPlace { list: self, node: IntermediateBox::make_place() }
+        BackPlace {
+            list: self,
+            node: IntermediateBox::make_place(),
+        }
     }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<T> Drop for LinkedList<T> {
-    #[unsafe_destructor_blind_to_params]
+unsafe impl<#[may_dangle] T> Drop for LinkedList<T> {
     fn drop(&mut self) {
         while let Some(_) = self.pop_front_node() {}
     }
@@ -757,6 +822,9 @@ impl<'a, T> DoubleEndedIterator for Iter<'a, T> {
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> ExactSizeIterator for Iter<'a, T> {}
 
+#[unstable(feature = "fused", issue = "35602")]
+impl<'a, T> FusedIterator for Iter<'a, T> {}
+
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = &'a mut T;
@@ -767,7 +835,7 @@ impl<'a, T> Iterator for IterMut<'a, T> {
             None
         } else {
             self.head.map(|node| unsafe {
-                let node = &mut **node;
+                let node = &mut *node.as_mut_ptr();
                 self.len -= 1;
                 self.head = node.next;
                 &mut node.element
@@ -789,7 +857,7 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
             None
         } else {
             self.tail.map(|node| unsafe {
-                let node = &mut **node;
+                let node = &mut *node.as_mut_ptr();
                 self.len -= 1;
                 self.tail = node.prev;
                 &mut node.element
@@ -800,6 +868,9 @@ impl<'a, T> DoubleEndedIterator for IterMut<'a, T> {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<'a, T> ExactSizeIterator for IterMut<'a, T> {}
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<'a, T> FusedIterator for IterMut<'a, T> {}
 
 impl<'a, T> IterMut<'a, T> {
     /// Inserts the given element just after the element most recently returned by `.next()`.
@@ -844,11 +915,11 @@ impl<'a, T> IterMut<'a, T> {
                     element: element,
                 })));
 
-                (**prev).next = node;
-                (**head).prev = node;
+                (*prev.as_mut_ptr()).next = node;
+                (*head.as_mut_ptr()).prev = node;
 
                 self.list.len += 1;
-            }
+            },
         }
     }
 
@@ -877,7 +948,7 @@ impl<'a, T> IterMut<'a, T> {
         if self.len == 0 {
             None
         } else {
-            self.head.map(|node| unsafe { &mut (**node).element })
+            self.head.map(|node| unsafe { &mut (*node.as_mut_ptr()).element })
         }
     }
 }
@@ -907,6 +978,9 @@ impl<T> DoubleEndedIterator for IntoIter<T> {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T> ExactSizeIterator for IntoIter<T> {}
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<T> FusedIterator for IntoIter<T> {}
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T> FromIterator<T> for LinkedList<T> {
@@ -1050,6 +1124,17 @@ pub struct FrontPlace<'a, T: 'a> {
 }
 
 #[unstable(feature = "collection_placement",
+           reason = "struct name and placement protocol are subject to change",
+           issue = "30172")]
+impl<'a, T: 'a + fmt::Debug> fmt::Debug for FrontPlace<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("FrontPlace")
+         .field(&self.list)
+         .finish()
+    }
+}
+
+#[unstable(feature = "collection_placement",
            reason = "placement protocol is subject to change",
            issue = "30172")]
 impl<'a, T> Placer<T> for FrontPlace<'a, T> {
@@ -1094,6 +1179,17 @@ pub struct BackPlace<'a, T: 'a> {
 }
 
 #[unstable(feature = "collection_placement",
+           reason = "struct name and placement protocol are subject to change",
+           issue = "30172")]
+impl<'a, T: 'a + fmt::Debug> fmt::Debug for BackPlace<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("BackPlace")
+         .field(&self.list)
+         .finish()
+    }
+}
+
+#[unstable(feature = "collection_placement",
            reason = "placement protocol is subject to change",
            issue = "30172")]
 impl<'a, T> Placer<T> for BackPlace<'a, T> {
@@ -1128,9 +1224,15 @@ impl<'a, T> InPlace<T> for BackPlace<'a, T> {
 // Ensure that `LinkedList` and its read-only iterators are covariant in their type parameters.
 #[allow(dead_code)]
 fn assert_covariance() {
-    fn a<'a>(x: LinkedList<&'static str>) -> LinkedList<&'a str> { x }
-    fn b<'i, 'a>(x: Iter<'i, &'static str>) -> Iter<'i, &'a str> { x }
-    fn c<'a>(x: IntoIter<&'static str>) -> IntoIter<&'a str> { x }
+    fn a<'a>(x: LinkedList<&'static str>) -> LinkedList<&'a str> {
+        x
+    }
+    fn b<'i, 'a>(x: Iter<'i, &'static str>) -> Iter<'i, &'a str> {
+        x
+    }
+    fn c<'a>(x: IntoIter<&'static str>) -> IntoIter<&'a str> {
+        x
+    }
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1153,9 +1255,6 @@ unsafe impl<'a, T: Sync> Sync for IterMut<'a, T> {}
 
 #[cfg(test)]
 mod tests {
-    use std::clone::Clone;
-    use std::iter::{Iterator, IntoIterator, Extend};
-    use std::option::Option::{self, Some, None};
     use std::__rand::{thread_rng, Rng};
     use std::thread;
     use std::vec::Vec;
@@ -1290,13 +1389,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(target_os = "emscripten", ignore)]
     fn test_send() {
         let n = list_from(&[1, 2, 3]);
         thread::spawn(move || {
-            check_links(&n);
-            let a: &[_] = &[&1, &2, &3];
-            assert_eq!(a, &n.iter().collect::<Vec<_>>()[..]);
-        })
+                check_links(&n);
+                let a: &[_] = &[&1, &2, &3];
+                assert_eq!(a, &*n.iter().collect::<Vec<_>>());
+            })
             .join()
             .ok()
             .unwrap();
@@ -1313,7 +1413,6 @@ mod tests {
 
     #[test]
     fn test_26021() {
-        use std::iter::ExactSizeIterator;
         // There was a bug in split_off that failed to null out the RHS's head's prev ptr.
         // This caused the RHS's dtor to walk up into the LHS at drop and delete all of
         // its nodes.

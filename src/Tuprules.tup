@@ -1,8 +1,7 @@
 .gitignore
 
 ROOT = $(TUP_CWD)
-RUST_TOOLCHAIN = nightly-2016-08-10
-RUSTUP_RUN = RUST_TARGET_PATH=$(ROOT)/libsyscall/arch rustup run $(RUST_TOOLCHAIN)
+RUSTUP_RUN = RUST_TARGET_PATH=$(ROOT)/libsyscall/arch rustup run @(RUST_TOOLCHAIN)
 RUSTC = $(RUSTUP_RUN) rustc
 RUSTDOC = $(RUSTUP_RUN) rustdoc
 

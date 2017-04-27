@@ -10,27 +10,38 @@
 
 //! Overloadable operators.
 //!
-//! Implementing these traits allows you to get an effect similar to
-//! overloading operators.
+//! Implementing these traits allows you to overload certain operators.
 //!
 //! Some of these traits are imported by the prelude, so they are available in
-//! every Rust program.
+//! every Rust program. Only operators backed by traits can be overloaded. For
+//! example, the addition operator (`+`) can be overloaded through the [`Add`]
+//! trait, but since the assignment operator (`=`) has no backing trait, there
+//! is no way of overloading its semantics. Additionally, this module does not
+//! provide any mechanism to create new operators. If traitless overloading or
+//! custom operators are required, you should look toward macros or compiler
+//! plugins to extend Rust's syntax.
+//!
+//! Note that the `&&` and `||` operators short-circuit, i.e. they only
+//! evaluate their second operand if it contributes to the result. Since this
+//! behavior is not enforceable by traits, `&&` and `||` are not supported as
+//! overloadable operators.
 //!
 //! Many of the operators take their operands by value. In non-generic
 //! contexts involving built-in types, this is usually not a problem.
 //! However, using these operators in generic code, requires some
 //! attention if values have to be reused as opposed to letting the operators
-//! consume them. One option is to occasionally use `clone()`.
+//! consume them. One option is to occasionally use [`clone`].
 //! Another option is to rely on the types involved providing additional
 //! operator implementations for references. For example, for a user-defined
 //! type `T` which is supposed to support addition, it is probably a good
-//! idea to have both `T` and `&T` implement the traits `Add<T>` and `Add<&T>`
-//! so that generic code can be written without unnecessary cloning.
+//! idea to have both `T` and `&T` implement the traits [`Add<T>`][`Add`] and
+//! [`Add<&T>`][`Add`] so that generic code can be written without unnecessary
+//! cloning.
 //!
 //! # Examples
 //!
-//! This example creates a `Point` struct that implements `Add` and `Sub`, and
-//! then demonstrates adding and subtracting two `Point`s.
+//! This example creates a `Point` struct that implements [`Add`] and [`Sub`],
+//! and then demonstrates adding and subtracting two `Point`s.
 //!
 //! ```rust
 //! use std::ops::{Add, Sub};
@@ -62,14 +73,82 @@
 //! }
 //! ```
 //!
-//! See the documentation for each trait for a minimum implementation that
-//! prints something to the screen.
+//! See the documentation for each trait for an example implementation.
+//!
+//! The [`Fn`], [`FnMut`], and [`FnOnce`] traits are implemented by types that can be
+//! invoked like functions. Note that [`Fn`] takes `&self`, [`FnMut`] takes `&mut
+//! self` and [`FnOnce`] takes `self`. These correspond to the three kinds of
+//! methods that can be invoked on an instance: call-by-reference,
+//! call-by-mutable-reference, and call-by-value. The most common use of these
+//! traits is to act as bounds to higher-level functions that take functions or
+//! closures as arguments.
+//!
+//! Taking a [`Fn`] as a parameter:
+//!
+//! ```rust
+//! fn call_with_one<F>(func: F) -> usize
+//!     where F: Fn(usize) -> usize
+//! {
+//!     func(1)
+//! }
+//!
+//! let double = |x| x * 2;
+//! assert_eq!(call_with_one(double), 2);
+//! ```
+//!
+//! Taking a [`FnMut`] as a parameter:
+//!
+//! ```rust
+//! fn do_twice<F>(mut func: F)
+//!     where F: FnMut()
+//! {
+//!     func();
+//!     func();
+//! }
+//!
+//! let mut x: usize = 1;
+//! {
+//!     let add_two_to_x = || x += 2;
+//!     do_twice(add_two_to_x);
+//! }
+//!
+//! assert_eq!(x, 5);
+//! ```
+//!
+//! Taking a [`FnOnce`] as a parameter:
+//!
+//! ```rust
+//! fn consume_with_relish<F>(func: F)
+//!     where F: FnOnce() -> String
+//! {
+//!     // `func` consumes its captured variables, so it cannot be run more
+//!     // than once
+//!     println!("Consumed: {}", func());
+//!
+//!     println!("Delicious!");
+//!
+//!     // Attempting to invoke `func()` again will throw a `use of moved
+//!     // value` error for `func`
+//! }
+//!
+//! let x = String::from("x");
+//! let consume_and_return_x = move || x;
+//! consume_with_relish(consume_and_return_x);
+//!
+//! // `consume_and_return_x` can no longer be invoked at this point
+//! ```
+//!
+//! [`Fn`]: trait.Fn.html
+//! [`FnMut`]: trait.FnMut.html
+//! [`FnOnce`]: trait.FnOnce.html
+//! [`Add`]: trait.Add.html
+//! [`Sub`]: trait.Sub.html
+//! [`clone`]: ../clone/trait.Clone.html#tymethod.clone
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use cmp::PartialOrd;
 use fmt;
-use marker::{Sized, Unsize};
+use marker::Unsize;
 
 /// The `Drop` trait is used to run some code when a value goes out of scope.
 /// This is sometimes called a 'destructor'.
@@ -102,6 +181,13 @@ pub trait Drop {
     ///
     /// After this function is over, the memory of `self` will be deallocated.
     ///
+    /// This function cannot be called explicitly. This is compiler error
+    /// [E0040]. However, the [`std::mem::drop`] function in the prelude can be
+    /// used to call the argument's `Drop` implementation.
+    ///
+    /// [E0040]: ../../error-index.html#E0040
+    /// [`std::mem::drop`]: ../../std/mem/fn.drop.html
+    ///
     /// # Panics
     ///
     /// Given that a `panic!` will call `drop()` as it unwinds, any `panic!` in
@@ -110,85 +196,53 @@ pub trait Drop {
     fn drop(&mut self);
 }
 
-// implements the unary operator "op &T"
-// based on "op T" where T is expected to be `Copy`able
-macro_rules! forward_ref_unop {
-    (impl $imp:ident, $method:ident for $t:ty) => {
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a> $imp for &'a $t {
-            type Output = <$t as $imp>::Output;
-
-            #[inline]
-            fn $method(self) -> <$t as $imp>::Output {
-                $imp::$method(*self)
-            }
-        }
-    }
-}
-
-// implements binary operators "&T op U", "T op &U", "&T op &U"
-// based on "T op U" where T and U are expected to be `Copy`able
-macro_rules! forward_ref_binop {
-    (impl $imp:ident, $method:ident for $t:ty, $u:ty) => {
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a> $imp<$u> for &'a $t {
-            type Output = <$t as $imp<$u>>::Output;
-
-            #[inline]
-            fn $method(self, other: $u) -> <$t as $imp<$u>>::Output {
-                $imp::$method(*self, other)
-            }
-        }
-
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a> $imp<&'a $u> for $t {
-            type Output = <$t as $imp<$u>>::Output;
-
-            #[inline]
-            fn $method(self, other: &'a $u) -> <$t as $imp<$u>>::Output {
-                $imp::$method(self, *other)
-            }
-        }
-
-        #[stable(feature = "rust1", since = "1.0.0")]
-        impl<'a, 'b> $imp<&'a $u> for &'b $t {
-            type Output = <$t as $imp<$u>>::Output;
-
-            #[inline]
-            fn $method(self, other: &'a $u) -> <$t as $imp<$u>>::Output {
-                $imp::$method(*self, *other)
-            }
-        }
-    }
-}
-
-/// The `Add` trait is used to specify the functionality of `+`.
+/// The addition operator `+`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Add`. When `Foo + Foo` happens, it ends up
-/// calling `add`, and therefore, `main` prints `Adding!`.
+/// This example creates a `Point` struct that implements the `Add` trait, and
+/// then demonstrates adding two `Point`s.
 ///
 /// ```
 /// use std::ops::Add;
 ///
-/// struct Foo;
+/// #[derive(Debug)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
 ///
-/// impl Add for Foo {
-///     type Output = Foo;
+/// impl Add for Point {
+///     type Output = Point;
 ///
-///     fn add(self, _rhs: Foo) -> Foo {
-///         println!("Adding!");
-///         self
+///     fn add(self, other: Point) -> Point {
+///         Point {
+///             x: self.x + other.x,
+///             y: self.y + other.y,
+///         }
+///     }
+/// }
+///
+/// impl PartialEq for Point {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.x == other.x && self.y == other.y
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo + Foo;
+///     assert_eq!(Point { x: 1, y: 0 } + Point { x: 2, y: 3 },
+///                Point { x: 3, y: 3 });
 /// }
 /// ```
+///
+/// Note that `RHS = Self` by default, but this is not mandatory. For example,
+/// [std::time::SystemTime] implements `Add<Duration>`, which permits
+/// operations of the form `SystemTime = SystemTime + Duration`.
+///
+/// [std::time::SystemTime]: ../../std/time/struct.SystemTime.html
 #[lang = "add"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} + {RHS}`"]
 pub trait Add<RHS=Self> {
     /// The resulting type after applying the `+` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -214,35 +268,55 @@ macro_rules! add_impl {
     )*)
 }
 
-add_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+add_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `Sub` trait is used to specify the functionality of `-`.
+/// The subtraction operator `-`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Sub`. When `Foo - Foo` happens, it ends up
-/// calling `sub`, and therefore, `main` prints `Subtracting!`.
+/// This example creates a `Point` struct that implements the `Sub` trait, and
+/// then demonstrates subtracting two `Point`s.
 ///
 /// ```
 /// use std::ops::Sub;
 ///
-/// struct Foo;
+/// #[derive(Debug)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
 ///
-/// impl Sub for Foo {
-///     type Output = Foo;
+/// impl Sub for Point {
+///     type Output = Point;
 ///
-///     fn sub(self, _rhs: Foo) -> Foo {
-///         println!("Subtracting!");
-///         self
+///     fn sub(self, other: Point) -> Point {
+///         Point {
+///             x: self.x - other.x,
+///             y: self.y - other.y,
+///         }
+///     }
+/// }
+///
+/// impl PartialEq for Point {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.x == other.x && self.y == other.y
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo - Foo;
+///     assert_eq!(Point { x: 3, y: 3 } - Point { x: 2, y: 3 },
+///                Point { x: 1, y: 0 });
 /// }
 /// ```
+///
+/// Note that `RHS = Self` by default, but this is not mandatory. For example,
+/// [std::time::SystemTime] implements `Sub<Duration>`, which permits
+/// operations of the form `SystemTime = SystemTime - Duration`.
+///
+/// [std::time::SystemTime]: ../../std/time/struct.SystemTime.html
 #[lang = "sub"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} - {RHS}`"]
 pub trait Sub<RHS=Self> {
     /// The resulting type after applying the `-` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -268,35 +342,104 @@ macro_rules! sub_impl {
     )*)
 }
 
-sub_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+sub_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `Mul` trait is used to specify the functionality of `*`.
+/// The multiplication operator `*`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Mul`. When `Foo * Foo` happens, it ends up
-/// calling `mul`, and therefore, `main` prints `Multiplying!`.
+/// Implementing a `Mul`tipliable rational number struct:
 ///
 /// ```
 /// use std::ops::Mul;
 ///
-/// struct Foo;
+/// // The uniqueness of rational numbers in lowest terms is a consequence of
+/// // the fundamental theorem of arithmetic.
+/// #[derive(Eq)]
+/// #[derive(PartialEq, Debug)]
+/// struct Rational {
+///     nominator: usize,
+///     denominator: usize,
+/// }
 ///
-/// impl Mul for Foo {
-///     type Output = Foo;
+/// impl Rational {
+///     fn new(nominator: usize, denominator: usize) -> Self {
+///         if denominator == 0 {
+///             panic!("Zero is an invalid denominator!");
+///         }
 ///
-///     fn mul(self, _rhs: Foo) -> Foo {
-///         println!("Multiplying!");
-///         self
+///         // Reduce to lowest terms by dividing by the greatest common
+///         // divisor.
+///         let gcd = gcd(nominator, denominator);
+///         Rational {
+///             nominator: nominator / gcd,
+///             denominator: denominator / gcd,
+///         }
 ///     }
 /// }
 ///
-/// fn main() {
-///     Foo * Foo;
+/// impl Mul for Rational {
+///     // The multiplication of rational numbers is a closed operation.
+///     type Output = Self;
+///
+///     fn mul(self, rhs: Self) -> Self {
+///         let nominator = self.nominator * rhs.nominator;
+///         let denominator = self.denominator * rhs.denominator;
+///         Rational::new(nominator, denominator)
+///     }
 /// }
+///
+/// // Euclid's two-thousand-year-old algorithm for finding the greatest common
+/// // divisor.
+/// fn gcd(x: usize, y: usize) -> usize {
+///     let mut x = x;
+///     let mut y = y;
+///     while y != 0 {
+///         let t = y;
+///         y = x % y;
+///         x = t;
+///     }
+///     x
+/// }
+///
+/// assert_eq!(Rational::new(1, 2), Rational::new(2, 4));
+/// assert_eq!(Rational::new(2, 3) * Rational::new(3, 4),
+///            Rational::new(1, 2));
+/// ```
+///
+/// Note that `RHS = Self` by default, but this is not mandatory. Here is an
+/// implementation which enables multiplication of vectors by scalars, as is
+/// done in linear algebra.
+///
+/// ```
+/// use std::ops::Mul;
+///
+/// struct Scalar {value: usize};
+///
+/// #[derive(Debug)]
+/// struct Vector {value: Vec<usize>};
+///
+/// impl Mul<Vector> for Scalar {
+///     type Output = Vector;
+///
+///     fn mul(self, rhs: Vector) -> Vector {
+///         Vector {value: rhs.value.iter().map(|v| self.value * v).collect()}
+///     }
+/// }
+///
+/// impl PartialEq<Vector> for Vector {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.value == other.value
+///     }
+/// }
+///
+/// let scalar = Scalar{value: 3};
+/// let vector = Vector{value: vec![2, 4, 6]};
+/// assert_eq!(scalar * vector, Vector{value: vec![6, 12, 18]});
 /// ```
 #[lang = "mul"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} * {RHS}`"]
 pub trait Mul<RHS=Self> {
     /// The resulting type after applying the `*` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -322,35 +465,110 @@ macro_rules! mul_impl {
     )*)
 }
 
-mul_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+mul_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `Div` trait is used to specify the functionality of `/`.
+/// The division operator `/`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Div`. When `Foo / Foo` happens, it ends up
-/// calling `div`, and therefore, `main` prints `Dividing!`.
+/// Implementing a `Div`idable rational number struct:
 ///
 /// ```
 /// use std::ops::Div;
 ///
-/// struct Foo;
+/// // The uniqueness of rational numbers in lowest terms is a consequence of
+/// // the fundamental theorem of arithmetic.
+/// #[derive(Eq)]
+/// #[derive(PartialEq, Debug)]
+/// struct Rational {
+///     nominator: usize,
+///     denominator: usize,
+/// }
 ///
-/// impl Div for Foo {
-///     type Output = Foo;
+/// impl Rational {
+///     fn new(nominator: usize, denominator: usize) -> Self {
+///         if denominator == 0 {
+///             panic!("Zero is an invalid denominator!");
+///         }
 ///
-///     fn div(self, _rhs: Foo) -> Foo {
-///         println!("Dividing!");
-///         self
+///         // Reduce to lowest terms by dividing by the greatest common
+///         // divisor.
+///         let gcd = gcd(nominator, denominator);
+///         Rational {
+///             nominator: nominator / gcd,
+///             denominator: denominator / gcd,
+///         }
 ///     }
 /// }
 ///
-/// fn main() {
-///     Foo / Foo;
+/// impl Div for Rational {
+///     // The division of rational numbers is a closed operation.
+///     type Output = Self;
+///
+///     fn div(self, rhs: Self) -> Self {
+///         if rhs.nominator == 0 {
+///             panic!("Cannot divide by zero-valued `Rational`!");
+///         }
+///
+///         let nominator = self.nominator * rhs.denominator;
+///         let denominator = self.denominator * rhs.nominator;
+///         Rational::new(nominator, denominator)
+///     }
 /// }
+///
+/// // Euclid's two-thousand-year-old algorithm for finding the greatest common
+/// // divisor.
+/// fn gcd(x: usize, y: usize) -> usize {
+///     let mut x = x;
+///     let mut y = y;
+///     while y != 0 {
+///         let t = y;
+///         y = x % y;
+///         x = t;
+///     }
+///     x
+/// }
+///
+/// fn main() {
+///     assert_eq!(Rational::new(1, 2), Rational::new(2, 4));
+///     assert_eq!(Rational::new(1, 2) / Rational::new(3, 4),
+///                Rational::new(2, 3));
+/// }
+/// ```
+///
+/// Note that `RHS = Self` by default, but this is not mandatory. Here is an
+/// implementation which enables division of vectors by scalars, as is done in
+/// linear algebra.
+///
+/// ```
+/// use std::ops::Div;
+///
+/// struct Scalar {value: f32};
+///
+/// #[derive(Debug)]
+/// struct Vector {value: Vec<f32>};
+///
+/// impl Div<Scalar> for Vector {
+///     type Output = Vector;
+///
+///     fn div(self, rhs: Scalar) -> Vector {
+///         Vector {value: self.value.iter().map(|v| v / rhs.value).collect()}
+///     }
+/// }
+///
+/// impl PartialEq<Vector> for Vector {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.value == other.value
+///     }
+/// }
+///
+/// let scalar = Scalar{value: 2f32};
+/// let vector = Vector{value: vec![2f32, 4f32, 6f32]};
+/// assert_eq!(vector / scalar, Vector{value: vec![1f32, 2f32, 3f32]});
 /// ```
 #[lang = "div"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} / {RHS}`"]
 pub trait Div<RHS=Self> {
     /// The resulting type after applying the `/` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -377,7 +595,7 @@ macro_rules! div_impl_integer {
     )*)
 }
 
-div_impl_integer! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+div_impl_integer! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
 macro_rules! div_impl_float {
     ($($t:ty)*) => ($(
@@ -395,33 +613,42 @@ macro_rules! div_impl_float {
 
 div_impl_float! { f32 f64 }
 
-/// The `Rem` trait is used to specify the functionality of `%`.
+/// The remainder operator `%`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Rem`. When `Foo % Foo` happens, it ends up
-/// calling `rem`, and therefore, `main` prints `Remainder-ing!`.
+/// This example implements `Rem` on a `SplitSlice` object. After `Rem` is
+/// implemented, one can use the `%` operator to find out what the remaining
+/// elements of the slice would be after splitting it into equal slices of a
+/// given length.
 ///
 /// ```
 /// use std::ops::Rem;
 ///
-/// struct Foo;
+/// #[derive(PartialEq, Debug)]
+/// struct SplitSlice<'a, T: 'a> {
+///     slice: &'a [T],
+/// }
 ///
-/// impl Rem for Foo {
-///     type Output = Foo;
+/// impl<'a, T> Rem<usize> for SplitSlice<'a, T> {
+///     type Output = SplitSlice<'a, T>;
 ///
-///     fn rem(self, _rhs: Foo) -> Foo {
-///         println!("Remainder-ing!");
-///         self
+///     fn rem(self, modulus: usize) -> Self {
+///         let len = self.slice.len();
+///         let rem = len % modulus;
+///         let start = len - rem;
+///         SplitSlice {slice: &self.slice[start..]}
 ///     }
 /// }
 ///
-/// fn main() {
-///     Foo % Foo;
-/// }
+/// // If we were to divide &[0, 1, 2, 3, 4, 5, 6, 7] into slices of size 3,
+/// // the remainder would be &[6, 7]
+/// assert_eq!(SplitSlice { slice: &[0, 1, 2, 3, 4, 5, 6, 7] } % 3,
+///            SplitSlice { slice: &[6, 7] });
 /// ```
 #[lang = "rem"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} % {RHS}`"]
 pub trait Rem<RHS=Self> {
     /// The resulting type after applying the `%` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -448,7 +675,8 @@ macro_rules! rem_impl_integer {
     )*)
 }
 
-rem_impl_integer! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+rem_impl_integer! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
+
 
 macro_rules! rem_impl_float {
     ($($t:ty)*) => ($(
@@ -466,30 +694,41 @@ macro_rules! rem_impl_float {
 
 rem_impl_float! { f32 f64 }
 
-/// The `Neg` trait is used to specify the functionality of unary `-`.
+/// The unary negation operator `-`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Neg`. When `-Foo` happens, it ends up calling
-/// `neg`, and therefore, `main` prints `Negating!`.
+/// An implementation of `Neg` for `Sign`, which allows the use of `-` to
+/// negate its value.
 ///
 /// ```
 /// use std::ops::Neg;
 ///
-/// struct Foo;
+/// #[derive(Debug, PartialEq)]
+/// enum Sign {
+///     Negative,
+///     Zero,
+///     Positive,
+/// }
 ///
-/// impl Neg for Foo {
-///     type Output = Foo;
+/// impl Neg for Sign {
+///     type Output = Sign;
 ///
-///     fn neg(self) -> Foo {
-///         println!("Negating!");
-///         self
+///     fn neg(self) -> Sign {
+///         match self {
+///             Sign::Negative => Sign::Positive,
+///             Sign::Zero => Sign::Zero,
+///             Sign::Positive => Sign::Negative,
+///         }
 ///     }
 /// }
 ///
-/// fn main() {
-///     -Foo;
-/// }
+/// // a negative positive is a negative
+/// assert_eq!(-Sign::Positive, Sign::Negative);
+/// // a double negative is a positive
+/// assert_eq!(-Sign::Negative, Sign::Positive);
+/// // zero is its own negation
+/// assert_eq!(-Sign::Zero, Sign::Zero);
 /// ```
 #[lang = "neg"]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -532,32 +771,37 @@ macro_rules! neg_impl_unsigned {
 }
 
 // neg_impl_unsigned! { usize u8 u16 u32 u64 }
-neg_impl_numeric! { isize i8 i16 i32 i64 f32 f64 }
+neg_impl_numeric! { isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `Not` trait is used to specify the functionality of unary `!`.
+/// The unary logical negation operator `!`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Not`. When `!Foo` happens, it ends up calling
-/// `not`, and therefore, `main` prints `Not-ing!`.
+/// An implementation of `Not` for `Answer`, which enables the use of `!` to
+/// invert its value.
 ///
 /// ```
 /// use std::ops::Not;
 ///
-/// struct Foo;
+/// #[derive(Debug, PartialEq)]
+/// enum Answer {
+///     Yes,
+///     No,
+/// }
 ///
-/// impl Not for Foo {
-///     type Output = Foo;
+/// impl Not for Answer {
+///     type Output = Answer;
 ///
-///     fn not(self) -> Foo {
-///         println!("Not-ing!");
-///         self
+///     fn not(self) -> Answer {
+///         match self {
+///             Answer::Yes => Answer::No,
+///             Answer::No => Answer::Yes
+///         }
 ///     }
 /// }
 ///
-/// fn main() {
-///     !Foo;
-/// }
+/// assert_eq!(!Answer::Yes, Answer::No);
+/// assert_eq!(!Answer::No, Answer::Yes);
 /// ```
 #[lang = "not"]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -585,35 +829,66 @@ macro_rules! not_impl {
     )*)
 }
 
-not_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+not_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `BitAnd` trait is used to specify the functionality of `&`.
+/// The bitwise AND operator `&`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `BitAnd`. When `Foo & Foo` happens, it ends up
-/// calling `bitand`, and therefore, `main` prints `Bitwise And-ing!`.
+/// In this example, the `&` operator is lifted to a trivial `Scalar` type.
 ///
 /// ```
 /// use std::ops::BitAnd;
 ///
-/// struct Foo;
+/// #[derive(Debug, PartialEq)]
+/// struct Scalar(bool);
 ///
-/// impl BitAnd for Foo {
-///     type Output = Foo;
+/// impl BitAnd for Scalar {
+///     type Output = Self;
 ///
-///     fn bitand(self, _rhs: Foo) -> Foo {
-///         println!("Bitwise And-ing!");
-///         self
+///     // rhs is the "right-hand side" of the expression `a & b`
+///     fn bitand(self, rhs: Self) -> Self {
+///         Scalar(self.0 & rhs.0)
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo & Foo;
+///     assert_eq!(Scalar(true) & Scalar(true), Scalar(true));
+///     assert_eq!(Scalar(true) & Scalar(false), Scalar(false));
+///     assert_eq!(Scalar(false) & Scalar(true), Scalar(false));
+///     assert_eq!(Scalar(false) & Scalar(false), Scalar(false));
+/// }
+/// ```
+///
+/// In this example, the `BitAnd` trait is implemented for a `BooleanVector`
+/// struct.
+///
+/// ```
+/// use std::ops::BitAnd;
+///
+/// #[derive(Debug, PartialEq)]
+/// struct BooleanVector(Vec<bool>);
+///
+/// impl BitAnd for BooleanVector {
+///     type Output = Self;
+///
+///     fn bitand(self, BooleanVector(rhs): Self) -> Self {
+///         let BooleanVector(lhs) = self;
+///         assert_eq!(lhs.len(), rhs.len());
+///         BooleanVector(lhs.iter().zip(rhs.iter()).map(|(x, y)| *x && *y).collect())
+///     }
+/// }
+///
+/// fn main() {
+///     let bv1 = BooleanVector(vec![true, true, false, false]);
+///     let bv2 = BooleanVector(vec![true, false, true, false]);
+///     let expected = BooleanVector(vec![true, false, false, false]);
+///     assert_eq!(bv1 & bv2, expected);
 /// }
 /// ```
 #[lang = "bitand"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} & {RHS}`"]
 pub trait BitAnd<RHS=Self> {
     /// The resulting type after applying the `&` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -638,35 +913,66 @@ macro_rules! bitand_impl {
     )*)
 }
 
-bitand_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+bitand_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `BitOr` trait is used to specify the functionality of `|`.
+/// The bitwise OR operator `|`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `BitOr`. When `Foo | Foo` happens, it ends up
-/// calling `bitor`, and therefore, `main` prints `Bitwise Or-ing!`.
+/// In this example, the `|` operator is lifted to a trivial `Scalar` type.
 ///
 /// ```
 /// use std::ops::BitOr;
 ///
-/// struct Foo;
+/// #[derive(Debug, PartialEq)]
+/// struct Scalar(bool);
 ///
-/// impl BitOr for Foo {
-///     type Output = Foo;
+/// impl BitOr for Scalar {
+///     type Output = Self;
 ///
-///     fn bitor(self, _rhs: Foo) -> Foo {
-///         println!("Bitwise Or-ing!");
-///         self
+///     // rhs is the "right-hand side" of the expression `a | b`
+///     fn bitor(self, rhs: Self) -> Self {
+///         Scalar(self.0 | rhs.0)
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo | Foo;
+///     assert_eq!(Scalar(true) | Scalar(true), Scalar(true));
+///     assert_eq!(Scalar(true) | Scalar(false), Scalar(true));
+///     assert_eq!(Scalar(false) | Scalar(true), Scalar(true));
+///     assert_eq!(Scalar(false) | Scalar(false), Scalar(false));
+/// }
+/// ```
+///
+/// In this example, the `BitOr` trait is implemented for a `BooleanVector`
+/// struct.
+///
+/// ```
+/// use std::ops::BitOr;
+///
+/// #[derive(Debug, PartialEq)]
+/// struct BooleanVector(Vec<bool>);
+///
+/// impl BitOr for BooleanVector {
+///     type Output = Self;
+///
+///     fn bitor(self, BooleanVector(rhs): Self) -> Self {
+///         let BooleanVector(lhs) = self;
+///         assert_eq!(lhs.len(), rhs.len());
+///         BooleanVector(lhs.iter().zip(rhs.iter()).map(|(x, y)| *x || *y).collect())
+///     }
+/// }
+///
+/// fn main() {
+///     let bv1 = BooleanVector(vec![true, true, false, false]);
+///     let bv2 = BooleanVector(vec![true, false, true, false]);
+///     let expected = BooleanVector(vec![true, true, true, false]);
+///     assert_eq!(bv1 | bv2, expected);
 /// }
 /// ```
 #[lang = "bitor"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} | {RHS}`"]
 pub trait BitOr<RHS=Self> {
     /// The resulting type after applying the `|` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -691,35 +997,69 @@ macro_rules! bitor_impl {
     )*)
 }
 
-bitor_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+bitor_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `BitXor` trait is used to specify the functionality of `^`.
+/// The bitwise XOR operator `^`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `BitXor`. When `Foo ^ Foo` happens, it ends up
-/// calling `bitxor`, and therefore, `main` prints `Bitwise Xor-ing!`.
+/// In this example, the `^` operator is lifted to a trivial `Scalar` type.
 ///
 /// ```
 /// use std::ops::BitXor;
 ///
-/// struct Foo;
+/// #[derive(Debug, PartialEq)]
+/// struct Scalar(bool);
 ///
-/// impl BitXor for Foo {
-///     type Output = Foo;
+/// impl BitXor for Scalar {
+///     type Output = Self;
 ///
-///     fn bitxor(self, _rhs: Foo) -> Foo {
-///         println!("Bitwise Xor-ing!");
-///         self
+///     // rhs is the "right-hand side" of the expression `a ^ b`
+///     fn bitxor(self, rhs: Self) -> Self {
+///         Scalar(self.0 ^ rhs.0)
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo ^ Foo;
+///     assert_eq!(Scalar(true) ^ Scalar(true), Scalar(false));
+///     assert_eq!(Scalar(true) ^ Scalar(false), Scalar(true));
+///     assert_eq!(Scalar(false) ^ Scalar(true), Scalar(true));
+///     assert_eq!(Scalar(false) ^ Scalar(false), Scalar(false));
+/// }
+/// ```
+///
+/// In this example, the `BitXor` trait is implemented for a `BooleanVector`
+/// struct.
+///
+/// ```
+/// use std::ops::BitXor;
+///
+/// #[derive(Debug, PartialEq)]
+/// struct BooleanVector(Vec<bool>);
+///
+/// impl BitXor for BooleanVector {
+///     type Output = Self;
+///
+///     fn bitxor(self, BooleanVector(rhs): Self) -> Self {
+///         let BooleanVector(lhs) = self;
+///         assert_eq!(lhs.len(), rhs.len());
+///         BooleanVector(lhs.iter()
+///                          .zip(rhs.iter())
+///                          .map(|(x, y)| (*x || *y) && !(*x && *y))
+///                          .collect())
+///     }
+/// }
+///
+/// fn main() {
+///     let bv1 = BooleanVector(vec![true, true, false, false]);
+///     let bv2 = BooleanVector(vec![true, false, true, false]);
+///     let expected = BooleanVector(vec![false, true, true, false]);
+///     assert_eq!(bv1 ^ bv2, expected);
 /// }
 /// ```
 #[lang = "bitxor"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} ^ {RHS}`"]
 pub trait BitXor<RHS=Self> {
     /// The resulting type after applying the `^` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -744,35 +1084,65 @@ macro_rules! bitxor_impl {
     )*)
 }
 
-bitxor_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+bitxor_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `Shl` trait is used to specify the functionality of `<<`.
+/// The left shift operator `<<`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Shl`. When `Foo << Foo` happens, it ends up
-/// calling `shl`, and therefore, `main` prints `Shifting left!`.
+/// An implementation of `Shl` that lifts the `<<` operation on integers to a
+/// `Scalar` struct.
 ///
 /// ```
 /// use std::ops::Shl;
 ///
-/// struct Foo;
+/// #[derive(PartialEq, Debug)]
+/// struct Scalar(usize);
 ///
-/// impl Shl<Foo> for Foo {
-///     type Output = Foo;
+/// impl Shl<Scalar> for Scalar {
+///     type Output = Self;
 ///
-///     fn shl(self, _rhs: Foo) -> Foo {
-///         println!("Shifting left!");
-///         self
+///     fn shl(self, Scalar(rhs): Self) -> Scalar {
+///         let Scalar(lhs) = self;
+///         Scalar(lhs << rhs)
+///     }
+/// }
+/// fn main() {
+///     assert_eq!(Scalar(4) << Scalar(2), Scalar(16));
+/// }
+/// ```
+///
+/// An implementation of `Shl` that spins a vector leftward by a given amount.
+///
+/// ```
+/// use std::ops::Shl;
+///
+/// #[derive(PartialEq, Debug)]
+/// struct SpinVector<T: Clone> {
+///     vec: Vec<T>,
+/// }
+///
+/// impl<T: Clone> Shl<usize> for SpinVector<T> {
+///     type Output = Self;
+///
+///     fn shl(self, rhs: usize) -> SpinVector<T> {
+///         // rotate the vector by `rhs` places
+///         let (a, b) = self.vec.split_at(rhs);
+///         let mut spun_vector: Vec<T> = vec![];
+///         spun_vector.extend_from_slice(b);
+///         spun_vector.extend_from_slice(a);
+///         SpinVector { vec: spun_vector }
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo << Foo;
+///     assert_eq!(SpinVector { vec: vec![0, 1, 2, 3, 4] } << 2,
+///                SpinVector { vec: vec![2, 3, 4, 0, 1] });
 /// }
 /// ```
 #[lang = "shl"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} << {RHS}`"]
 pub trait Shl<RHS> {
     /// The resulting type after applying the `<<` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -806,45 +1176,77 @@ macro_rules! shl_impl_all {
         shl_impl! { $t, u16 }
         shl_impl! { $t, u32 }
         shl_impl! { $t, u64 }
+        shl_impl! { $t, u128 }
         shl_impl! { $t, usize }
 
         shl_impl! { $t, i8 }
         shl_impl! { $t, i16 }
         shl_impl! { $t, i32 }
         shl_impl! { $t, i64 }
+        shl_impl! { $t, i128 }
         shl_impl! { $t, isize }
     )*)
 }
 
-shl_impl_all! { u8 u16 u32 u64 usize i8 i16 i32 i64 isize }
+shl_impl_all! { u8 u16 u32 u64 u128 usize i8 i16 i32 i64 isize i128 }
 
-/// The `Shr` trait is used to specify the functionality of `>>`.
+/// The right shift operator `>>`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Shr`. When `Foo >> Foo` happens, it ends up
-/// calling `shr`, and therefore, `main` prints `Shifting right!`.
+/// An implementation of `Shr` that lifts the `>>` operation on integers to a
+/// `Scalar` struct.
 ///
 /// ```
 /// use std::ops::Shr;
 ///
-/// struct Foo;
+/// #[derive(PartialEq, Debug)]
+/// struct Scalar(usize);
 ///
-/// impl Shr<Foo> for Foo {
-///     type Output = Foo;
+/// impl Shr<Scalar> for Scalar {
+///     type Output = Self;
 ///
-///     fn shr(self, _rhs: Foo) -> Foo {
-///         println!("Shifting right!");
-///         self
+///     fn shr(self, Scalar(rhs): Self) -> Scalar {
+///         let Scalar(lhs) = self;
+///         Scalar(lhs >> rhs)
+///     }
+/// }
+/// fn main() {
+///     assert_eq!(Scalar(16) >> Scalar(2), Scalar(4));
+/// }
+/// ```
+///
+/// An implementation of `Shr` that spins a vector rightward by a given amount.
+///
+/// ```
+/// use std::ops::Shr;
+///
+/// #[derive(PartialEq, Debug)]
+/// struct SpinVector<T: Clone> {
+///     vec: Vec<T>,
+/// }
+///
+/// impl<T: Clone> Shr<usize> for SpinVector<T> {
+///     type Output = Self;
+///
+///     fn shr(self, rhs: usize) -> SpinVector<T> {
+///         // rotate the vector by `rhs` places
+///         let (a, b) = self.vec.split_at(self.vec.len() - rhs);
+///         let mut spun_vector: Vec<T> = vec![];
+///         spun_vector.extend_from_slice(b);
+///         spun_vector.extend_from_slice(a);
+///         SpinVector { vec: spun_vector }
 ///     }
 /// }
 ///
 /// fn main() {
-///     Foo >> Foo;
+///     assert_eq!(SpinVector { vec: vec![0, 1, 2, 3, 4] } >> 2,
+///                SpinVector { vec: vec![3, 4, 0, 1, 2] });
 /// }
 /// ```
 #[lang = "shr"]
 #[stable(feature = "rust1", since = "1.0.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} >> {RHS}`"]
 pub trait Shr<RHS> {
     /// The resulting type after applying the `>>` operator
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -878,48 +1280,62 @@ macro_rules! shr_impl_all {
         shr_impl! { $t, u16 }
         shr_impl! { $t, u32 }
         shr_impl! { $t, u64 }
+        shr_impl! { $t, u128 }
         shr_impl! { $t, usize }
 
         shr_impl! { $t, i8 }
         shr_impl! { $t, i16 }
         shr_impl! { $t, i32 }
         shr_impl! { $t, i64 }
+        shr_impl! { $t, i128 }
         shr_impl! { $t, isize }
     )*)
 }
 
-shr_impl_all! { u8 u16 u32 u64 usize i8 i16 i32 i64 isize }
+shr_impl_all! { u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize }
 
-/// The `AddAssign` trait is used to specify the functionality of `+=`.
+/// The addition assignment operator `+=`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `AddAssign`. When `Foo += Foo` happens, it ends up
-/// calling `add_assign`, and therefore, `main` prints `Adding!`.
+/// This example creates a `Point` struct that implements the `AddAssign`
+/// trait, and then demonstrates add-assigning to a mutable `Point`.
 ///
 /// ```
 /// use std::ops::AddAssign;
 ///
-/// struct Foo;
+/// #[derive(Debug)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
 ///
-/// impl AddAssign for Foo {
-///     fn add_assign(&mut self, _rhs: Foo) {
-///         println!("Adding!");
+/// impl AddAssign for Point {
+///     fn add_assign(&mut self, other: Point) {
+///         *self = Point {
+///             x: self.x + other.x,
+///             y: self.y + other.y,
+///         };
 ///     }
 /// }
 ///
-/// # #[allow(unused_assignments)]
-/// fn main() {
-///     let mut foo = Foo;
-///     foo += Foo;
+/// impl PartialEq for Point {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.x == other.x && self.y == other.y
+///     }
 /// }
+///
+/// let mut point = Point { x: 1, y: 0 };
+/// point += Point { x: 2, y: 3 };
+/// assert_eq!(point, Point { x: 3, y: 3 });
 /// ```
 #[lang = "add_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} += {Rhs}`"]
 pub trait AddAssign<Rhs=Self> {
     /// The method for the `+=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn add_assign(&mut self, Rhs);
+    fn add_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! add_assign_impl {
@@ -933,38 +1349,50 @@ macro_rules! add_assign_impl {
     )+)
 }
 
-add_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+add_assign_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `SubAssign` trait is used to specify the functionality of `-=`.
+/// The subtraction assignment operator `-=`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `SubAssign`. When `Foo -= Foo` happens, it ends up
-/// calling `sub_assign`, and therefore, `main` prints `Subtracting!`.
+/// This example creates a `Point` struct that implements the `SubAssign`
+/// trait, and then demonstrates sub-assigning to a mutable `Point`.
 ///
 /// ```
 /// use std::ops::SubAssign;
 ///
-/// struct Foo;
+/// #[derive(Debug)]
+/// struct Point {
+///     x: i32,
+///     y: i32,
+/// }
 ///
-/// impl SubAssign for Foo {
-///     fn sub_assign(&mut self, _rhs: Foo) {
-///         println!("Subtracting!");
+/// impl SubAssign for Point {
+///     fn sub_assign(&mut self, other: Point) {
+///         *self = Point {
+///             x: self.x - other.x,
+///             y: self.y - other.y,
+///         };
 ///     }
 /// }
 ///
-/// # #[allow(unused_assignments)]
-/// fn main() {
-///     let mut foo = Foo;
-///     foo -= Foo;
+/// impl PartialEq for Point {
+///     fn eq(&self, other: &Self) -> bool {
+///         self.x == other.x && self.y == other.y
+///     }
 /// }
+///
+/// let mut point = Point { x: 3, y: 3 };
+/// point -= Point { x: 2, y: 3 };
+/// assert_eq!(point, Point {x: 1, y: 0});
 /// ```
 #[lang = "sub_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} -= {Rhs}`"]
 pub trait SubAssign<Rhs=Self> {
     /// The method for the `-=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn sub_assign(&mut self, Rhs);
+    fn sub_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! sub_assign_impl {
@@ -978,9 +1406,9 @@ macro_rules! sub_assign_impl {
     )+)
 }
 
-sub_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+sub_assign_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `MulAssign` trait is used to specify the functionality of `*=`.
+/// The multiplication assignment operator `*=`.
 ///
 /// # Examples
 ///
@@ -1006,10 +1434,11 @@ sub_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
 /// ```
 #[lang = "mul_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} *= {Rhs}`"]
 pub trait MulAssign<Rhs=Self> {
     /// The method for the `*=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn mul_assign(&mut self, Rhs);
+    fn mul_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! mul_assign_impl {
@@ -1023,9 +1452,9 @@ macro_rules! mul_assign_impl {
     )+)
 }
 
-mul_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+mul_assign_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `DivAssign` trait is used to specify the functionality of `/=`.
+/// The division assignment operator `/=`.
 ///
 /// # Examples
 ///
@@ -1051,10 +1480,11 @@ mul_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
 /// ```
 #[lang = "div_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} /= {Rhs}`"]
 pub trait DivAssign<Rhs=Self> {
     /// The method for the `/=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn div_assign(&mut self, Rhs);
+    fn div_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! div_assign_impl {
@@ -1067,9 +1497,9 @@ macro_rules! div_assign_impl {
     )+)
 }
 
-div_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+div_assign_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `RemAssign` trait is used to specify the functionality of `%=`.
+/// The remainder assignment operator `%=`.
 ///
 /// # Examples
 ///
@@ -1095,10 +1525,11 @@ div_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
 /// ```
 #[lang = "rem_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} %= {Rhs}`"]
 pub trait RemAssign<Rhs=Self> {
     /// The method for the `%=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn rem_assign(&mut self, Rhs);
+    fn rem_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! rem_assign_impl {
@@ -1111,38 +1542,81 @@ macro_rules! rem_assign_impl {
     )+)
 }
 
-rem_assign_impl! { usize u8 u16 u32 u64 isize i8 i16 i32 i64 f32 f64 }
+rem_assign_impl! { usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 f32 f64 }
 
-/// The `BitAndAssign` trait is used to specify the functionality of `&=`.
+/// The bitwise AND assignment operator `&=`.
 ///
 /// # Examples
 ///
-/// A trivial implementation of `BitAndAssign`. When `Foo &= Foo` happens, it ends up
-/// calling `bitand_assign`, and therefore, `main` prints `Bitwise And-ing!`.
+/// In this example, the `&=` operator is lifted to a trivial `Scalar` type.
 ///
 /// ```
 /// use std::ops::BitAndAssign;
 ///
-/// struct Foo;
+/// #[derive(Debug, PartialEq)]
+/// struct Scalar(bool);
 ///
-/// impl BitAndAssign for Foo {
-///     fn bitand_assign(&mut self, _rhs: Foo) {
-///         println!("Bitwise And-ing!");
+/// impl BitAndAssign for Scalar {
+///     // rhs is the "right-hand side" of the expression `a &= b`
+///     fn bitand_assign(&mut self, rhs: Self) {
+///         *self = Scalar(self.0 & rhs.0)
 ///     }
 /// }
 ///
-/// # #[allow(unused_assignments)]
 /// fn main() {
-///     let mut foo = Foo;
-///     foo &= Foo;
+///     let mut scalar = Scalar(true);
+///     scalar &= Scalar(true);
+///     assert_eq!(scalar, Scalar(true));
+///
+///     let mut scalar = Scalar(true);
+///     scalar &= Scalar(false);
+///     assert_eq!(scalar, Scalar(false));
+///
+///     let mut scalar = Scalar(false);
+///     scalar &= Scalar(true);
+///     assert_eq!(scalar, Scalar(false));
+///
+///     let mut scalar = Scalar(false);
+///     scalar &= Scalar(false);
+///     assert_eq!(scalar, Scalar(false));
+/// }
+/// ```
+///
+/// In this example, the `BitAndAssign` trait is implemented for a
+/// `BooleanVector` struct.
+///
+/// ```
+/// use std::ops::BitAndAssign;
+///
+/// #[derive(Debug, PartialEq)]
+/// struct BooleanVector(Vec<bool>);
+///
+/// impl BitAndAssign for BooleanVector {
+///     // rhs is the "right-hand side" of the expression `a &= b`
+///     fn bitand_assign(&mut self, rhs: Self) {
+///         assert_eq!(self.0.len(), rhs.0.len());
+///         *self = BooleanVector(self.0
+///                                   .iter()
+///                                   .zip(rhs.0.iter())
+///                                   .map(|(x, y)| *x && *y)
+///                                   .collect());
+///     }
+/// }
+///
+/// fn main() {
+///     let mut bv = BooleanVector(vec![true, true, false, false]);
+///     bv &= BooleanVector(vec![true, false, true, false]);
+///     let expected = BooleanVector(vec![true, false, false, false]);
+///     assert_eq!(bv, expected);
 /// }
 /// ```
 #[lang = "bitand_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} &= {Rhs}`"]
 pub trait BitAndAssign<Rhs=Self> {
-    /// The method for the `&` operator
+    /// The method for the `&=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn bitand_assign(&mut self, Rhs);
+    fn bitand_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! bitand_assign_impl {
@@ -1155,9 +1629,9 @@ macro_rules! bitand_assign_impl {
     )+)
 }
 
-bitand_assign_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+bitand_assign_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `BitOrAssign` trait is used to specify the functionality of `|=`.
+/// The bitwise OR assignment operator `|=`.
 ///
 /// # Examples
 ///
@@ -1183,10 +1657,11 @@ bitand_assign_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
 /// ```
 #[lang = "bitor_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} |= {Rhs}`"]
 pub trait BitOrAssign<Rhs=Self> {
     /// The method for the `|=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn bitor_assign(&mut self, Rhs);
+    fn bitor_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! bitor_assign_impl {
@@ -1199,9 +1674,9 @@ macro_rules! bitor_assign_impl {
     )+)
 }
 
-bitor_assign_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+bitor_assign_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `BitXorAssign` trait is used to specify the functionality of `^=`.
+/// The bitwise XOR assignment operator `^=`.
 ///
 /// # Examples
 ///
@@ -1227,10 +1702,11 @@ bitor_assign_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
 /// ```
 #[lang = "bitxor_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} ^= {Rhs}`"]
 pub trait BitXorAssign<Rhs=Self> {
     /// The method for the `^=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn bitxor_assign(&mut self, Rhs);
+    fn bitxor_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! bitxor_assign_impl {
@@ -1243,9 +1719,9 @@ macro_rules! bitxor_assign_impl {
     )+)
 }
 
-bitxor_assign_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
+bitxor_assign_impl! { bool usize u8 u16 u32 u64 u128 isize i8 i16 i32 i64 i128 }
 
-/// The `ShlAssign` trait is used to specify the functionality of `<<=`.
+/// The left shift assignment operator `<<=`.
 ///
 /// # Examples
 ///
@@ -1271,10 +1747,11 @@ bitxor_assign_impl! { bool usize u8 u16 u32 u64 isize i8 i16 i32 i64 }
 /// ```
 #[lang = "shl_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} <<= {Rhs}`"]
 pub trait ShlAssign<Rhs> {
     /// The method for the `<<=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn shl_assign(&mut self, Rhs);
+    fn shl_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! shl_assign_impl {
@@ -1296,19 +1773,21 @@ macro_rules! shl_assign_impl_all {
         shl_assign_impl! { $t, u16 }
         shl_assign_impl! { $t, u32 }
         shl_assign_impl! { $t, u64 }
+        shl_assign_impl! { $t, u128 }
         shl_assign_impl! { $t, usize }
 
         shl_assign_impl! { $t, i8 }
         shl_assign_impl! { $t, i16 }
         shl_assign_impl! { $t, i32 }
         shl_assign_impl! { $t, i64 }
+        shl_assign_impl! { $t, i128 }
         shl_assign_impl! { $t, isize }
     )*)
 }
 
-shl_assign_impl_all! { u8 u16 u32 u64 usize i8 i16 i32 i64 isize }
+shl_assign_impl_all! { u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize }
 
-/// The `ShrAssign` trait is used to specify the functionality of `>>=`.
+/// The right shift assignment operator `>>=`.
 ///
 /// # Examples
 ///
@@ -1334,10 +1813,11 @@ shl_assign_impl_all! { u8 u16 u32 u64 usize i8 i16 i32 i64 isize }
 /// ```
 #[lang = "shr_assign"]
 #[stable(feature = "op_assign_traits", since = "1.8.0")]
+#[rustc_on_unimplemented = "no implementation for `{Self} >>= {Rhs}`"]
 pub trait ShrAssign<Rhs=Self> {
     /// The method for the `>>=` operator
     #[stable(feature = "op_assign_traits", since = "1.8.0")]
-    fn shr_assign(&mut self, Rhs);
+    fn shr_assign(&mut self, rhs: Rhs);
 }
 
 macro_rules! shr_assign_impl {
@@ -1359,45 +1839,71 @@ macro_rules! shr_assign_impl_all {
         shr_assign_impl! { $t, u16 }
         shr_assign_impl! { $t, u32 }
         shr_assign_impl! { $t, u64 }
+        shr_assign_impl! { $t, u128 }
         shr_assign_impl! { $t, usize }
 
         shr_assign_impl! { $t, i8 }
         shr_assign_impl! { $t, i16 }
         shr_assign_impl! { $t, i32 }
         shr_assign_impl! { $t, i64 }
+        shr_assign_impl! { $t, i128 }
         shr_assign_impl! { $t, isize }
     )*)
 }
 
-shr_assign_impl_all! { u8 u16 u32 u64 usize i8 i16 i32 i64 isize }
+shr_assign_impl_all! { u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize }
 
 /// The `Index` trait is used to specify the functionality of indexing operations
-/// like `arr[idx]` when used in an immutable context.
+/// like `container[index]` when used in an immutable context.
+///
+/// `container[index]` is actually syntactic sugar for `*container.index(index)`,
+/// but only when used as an immutable value. If a mutable value is requested,
+/// [`IndexMut`] is used instead. This allows nice things such as
+/// `let value = v[index]` if `value` implements [`Copy`].
+///
+/// [`IndexMut`]: ../../std/ops/trait.IndexMut.html
+/// [`Copy`]: ../../std/marker/trait.Copy.html
 ///
 /// # Examples
 ///
-/// A trivial implementation of `Index`. When `Foo[Bar]` happens, it ends up
-/// calling `index`, and therefore, `main` prints `Indexing!`.
+/// The following example implements `Index` on a read-only `NucleotideCount`
+/// container, enabling individual counts to be retrieved with index syntax.
 ///
 /// ```
 /// use std::ops::Index;
 ///
-/// #[derive(Copy, Clone)]
-/// struct Foo;
-/// struct Bar;
+/// enum Nucleotide {
+///     A,
+///     C,
+///     G,
+///     T,
+/// }
 ///
-/// impl Index<Bar> for Foo {
-///     type Output = Foo;
+/// struct NucleotideCount {
+///     a: usize,
+///     c: usize,
+///     g: usize,
+///     t: usize,
+/// }
 ///
-///     fn index<'a>(&'a self, _index: Bar) -> &'a Foo {
-///         println!("Indexing!");
-///         self
+/// impl Index<Nucleotide> for NucleotideCount {
+///     type Output = usize;
+///
+///     fn index(&self, nucleotide: Nucleotide) -> &usize {
+///         match nucleotide {
+///             Nucleotide::A => &self.a,
+///             Nucleotide::C => &self.c,
+///             Nucleotide::G => &self.g,
+///             Nucleotide::T => &self.t,
+///         }
 ///     }
 /// }
 ///
-/// fn main() {
-///     Foo[Bar];
-/// }
+/// let nucleotide_count = NucleotideCount {a: 14, c: 9, g: 10, t: 12};
+/// assert_eq!(nucleotide_count[Nucleotide::A], 14);
+/// assert_eq!(nucleotide_count[Nucleotide::C], 9);
+/// assert_eq!(nucleotide_count[Nucleotide::G], 10);
+/// assert_eq!(nucleotide_count[Nucleotide::T], 12);
 /// ```
 #[lang = "index"]
 #[rustc_on_unimplemented = "the type `{Self}` cannot be indexed by `{Idx}`"]
@@ -1407,50 +1913,91 @@ pub trait Index<Idx: ?Sized> {
     #[stable(feature = "rust1", since = "1.0.0")]
     type Output: ?Sized;
 
-    /// The method for the indexing (`Foo[Bar]`) operation
+    /// The method for the indexing (`container[index]`) operation
     #[stable(feature = "rust1", since = "1.0.0")]
     fn index(&self, index: Idx) -> &Self::Output;
 }
 
 /// The `IndexMut` trait is used to specify the functionality of indexing
-/// operations like `arr[idx]`, when used in a mutable context.
+/// operations like `container[index]` when used in a mutable context.
+///
+/// `container[index]` is actually syntactic sugar for
+/// `*container.index_mut(index)`, but only when used as a mutable value. If
+/// an immutable value is requested, the [`Index`] trait is used instead. This
+/// allows nice things such as `v[index] = value` if `value` implements [`Copy`].
+///
+/// [`Index`]: ../../std/ops/trait.Index.html
+/// [`Copy`]: ../../std/marker/trait.Copy.html
 ///
 /// # Examples
 ///
-/// A trivial implementation of `IndexMut`. When `Foo[Bar]` happens, it ends up
-/// calling `index_mut`, and therefore, `main` prints `Indexing!`.
+/// A very simple implementation of a `Balance` struct that has two sides, where
+/// each can be indexed mutably and immutably.
 ///
 /// ```
-/// use std::ops::{Index, IndexMut};
+/// use std::ops::{Index,IndexMut};
 ///
-/// #[derive(Copy, Clone)]
-/// struct Foo;
-/// struct Bar;
+/// #[derive(Debug)]
+/// enum Side {
+///     Left,
+///     Right,
+/// }
 ///
-/// impl Index<Bar> for Foo {
-///     type Output = Foo;
+/// #[derive(Debug, PartialEq)]
+/// enum Weight {
+///     Kilogram(f32),
+///     Pound(f32),
+/// }
 ///
-///     fn index<'a>(&'a self, _index: Bar) -> &'a Foo {
-///         self
+/// struct Balance {
+///     pub left: Weight,
+///     pub right:Weight,
+/// }
+///
+/// impl Index<Side> for Balance {
+///     type Output = Weight;
+///
+///     fn index<'a>(&'a self, index: Side) -> &'a Weight {
+///         println!("Accessing {:?}-side of balance immutably", index);
+///         match index {
+///             Side::Left => &self.left,
+///             Side::Right => &self.right,
+///         }
 ///     }
 /// }
 ///
-/// impl IndexMut<Bar> for Foo {
-///     fn index_mut<'a>(&'a mut self, _index: Bar) -> &'a mut Foo {
-///         println!("Indexing!");
-///         self
+/// impl IndexMut<Side> for Balance {
+///     fn index_mut<'a>(&'a mut self, index: Side) -> &'a mut Weight {
+///         println!("Accessing {:?}-side of balance mutably", index);
+///         match index {
+///             Side::Left => &mut self.left,
+///             Side::Right => &mut self.right,
+///         }
 ///     }
 /// }
 ///
 /// fn main() {
-///     &mut Foo[Bar];
+///     let mut balance = Balance {
+///         right: Weight::Kilogram(2.5),
+///         left: Weight::Pound(1.5),
+///     };
+///
+///     // In this case balance[Side::Right] is sugar for
+///     // *balance.index(Side::Right), since we are only reading
+///     // balance[Side::Right], not writing it.
+///     assert_eq!(balance[Side::Right],Weight::Kilogram(2.5));
+///
+///     // However in this case balance[Side::Left] is sugar for
+///     // *balance.index_mut(Side::Left), since we are writing
+///     // balance[Side::Left].
+///     balance[Side::Left] = Weight::Kilogram(3.0);
 /// }
 /// ```
 #[lang = "index_mut"]
 #[rustc_on_unimplemented = "the type `{Self}` cannot be mutably indexed by `{Idx}`"]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub trait IndexMut<Idx: ?Sized>: Index<Idx> {
-    /// The method for the indexing (`Foo[Bar]`) operation
+    /// The method for the mutable indexing (`container[index]`) operation
     #[stable(feature = "rust1", since = "1.0.0")]
     fn index_mut(&mut self, index: Idx) -> &mut Self::Output;
 }
@@ -1462,16 +2009,29 @@ pub trait IndexMut<Idx: ?Sized>: Index<Idx> {
 ///
 /// # Examples
 ///
-/// ```
-/// fn main() {
-///     assert_eq!((..), std::ops::RangeFull);
+/// The `..` syntax is a `RangeFull`:
 ///
-///     let arr = [0, 1, 2, 3];
-///     assert_eq!(arr[ .. ], [0,1,2,3]);  // RangeFull
-///     assert_eq!(arr[ ..3], [0,1,2  ]);
-///     assert_eq!(arr[1.. ], [  1,2,3]);
-///     assert_eq!(arr[1..3], [  1,2  ]);
+/// ```
+/// assert_eq!((..), std::ops::RangeFull);
+/// ```
+///
+/// It does not have an `IntoIterator` implementation, so you can't use it in a
+/// `for` loop directly. This won't compile:
+///
+/// ```ignore
+/// for i in .. {
+///    // ...
 /// }
+/// ```
+///
+/// Used as a slicing index, `RangeFull` produces the full array as a slice.
+///
+/// ```
+/// let arr = [0, 1, 2, 3];
+/// assert_eq!(arr[ .. ], [0,1,2,3]);  // RangeFull
+/// assert_eq!(arr[ ..3], [0,1,2  ]);
+/// assert_eq!(arr[1.. ], [  1,2,3]);
+/// assert_eq!(arr[1..3], [  1,2  ]);
 /// ```
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1487,7 +2047,7 @@ impl fmt::Debug for RangeFull {
 /// A (half-open) range which is bounded at both ends: { x | start <= x < end }.
 /// Use `start..end` (two dots) for its shorthand.
 ///
-/// See the [`contains()`](#method.contains) method for its characterization.
+/// See the [`contains`](#method.contains) method for its characterization.
 ///
 /// # Examples
 ///
@@ -1545,7 +2105,7 @@ impl<Idx: PartialOrd<Idx>> Range<Idx> {
 /// A range which is only bounded below: { x | start <= x }.
 /// Use `start..` for its shorthand.
 ///
-/// See the [`contains()`](#method.contains) method for its characterization.
+/// See the [`contains`](#method.contains) method for its characterization.
 ///
 /// Note: Currently, no overflow checking is done for the iterator
 /// implementation; if you use an integer range and the integer overflows, it
@@ -1601,20 +2161,36 @@ impl<Idx: PartialOrd<Idx>> RangeFrom<Idx> {
 /// A range which is only bounded above: { x | x < end }.
 /// Use `..end` (two dots) for its shorthand.
 ///
-/// See the [`contains()`](#method.contains) method for its characterization.
+/// See the [`contains`](#method.contains) method for its characterization.
 ///
 /// It cannot serve as an iterator because it doesn't have a starting point.
 ///
-/// ```
-/// fn main() {
-///     assert_eq!((..5), std::ops::RangeTo{ end: 5 });
+/// # Examples
 ///
-///     let arr = [0, 1, 2, 3];
-///     assert_eq!(arr[ .. ], [0,1,2,3]);
-///     assert_eq!(arr[ ..3], [0,1,2  ]);  // RangeTo
-///     assert_eq!(arr[1.. ], [  1,2,3]);
-///     assert_eq!(arr[1..3], [  1,2  ]);
+/// The `..{integer}` syntax is a `RangeTo`:
+///
+/// ```
+/// assert_eq!((..5), std::ops::RangeTo{ end: 5 });
+/// ```
+///
+/// It does not have an `IntoIterator` implementation, so you can't use it in a
+/// `for` loop directly. This won't compile:
+///
+/// ```ignore
+/// for i in ..5 {
+///     // ...
 /// }
+/// ```
+///
+/// When used as a slicing index, `RangeTo` produces a slice of all array
+/// elements before the index indicated by `end`.
+///
+/// ```
+/// let arr = [0, 1, 2, 3];
+/// assert_eq!(arr[ .. ], [0,1,2,3]);
+/// assert_eq!(arr[ ..3], [0,1,2  ]);  // RangeTo
+/// assert_eq!(arr[1.. ], [  1,2,3]);
+/// assert_eq!(arr[1..3], [  1,2  ]);
 /// ```
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -1651,7 +2227,7 @@ impl<Idx: PartialOrd<Idx>> RangeTo<Idx> {
 /// An inclusive range which is bounded at both ends: { x | start <= x <= end }.
 /// Use `start...end` (three dots) for its shorthand.
 ///
-/// See the [`contains()`](#method.contains) method for its characterization.
+/// See the [`contains`](#method.contains) method for its characterization.
 ///
 /// # Examples
 ///
@@ -1737,21 +2313,36 @@ impl<Idx: PartialOrd<Idx>> RangeInclusive<Idx> {
 /// An inclusive range which is only bounded above: { x | x <= end }.
 /// Use `...end` (three dots) for its shorthand.
 ///
-/// See the [`contains()`](#method.contains) method for its characterization.
+/// See the [`contains`](#method.contains) method for its characterization.
 ///
 /// It cannot serve as an iterator because it doesn't have a starting point.
 ///
 /// # Examples
 ///
+/// The `...{integer}` syntax is a `RangeToInclusive`:
+///
 /// ```
 /// #![feature(inclusive_range,inclusive_range_syntax)]
-/// fn main() {
-///     assert_eq!((...5), std::ops::RangeToInclusive{ end: 5 });
+/// assert_eq!((...5), std::ops::RangeToInclusive{ end: 5 });
+/// ```
 ///
-///     let arr = [0, 1, 2, 3];
-///     assert_eq!(arr[ ...2], [0,1,2  ]);  // RangeToInclusive
-///     assert_eq!(arr[1...2], [  1,2  ]);
+/// It does not have an `IntoIterator` implementation, so you can't use it in a
+/// `for` loop directly. This won't compile:
+///
+/// ```ignore
+/// for i in ...5 {
+///     // ...
 /// }
+/// ```
+///
+/// When used as a slicing index, `RangeToInclusive` produces a slice of all
+/// array elements up to and including the index indicated by `end`.
+///
+/// ```
+/// #![feature(inclusive_range_syntax)]
+/// let arr = [0, 1, 2, 3];
+/// assert_eq!(arr[ ...2], [0,1,2  ]);  // RangeToInclusive
+/// assert_eq!(arr[1...2], [  1,2  ]);
 /// ```
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 #[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
@@ -1870,13 +2461,13 @@ impl<'a, T: ?Sized> Deref for &'a mut T {
 /// impl<T> Deref for DerefMutExample<T> {
 ///     type Target = T;
 ///
-///     fn deref<'a>(&'a self) -> &'a T {
+///     fn deref(&self) -> &T {
 ///         &self.value
 ///     }
 /// }
 ///
 /// impl<T> DerefMut for DerefMutExample<T> {
-///     fn deref_mut<'a>(&'a mut self) -> &'a mut T {
+///     fn deref_mut(&mut self) -> &mut T {
 ///         &mut self.value
 ///     }
 /// }
@@ -1901,6 +2492,35 @@ impl<'a, T: ?Sized> DerefMut for &'a mut T {
 }
 
 /// A version of the call operator that takes an immutable receiver.
+///
+/// # Examples
+///
+/// Closures automatically implement this trait, which allows them to be
+/// invoked. Note, however, that `Fn` takes an immutable reference to any
+/// captured variables. To take a mutable capture, implement [`FnMut`], and to
+/// consume the capture, implement [`FnOnce`].
+///
+/// [`FnMut`]: trait.FnMut.html
+/// [`FnOnce`]: trait.FnOnce.html
+///
+/// ```
+/// let square = |x| x * x;
+/// assert_eq!(square(5), 25);
+/// ```
+///
+/// Closures can also be passed to higher-level functions through a `Fn`
+/// parameter (or a `FnMut` or `FnOnce` parameter, which are supertraits of
+/// `Fn`).
+///
+/// ```
+/// fn call_with_one<F>(func: F) -> usize
+///     where F: Fn(usize) -> usize {
+///     func(1)
+/// }
+///
+/// let double = |x| x * 2;
+/// assert_eq!(call_with_one(double), 2);
+/// ```
 #[lang = "fn"]
 #[stable(feature = "rust1", since = "1.0.0")]
 #[rustc_paren_sugar]
@@ -1912,6 +2532,40 @@ pub trait Fn<Args> : FnMut<Args> {
 }
 
 /// A version of the call operator that takes a mutable receiver.
+///
+/// # Examples
+///
+/// Closures that mutably capture variables automatically implement this trait,
+/// which allows them to be invoked.
+///
+/// ```
+/// let mut x = 5;
+/// {
+///     let mut square_x = || x *= x;
+///     square_x();
+/// }
+/// assert_eq!(x, 25);
+/// ```
+///
+/// Closures can also be passed to higher-level functions through a `FnMut`
+/// parameter (or a `FnOnce` parameter, which is a supertrait of `FnMut`).
+///
+/// ```
+/// fn do_twice<F>(mut func: F)
+///     where F: FnMut()
+/// {
+///     func();
+///     func();
+/// }
+///
+/// let mut x: usize = 1;
+/// {
+///     let add_two_to_x = || x += 2;
+///     do_twice(add_two_to_x);
+/// }
+///
+/// assert_eq!(x, 5);
+/// ```
 #[lang = "fn_mut"]
 #[stable(feature = "rust1", since = "1.0.0")]
 #[rustc_paren_sugar]
@@ -1923,6 +2577,41 @@ pub trait FnMut<Args> : FnOnce<Args> {
 }
 
 /// A version of the call operator that takes a by-value receiver.
+///
+/// # Examples
+///
+/// By-value closures automatically implement this trait, which allows them to
+/// be invoked.
+///
+/// ```
+/// let x = 5;
+/// let square_x = move || x * x;
+/// assert_eq!(square_x(), 25);
+/// ```
+///
+/// By-value Closures can also be passed to higher-level functions through a
+/// `FnOnce` parameter.
+///
+/// ```
+/// fn consume_with_relish<F>(func: F)
+///     where F: FnOnce() -> String
+/// {
+///     // `func` consumes its captured variables, so it cannot be run more
+///     // than once
+///     println!("Consumed: {}", func());
+///
+///     println!("Delicious!");
+///
+///     // Attempting to invoke `func()` again will throw a `use of moved
+///     // value` error for `func`
+/// }
+///
+/// let x = String::from("x");
+/// let consume_and_return_x = move || x;
+/// consume_with_relish(consume_and_return_x);
+///
+/// // `consume_and_return_x` can no longer be invoked at this point
+/// ```
 #[lang = "fn_once"]
 #[stable(feature = "rust1", since = "1.0.0")]
 #[rustc_paren_sugar]
@@ -1938,9 +2627,6 @@ pub trait FnOnce<Args> {
 }
 
 mod impls {
-    use marker::Sized;
-    use super::{Fn, FnMut, FnOnce};
-
     #[stable(feature = "rust1", since = "1.0.0")]
     impl<'a,A,F:?Sized> Fn<A> for &'a F
         where F : Fn<A>
@@ -1992,6 +2678,35 @@ mod impls {
 
 /// Trait that indicates that this is a pointer or a wrapper for one,
 /// where unsizing can be performed on the pointee.
+///
+/// See the [DST coercion RfC][dst-coerce] and [the nomicon entry on coercion][nomicon-coerce]
+/// for more details.
+///
+/// For builtin pointer types, pointers to `T` will coerce to pointers to `U` if `T: Unsize<U>`
+/// by converting from a thin pointer to a fat pointer.
+///
+/// For custom types, the coercion here works by coercing `Foo<T>` to `Foo<U>`
+/// provided an impl of `CoerceUnsized<Foo<U>> for Foo<T>` exists.
+/// Such an impl can only be written if `Foo<T>` has only a single non-phantomdata
+/// field involving `T`. If the type of that field is `Bar<T>`, an implementation
+/// of `CoerceUnsized<Bar<U>> for Bar<T>` must exist. The coercion will work by
+/// by coercing the `Bar<T>` field into `Bar<U>` and filling in the rest of the fields
+/// from `Foo<T>` to create a `Foo<U>`. This will effectively drill down to a pointer
+/// field and coerce that.
+///
+/// Generally, for smart pointers you will implement
+/// `CoerceUnsized<Ptr<U>> for Ptr<T> where T: Unsize<U>, U: ?Sized`, with an
+/// optional `?Sized` bound on `T` itself. For wrapper types that directly embed `T`
+/// like `Cell<T>` and `RefCell<T>`, you
+/// can directly implement `CoerceUnsized<Wrap<U>> for Wrap<T> where T: CoerceUnsized<U>`.
+/// This will let coercions of types like `Cell<Box<T>>` work.
+///
+/// [`Unsize`][unsize] is used to mark types which can be coerced to DSTs if behind
+/// pointers. It is implemented automatically by the compiler.
+///
+/// [dst-coerce]: https://github.com/rust-lang/rfcs/blob/master/text/0982-dst-coercion.md
+/// [unsize]: ../marker/trait.Unsize.html
+/// [nomicon-coerce]: ../../nomicon/coercions.html
 #[unstable(feature = "coerce_unsized", issue = "27732")]
 #[lang="coerce_unsized"]
 pub trait CoerceUnsized<T> {
@@ -2029,7 +2744,7 @@ impl<T: ?Sized+Unsize<U>, U: ?Sized> CoerceUnsized<*const U> for *mut T {}
 #[unstable(feature = "coerce_unsized", issue = "27732")]
 impl<T: ?Sized+Unsize<U>, U: ?Sized> CoerceUnsized<*const U> for *const T {}
 
-/// Both `in (PLACE) EXPR` and `box EXPR` desugar into expressions
+/// Both `PLACE <- EXPR` and `box EXPR` desugar into expressions
 /// that allocate an intermediate "place" that holds uninitialized
 /// state.  The desugaring evaluates EXPR, and writes the result at
 /// the address returned by the `pointer` method of this trait.
@@ -2044,7 +2759,7 @@ impl<T: ?Sized+Unsize<U>, U: ?Sized> CoerceUnsized<*const U> for *const T {}
 /// converting the agent to an instance of the owning pointer, via the
 /// appropriate `finalize` method (see the `InPlace`.
 ///
-/// If evaluating EXPR fails, then the destructor for the
+/// If evaluating EXPR fails, then it is up to the destructor for the
 /// implementation of Place to clean up any intermediate state
 /// (e.g. deallocate box storage, pop a stack, etc).
 #[unstable(feature = "placement_new_protocol", issue = "27779")]
@@ -2055,9 +2770,9 @@ pub trait Place<Data: ?Sized> {
     fn pointer(&mut self) -> *mut Data;
 }
 
-/// Interface to implementations of  `in (PLACE) EXPR`.
+/// Interface to implementations of  `PLACE <- EXPR`.
 ///
-/// `in (PLACE) EXPR` effectively desugars into:
+/// `PLACE <- EXPR` effectively desugars into:
 ///
 /// ```rust,ignore
 /// let p = PLACE;
@@ -2070,7 +2785,7 @@ pub trait Place<Data: ?Sized> {
 /// }
 /// ```
 ///
-/// The type of `in (PLACE) EXPR` is derived from the type of `PLACE`;
+/// The type of `PLACE <- EXPR` is derived from the type of `PLACE`;
 /// if the type of `PLACE` is `P`, then the final type of the whole
 /// expression is `P::Place::Owner` (see the `InPlace` and `Boxed`
 /// traits).
@@ -2088,12 +2803,12 @@ pub trait Placer<Data: ?Sized> {
     fn make_place(self) -> Self::Place;
 }
 
-/// Specialization of `Place` trait supporting `in (PLACE) EXPR`.
+/// Specialization of `Place` trait supporting `PLACE <- EXPR`.
 #[unstable(feature = "placement_new_protocol", issue = "27779")]
 pub trait InPlace<Data: ?Sized>: Place<Data> {
-    /// `Owner` is the type of the end value of `in (PLACE) EXPR`
+    /// `Owner` is the type of the end value of `PLACE <- EXPR`
     ///
-    /// Note that when `in (PLACE) EXPR` is solely used for
+    /// Note that when `PLACE <- EXPR` is solely used for
     /// side-effecting an existing data-structure,
     /// e.g. `Vec::emplace_back`, then `Owner` need not carry any
     /// information at all (e.g. it can be the unit type `()` in that
@@ -2144,4 +2859,75 @@ pub trait Boxed {
 pub trait BoxPlace<Data: ?Sized> : Place<Data> {
     /// Creates a globally fresh place.
     fn make_place() -> Self;
+}
+
+/// A trait for types which have success and error states and are meant to work
+/// with the question mark operator.
+/// When the `?` operator is used with a value, whether the value is in the
+/// success or error state is determined by calling `translate`.
+///
+/// This trait is **very** experimental, it will probably be iterated on heavily
+/// before it is stabilised. Implementors should expect change. Users of `?`
+/// should not rely on any implementations of `Carrier` other than `Result`,
+/// i.e., you should not expect `?` to continue to work with `Option`, etc.
+#[unstable(feature = "question_mark_carrier", issue = "31436")]
+pub trait Carrier {
+    /// The type of the value when computation succeeds.
+    type Success;
+    /// The type of the value when computation errors out.
+    type Error;
+
+    /// Create a `Carrier` from a success value.
+    fn from_success(Self::Success) -> Self;
+
+    /// Create a `Carrier` from an error value.
+    fn from_error(Self::Error) -> Self;
+
+    /// Translate this `Carrier` to another implementation of `Carrier` with the
+    /// same associated types.
+    fn translate<T>(self) -> T where T: Carrier<Success=Self::Success, Error=Self::Error>;
+}
+
+#[unstable(feature = "question_mark_carrier", issue = "31436")]
+impl<U, V> Carrier for Result<U, V> {
+    type Success = U;
+    type Error = V;
+
+    fn from_success(u: U) -> Result<U, V> {
+        Ok(u)
+    }
+
+    fn from_error(e: V) -> Result<U, V> {
+        Err(e)
+    }
+
+    fn translate<T>(self) -> T
+        where T: Carrier<Success=U, Error=V>
+    {
+        match self {
+            Ok(u) => T::from_success(u),
+            Err(e) => T::from_error(e),
+        }
+    }
+}
+
+struct _DummyErrorType;
+
+impl Carrier for _DummyErrorType {
+    type Success = ();
+    type Error = ();
+
+    fn from_success(_: ()) -> _DummyErrorType {
+        _DummyErrorType
+    }
+
+    fn from_error(_: ()) -> _DummyErrorType {
+        _DummyErrorType
+    }
+
+    fn translate<T>(self) -> T
+        where T: Carrier<Success=(), Error=()>
+    {
+        T::from_success(())
+    }
 }

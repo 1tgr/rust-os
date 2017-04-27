@@ -3,7 +3,7 @@ RUSTFLAGS += -L $(ROOT)/liballoc_system
 RUSTFLAGS += -L $(ROOT)/libcollections
 RUSTFLAGS += -L $(ROOT)/libcore
 RUSTFLAGS += -L $(ROOT)/liblibc
-RUSTFLAGS += -L $(ROOT)/librustc_unicode
+RUSTFLAGS += -L $(ROOT)/libstd_unicode
 RUSTFLAGS += -L $(ROOT)/libsyscall
 RUSTFLAGS += -L $(ROOT)/modules
 

@@ -1,7 +1,7 @@
 include_rules
 
 RUSTFLAGS += -L ../liballoc
-RUSTFLAGS += -L ../librustc_unicode
+RUSTFLAGS += -L ../libstd_unicode
 
 RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
 RUSTFLAGS += --extern core=../libcore/libcore.rlib

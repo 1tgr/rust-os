@@ -61,12 +61,12 @@ use core::borrow;
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{self, Hash};
+use core::iter::FusedIterator;
 use core::marker::{self, Unsize};
 use core::mem;
 use core::ops::{CoerceUnsized, Deref, DerefMut};
 use core::ops::{BoxPlace, Boxed, InPlace, Place, Placer};
 use core::ptr::{self, Unique};
-use core::raw::TraitObject;
 use core::convert::From;
 
 /// A value that represents the heap. This is the default place that the `box`
@@ -103,6 +103,7 @@ pub struct ExchangeHeapSingleton {
 ///
 /// See the [module-level documentation](../../std/boxed/index.html) for more.
 #[lang = "owned_box"]
+#[fundamental]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct Box<T: ?Sized>(Unique<T>);
 
@@ -224,6 +225,8 @@ impl<T: ?Sized> Drop for IntermediateBox<T> {
 impl<T> Box<T> {
     /// Allocates memory on the heap and then places `x` into it.
     ///
+    /// This doesn't actually allocate if `T` is zero-sized.
+    ///
     /// # Examples
     ///
     /// ```
@@ -244,11 +247,13 @@ impl<T: ?Sized> Box<T> {
     /// the destructor of `T` and free the allocated memory. Since the
     /// way `Box` allocates and releases memory is unspecified, the
     /// only valid pointer to pass to this function is the one taken
-    /// from another `Box` via the `Box::into_raw` function.
+    /// from another `Box` via the [`Box::into_raw`] function.
     ///
     /// This function is unsafe because improper use may lead to
     /// memory problems. For example, a double-free may occur if the
     /// function is called twice on the same raw pointer.
+    ///
+    /// [`Box::into_raw`]: struct.Box.html#method.into_raw
     ///
     /// # Examples
     ///
@@ -269,7 +274,13 @@ impl<T: ?Sized> Box<T> {
     /// memory previously managed by the `Box`. In particular, the
     /// caller should properly destroy `T` and release the memory. The
     /// proper way to do so is to convert the raw pointer back into a
-    /// `Box` with the `Box::from_raw` function.
+    /// `Box` with the [`Box::from_raw`] function.
+    ///
+    /// Note: this is an associated function, which means that you have
+    /// to call it as `Box::into_raw(b)` instead of `b.into_raw()`. This
+    /// is so that there is no conflict with a method on the inner type.
+    ///
+    /// [`Box::from_raw`]: struct.Box.html#method.from_raw
     ///
     /// # Examples
     ///
@@ -285,7 +296,15 @@ impl<T: ?Sized> Box<T> {
 }
 
 #[stable(feature = "rust1", since = "1.0.0")]
+unsafe impl<#[may_dangle] T: ?Sized> Drop for Box<T> {
+    fn drop(&mut self) {
+        // FIXME: Do nothing, drop is currently performed by compiler.
+    }
+}
+
+#[stable(feature = "rust1", since = "1.0.0")]
 impl<T: Default> Default for Box<T> {
+    /// Creates a `Box<T>`, with the `Default` value for T.
     fn default() -> Box<T> {
         box Default::default()
     }
@@ -295,6 +314,14 @@ impl<T: Default> Default for Box<T> {
 impl<T> Default for Box<[T]> {
     fn default() -> Box<[T]> {
         Box::<[T; 0]>::new([])
+    }
+}
+
+#[stable(feature = "default_box_extra", since = "1.17.0")]
+impl Default for Box<str> {
+    fn default() -> Box<str> {
+        let default: Box<[u8]> = Default::default();
+        unsafe { mem::transmute(default) }
     }
 }
 
@@ -402,6 +429,23 @@ impl<T> From<T> for Box<T> {
     }
 }
 
+#[stable(feature = "box_from_slice", since = "1.17.0")]
+impl<'a, T: Copy> From<&'a [T]> for Box<[T]> {
+    fn from(slice: &'a [T]) -> Box<[T]> {
+        let mut boxed = unsafe { RawVec::with_capacity(slice.len()).into_box() };
+        boxed.copy_from_slice(slice);
+        boxed
+    }
+}
+
+#[stable(feature = "box_from_slice", since = "1.17.0")]
+impl<'a> From<&'a str> for Box<str> {
+    fn from(s: &'a str) -> Box<str> {
+        let boxed: Box<[u8]> = Box::from(s.as_bytes());
+        unsafe { mem::transmute(boxed) }
+    }
+}
+
 impl Box<Any> {
     #[inline]
     #[stable(feature = "rust1", since = "1.0.0")]
@@ -427,12 +471,8 @@ impl Box<Any> {
     pub fn downcast<T: Any>(self) -> Result<Box<T>, Box<Any>> {
         if self.is::<T>() {
             unsafe {
-                // Get the raw representation of the trait object
-                let raw = Box::into_raw(self);
-                let to: TraitObject = mem::transmute::<*mut Any, TraitObject>(raw);
-
-                // Extract the data pointer
-                Ok(Box::from_raw(to.data as *mut T))
+                let raw: *mut Any = Box::into_raw(self);
+                Ok(Box::from_raw(raw as *mut T))
             }
         } else {
             Err(self)
@@ -519,6 +559,9 @@ impl<I: Iterator + ?Sized> Iterator for Box<I> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         (**self).size_hint()
     }
+    fn nth(&mut self, n: usize) -> Option<I::Item> {
+        (**self).nth(n)
+    }
 }
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<I: DoubleEndedIterator + ?Sized> DoubleEndedIterator for Box<I> {
@@ -527,7 +570,17 @@ impl<I: DoubleEndedIterator + ?Sized> DoubleEndedIterator for Box<I> {
     }
 }
 #[stable(feature = "rust1", since = "1.0.0")]
-impl<I: ExactSizeIterator + ?Sized> ExactSizeIterator for Box<I> {}
+impl<I: ExactSizeIterator + ?Sized> ExactSizeIterator for Box<I> {
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+    fn is_empty(&self) -> bool {
+        (**self).is_empty()
+    }
+}
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<I: FusedIterator + ?Sized> FusedIterator for Box<I> {}
 
 
 /// `FnBox` is a version of the `FnOnce` intended for use with boxed
@@ -569,7 +622,7 @@ impl<I: ExactSizeIterator + ?Sized> ExactSizeIterator for Box<I> {}
 /// ```
 #[rustc_paren_sugar]
 #[unstable(feature = "fnbox",
-           reason = "will be deprecated if and when Box<FnOnce> becomes usable", issue = "28796")]
+           reason = "will be deprecated if and when `Box<FnOnce>` becomes usable", issue = "28796")]
 pub trait FnBox<A> {
     type Output;
 
@@ -577,7 +630,7 @@ pub trait FnBox<A> {
 }
 
 #[unstable(feature = "fnbox",
-           reason = "will be deprecated if and when Box<FnOnce> becomes usable", issue = "28796")]
+           reason = "will be deprecated if and when `Box<FnOnce>` becomes usable", issue = "28796")]
 impl<A, F> FnBox<A> for F
     where F: FnOnce<A>
 {
@@ -589,7 +642,7 @@ impl<A, F> FnBox<A> for F
 }
 
 #[unstable(feature = "fnbox",
-           reason = "will be deprecated if and when Box<FnOnce> becomes usable", issue = "28796")]
+           reason = "will be deprecated if and when `Box<FnOnce>` becomes usable", issue = "28796")]
 impl<'a, A, R> FnOnce<A> for Box<FnBox<A, Output = R> + 'a> {
     type Output = R;
 
@@ -599,7 +652,7 @@ impl<'a, A, R> FnOnce<A> for Box<FnBox<A, Output = R> + 'a> {
 }
 
 #[unstable(feature = "fnbox",
-           reason = "will be deprecated if and when Box<FnOnce> becomes usable", issue = "28796")]
+           reason = "will be deprecated if and when `Box<FnOnce>` becomes usable", issue = "28796")]
 impl<'a, A, R> FnOnce<A> for Box<FnBox<A, Output = R> + Send + 'a> {
     type Output = R;
 
