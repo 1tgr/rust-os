@@ -37,7 +37,7 @@ pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack_ptr: *mut u8) -> jmp_buf {
 
     let pp = Box::new(p);
     let rsp : *mut u8 = stack_ptr;
-    let rip : *const u8 = &thread_entry_asm;
+    let rip : *const u8 = unsafe { &thread_entry_asm };
     let rbx : *const u8 = &*pp as *const _ as *const _;
     mem::forget(pp);
 

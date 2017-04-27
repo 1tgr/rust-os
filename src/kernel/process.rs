@@ -199,7 +199,7 @@ impl Process {
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
         let two_meg = 2 * 1024 * 1024;
-        let kernel_end_ptr = Align::up(&kernel_end as *const u8, 4 * two_meg);
+        let kernel_end_ptr = Align::up(unsafe { &kernel_end } as *const u8, 4 * two_meg);
         let identity = unsafe { slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize) };
         kernel_virt.reserve(
             identity,

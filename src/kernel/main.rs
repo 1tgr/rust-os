@@ -19,7 +19,6 @@
 #![feature(heap_api)]
 #![feature(lang_items)]	//< unwind needs to define lang items
 #![feature(nonzero)]
-#![feature(unicode)]
 
 #![no_std]
 
