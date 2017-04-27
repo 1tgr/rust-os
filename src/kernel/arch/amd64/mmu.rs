@@ -196,7 +196,7 @@ pub struct AddressSpace {
 impl AddressSpace {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace> {
         let pml4_addr = try!(bitmap.alloc_page());
-        let kernel_base_ptr = &KERNEL_BASE as *const u8;
+        let kernel_base_ptr = unsafe { &KERNEL_BASE } as *const u8;
         let two_meg = 2 * 1024 * 1024;
         let pml4_index = pml4_index(kernel_base_ptr);
         let pdpt_index = pdpt_index(kernel_base_ptr);
@@ -252,7 +252,7 @@ impl AddressSpace {
 impl Drop for AddressSpace {
     fn drop(&mut self) {
         if cpu::read_cr3() == self.cr3 {
-            let cr3 = phys_mem::virt2phys(&init_pml4);
+            let cr3 = phys_mem::virt2phys(unsafe { &init_pml4 });
             log!("drop: {:x} -> {:x}", self.cr3, cr3);
             unsafe { cpu::write_cr3(cr3) };
         }
@@ -318,7 +318,7 @@ pub mod test {
         fn can_map_kernel() {
             let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
             let two_meg = 2 * 1024 * 1024;
-            let ptr1 = Align::up(&kernel_end as *const u8, 4 * two_meg);
+            let ptr1 = Align::up(unsafe { &kernel_end } as *const u8, 4 * two_meg);
             let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
             let addr = bitmap.alloc_page().unwrap();
             let address_space = AddressSpace::new(bitmap).unwrap();

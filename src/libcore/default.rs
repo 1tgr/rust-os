@@ -12,8 +12,6 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use marker::Sized;
-
 /// A trait for giving a type a useful default value.
 ///
 /// Sometimes, you want to fall back to some kind of default value, and
@@ -37,7 +35,6 @@ use marker::Sized;
 ///     foo: i32,
 ///     bar: f32,
 /// }
-///
 ///
 /// fn main() {
 ///     let options: SomeOptions = Default::default();
@@ -147,12 +144,14 @@ default_impl! { u8, 0 }
 default_impl! { u16, 0 }
 default_impl! { u32, 0 }
 default_impl! { u64, 0 }
+default_impl! { u128, 0 }
 
 default_impl! { isize, 0 }
 default_impl! { i8, 0 }
 default_impl! { i16, 0 }
 default_impl! { i32, 0 }
 default_impl! { i64, 0 }
+default_impl! { i128, 0 }
 
 default_impl! { f32, 0.0f32 }
 default_impl! { f64, 0.0f64 }

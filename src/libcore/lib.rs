@@ -42,6 +42,11 @@
 //!   line. It is up to consumers of this core library to define this panic
 //!   function; it is only required to never return. This requires a `lang`
 //!   attribute named `panic_fmt`.
+//!
+//! * `rust_eh_personality` - is used by the failure mechanisms of the
+//!    compiler. This is often mapped to GCC's personality function, but crates
+//!    which do not trigger a panic can be assured that this function is never
+//!    called. The `lang` attribute is called `eh_personality`.
 
 // Since libcore defines many fundamental lang items, all tests live in a
 // separate crate, libcoretest, to avoid bizarre issues.
@@ -60,36 +65,44 @@
 #![no_core]
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
-#![cfg_attr(not(stage0), deny(warnings))]
-
-#![cfg_attr(stage0, allow(unused_attributes))]
+#![deny(warnings)]
 
 #![feature(allow_internal_unstable)]
 #![feature(asm)]
 #![feature(associated_type_defaults)]
+#![feature(associated_consts)]
 #![feature(cfg_target_feature)]
+#![feature(cfg_target_has_atomic)]
 #![feature(concat_idents)]
 #![feature(const_fn)]
-#![feature(cfg_target_has_atomic)]
 #![feature(custom_attribute)]
 #![feature(fundamental)]
+#![feature(i128_type)]
 #![feature(inclusive_range_syntax)]
 #![feature(intrinsics)]
 #![feature(lang_items)]
+#![feature(never_type)]
 #![feature(no_core)]
 #![feature(on_unimplemented)]
 #![feature(optin_builtin_traits)]
-#![feature(reflect)]
-#![feature(unwind_attributes)]
+#![feature(prelude_import)]
 #![feature(repr_simd, platform_intrinsics)]
 #![feature(rustc_attrs)]
 #![feature(specialization)]
 #![feature(staged_api)]
 #![feature(unboxed_closures)]
-#![feature(question_mark)]
+#![feature(untagged_unions)]
+#![feature(unwind_attributes)]
+
+#[prelude_import]
+#[allow(unused)]
+use prelude::v1::*;
 
 #[macro_use]
 mod macros;
+
+#[macro_use]
+mod internal_macros;
 
 #[path = "num/float_macros.rs"]
 #[macro_use]
@@ -108,12 +121,14 @@ mod uint_macros;
 #[path = "num/i16.rs"]   pub mod i16;
 #[path = "num/i32.rs"]   pub mod i32;
 #[path = "num/i64.rs"]   pub mod i64;
+#[path = "num/i128.rs"]   pub mod i128;
 
 #[path = "num/usize.rs"] pub mod usize;
 #[path = "num/u8.rs"]    pub mod u8;
 #[path = "num/u16.rs"]   pub mod u16;
 #[path = "num/u32.rs"]   pub mod u32;
 #[path = "num/u64.rs"]   pub mod u64;
+#[path = "num/u128.rs"]   pub mod u128;
 
 #[path = "num/f32.rs"]   pub mod f32;
 #[path = "num/f64.rs"]   pub mod f64;

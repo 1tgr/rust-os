@@ -118,7 +118,7 @@ provide a large enough buffer and `Part` array, and to assemble the final
 string from resulting `Part`s itself.
 
 All algorithms and formatting functions are accompanied by extensive tests
-in `coretest::num::flt2dec` module. It also shows how to use individual
+in `coretests::num::flt2dec` module. It also shows how to use individual
 functions.
 
 */
@@ -130,7 +130,6 @@ functions.
             reason = "internal routines only exposed for testing",
             issue = "0")]
 
-use prelude::v1::*;
 use i16;
 pub use self::decoder::{decode, DecodableFloat, FullDecoded, Decoded};
 

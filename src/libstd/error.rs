@@ -13,9 +13,9 @@
 //! # The `Error` trait
 //!
 //! `Error` is a trait representing the basic expectations for error values,
-//! i.e. values of type `E` in `Result<T, E>`. At a minimum, errors must provide
+//! i.e. values of type `E` in [`Result<T, E>`]. At a minimum, errors must provide
 //! a description, but they may optionally provide additional detail (via
-//! `Display`) and cause chain information:
+//! [`Display`]) and cause chain information:
 //!
 //! ```
 //! use std::fmt::Display;
@@ -27,12 +27,16 @@
 //! }
 //! ```
 //!
-//! The `cause` method is generally used when errors cross "abstraction
+//! The [`cause`] method is generally used when errors cross "abstraction
 //! boundaries", i.e.  when a one module must report an error that is "caused"
 //! by an error from a lower-level module. This setup makes it possible for the
 //! high-level module to provide its own errors that do not commit to any
 //! particular implementation, but also reveal some of its implementation for
-//! debugging via `cause` chains.
+//! debugging via [`cause`] chains.
+//!
+//! [`Result<T, E>`]: ../result/enum.Result.html
+//! [`Display`]: ../fmt/trait.Display.html
+//! [`cause`]: trait.Error.html#method.cause
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
@@ -48,23 +52,26 @@
 // reconsider what crate these items belong in.
 
 use any::TypeId;
-use boxed::Box;
+use cell;
+use char;
 use fmt::{self, Debug, Display};
-use marker::{Send, Sync, Reflect};
 use mem::transmute;
 use num;
-use raw::TraitObject;
 use str;
-use string::{self, String};
+use string;
 
 /// Base functionality for all errors in Rust.
 #[stable(feature = "rust1", since = "1.0.0")]
-pub trait Error: Debug + Display + Reflect {
+pub trait Error: Debug + Display {
     /// A short description of the error.
     ///
-    /// The description should not contain newlines or sentence-ending
-    /// punctuation, to facilitate embedding in larger user-facing
-    /// strings.
+    /// The description should only be used for a simple message.
+    /// It should not contain newlines or sentence-ending punctuation,
+    /// to facilitate embedding in larger user-facing strings.
+    /// For showing formatted error messages with more information see
+    /// [`Display`].
+    ///
+    /// [`Display`]: ../fmt/trait.Display.html
     ///
     /// # Examples
     ///
@@ -102,7 +109,7 @@ pub trait Error: Debug + Display + Reflect {
     ///
     /// impl Error for SuperError {
     ///     fn description(&self) -> &str {
-    ///         "I'm the superhero of errors!"
+    ///         "I'm the superhero of errors"
     ///     }
     ///
     ///     fn cause(&self) -> Option<&Error> {
@@ -121,7 +128,7 @@ pub trait Error: Debug + Display + Reflect {
     ///
     /// impl Error for SuperErrorSideKick {
     ///     fn description(&self) -> &str {
-    ///         "I'm SuperError side kick!"
+    ///         "I'm SuperError side kick"
     ///     }
     /// }
     ///
@@ -209,6 +216,11 @@ impl<'a> From<&'a str> for Box<Error> {
     }
 }
 
+#[unstable(feature = "never_type_impls", issue = "35121")]
+impl Error for ! {
+    fn description(&self) -> &str { *self }
+}
+
 #[stable(feature = "rust1", since = "1.0.0")]
 impl Error for str::ParseBoolError {
     fn description(&self) -> &str { "failed to parse bool" }
@@ -256,6 +268,59 @@ impl Error for string::FromUtf16Error {
     }
 }
 
+#[stable(feature = "str_parse_error2", since = "1.8.0")]
+impl Error for string::ParseError {
+    fn description(&self) -> &str {
+        match *self {}
+    }
+}
+
+#[stable(feature = "decode_utf16", since = "1.9.0")]
+impl Error for char::DecodeUtf16Error {
+    fn description(&self) -> &str {
+        "unpaired surrogate found"
+    }
+}
+
+#[stable(feature = "box_error", since = "1.7.0")]
+impl<T: Error> Error for Box<T> {
+    fn description(&self) -> &str {
+        Error::description(&**self)
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        Error::cause(&**self)
+    }
+}
+
+#[stable(feature = "fmt_error", since = "1.11.0")]
+impl Error for fmt::Error {
+    fn description(&self) -> &str {
+        "an error occurred when formatting an argument"
+    }
+}
+
+#[stable(feature = "try_borrow", since = "1.13.0")]
+impl Error for cell::BorrowError {
+    fn description(&self) -> &str {
+        "already mutably borrowed"
+    }
+}
+
+#[stable(feature = "try_borrow", since = "1.13.0")]
+impl Error for cell::BorrowMutError {
+    fn description(&self) -> &str {
+        "already borrowed"
+    }
+}
+
+#[unstable(feature = "try_from", issue = "33417")]
+impl Error for char::CharTryFromError {
+    fn description(&self) -> &str {
+        "converted integer out of range for `char`"
+    }
+}
+
 // copied from any.rs
 impl Error + 'static {
     /// Returns true if the boxed type is the same as `T`
@@ -279,11 +344,7 @@ impl Error + 'static {
     pub fn downcast_ref<T: Error + 'static>(&self) -> Option<&T> {
         if self.is::<T>() {
             unsafe {
-                // Get the raw representation of the trait object
-                let to: TraitObject = transmute(self);
-
-                // Extract the data pointer
-                Some(&*(to.data as *const T))
+                Some(&*(self as *const Error as *const T))
             }
         } else {
             None
@@ -297,11 +358,7 @@ impl Error + 'static {
     pub fn downcast_mut<T: Error + 'static>(&mut self) -> Option<&mut T> {
         if self.is::<T>() {
             unsafe {
-                // Get the raw representation of the trait object
-                let to: TraitObject = transmute(self);
-
-                // Extract the data pointer
-                Some(&mut *(to.data as *const T as *mut T))
+                Some(&mut *(self as *mut Error as *mut T))
             }
         } else {
             None
@@ -362,13 +419,8 @@ impl Error {
     pub fn downcast<T: Error + 'static>(self: Box<Self>) -> Result<Box<T>, Box<Error>> {
         if self.is::<T>() {
             unsafe {
-                // Get the raw representation of the trait object
-                let raw = Box::into_raw(self);
-                let to: TraitObject =
-                    transmute::<*mut Error, TraitObject>(raw);
-
-                // Extract the data pointer
-                Ok(Box::from_raw(to.data as *mut T))
+                let raw: *mut Error = Box::into_raw(self);
+                Ok(Box::from_raw(raw as *mut T))
             }
         } else {
             Err(self)
@@ -406,7 +458,6 @@ impl Error + Send + Sync {
 
 #[cfg(test)]
 mod tests {
-    use prelude::v1::*;
     use super::Error;
     use fmt;
 

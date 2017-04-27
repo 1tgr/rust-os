@@ -4,7 +4,7 @@ RUSTFLAGS += -L ../liballoc
 RUSTFLAGS += -L ../libcollections
 RUSTFLAGS += -L ../libcore
 RUSTFLAGS += -L ../liblibc
-RUSTFLAGS += -L ../librustc_unicode
+RUSTFLAGS += -L ../libstd_unicode
 RUSTFLAGS += -L ../libsyscall
 
 RUSTFLAGS += --extern cairo=../libcairo/libcairo.rlib

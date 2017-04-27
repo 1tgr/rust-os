@@ -5,14 +5,14 @@ RUSTFLAGS += -L ../liballoc_system
 RUSTFLAGS += -L ../libcollections
 RUSTFLAGS += -L ../libcore
 RUSTFLAGS += -L ../liblibc
-RUSTFLAGS += -L ../librustc_unicode
+RUSTFLAGS += -L ../libstd_unicode
 
 LIBS += ../liballoc/liballoc.rlib
 LIBS += ../liballoc_system/liballoc_system.rlib
 LIBS += ../libcollections/libcollections.rlib
 LIBS += ../libcore/libcore.rlib
 LIBS += ../liblibc/liblibc.rlib
-LIBS += ../librustc_unicode/librustc_unicode.rlib
+LIBS += ../libstd_unicode/libstd_unicode.rlib
 LIBS += ../libsyscall/libsyscall_kernel.rlib
 
 LIBS1 += ../newlib/$(TARGET)/lib/libc.a
@@ -20,7 +20,7 @@ LIBS1 += ../newlib/$(TARGET)/lib/libc.a
 RUSTFLAGS += --extern alloc=../liballoc/liballoc.rlib
 RUSTFLAGS += --extern collections=../libcollections/libcollections.rlib
 RUSTFLAGS += --extern core=../libcore/libcore.rlib
-RUSTFLAGS += --extern rustc_unicode=../librustc_unicode/librustc_unicode.rlib
+RUSTFLAGS += --extern std_unicode=../libstd_unicode/libstd_unicode.rlib
 RUSTFLAGS += --extern syscall=../libsyscall/libsyscall_kernel.rlib
 
 RUSTCFLAGS += --cfg feature=\"test\"
