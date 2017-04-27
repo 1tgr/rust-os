@@ -8,15 +8,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use clone::Clone;
-use cmp::PartialOrd;
 use mem;
 use ops::{self, Add, Sub};
-use option::Option::{self, Some, None};
-use marker::Sized;
 use usize;
 
-use super::{DoubleEndedIterator, ExactSizeIterator, Iterator};
+use super::{FusedIterator, TrustedLen};
 
 /// Objects that can be stepped over in both directions.
 ///
@@ -100,12 +96,12 @@ macro_rules! step_impl_unsigned {
 
             #[inline]
             fn add_one(&self) -> Self {
-                *self + 1
+                Add::add(*self, 1)
             }
 
             #[inline]
             fn sub_one(&self) -> Self {
-                *self - 1
+                Sub::sub(*self, 1)
             }
 
             #[inline]
@@ -171,12 +167,12 @@ macro_rules! step_impl_signed {
 
             #[inline]
             fn add_one(&self) -> Self {
-                *self + 1
+                Add::add(*self, 1)
             }
 
             #[inline]
             fn sub_one(&self) -> Self {
-                *self - 1
+                Sub::sub(*self, 1)
             }
 
             #[inline]
@@ -220,12 +216,12 @@ macro_rules! step_impl_no_between {
 
             #[inline]
             fn add_one(&self) -> Self {
-                *self + 1
+                Add::add(*self, 1)
             }
 
             #[inline]
             fn sub_one(&self) -> Self {
-                *self - 1
+                Sub::sub(*self, 1)
             }
 
             #[inline]
@@ -246,6 +242,7 @@ step_impl_signed!(i64);
 // assume here that it is less than 64-bits.
 #[cfg(not(target_pointer_width = "64"))]
 step_impl_no_between!(u64 i64);
+step_impl_no_between!(u128 i128);
 
 /// An adapter for stepping range iterators by a custom amount.
 ///
@@ -267,14 +264,12 @@ impl<A: Step> ops::RangeFrom<A> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(step_by)]
-    ///
-    /// for i in (0u8..).step_by(2).take(10) {
-    ///     println!("{}", i);
+    /// #![feature(step_by)]
+    /// fn main() {
+    ///     let result: Vec<_> = (0..).step_by(2).take(5).collect();
+    ///     assert_eq!(result, vec![0, 2, 4, 6, 8]);
     /// }
     /// ```
-    ///
-    /// This prints the first ten even natural integers (0 to 18).
     #[unstable(feature = "step_by", reason = "recent addition",
                issue = "27741")]
     pub fn step_by(self, by: A) -> StepBy<A, Self> {
@@ -295,20 +290,10 @@ impl<A: Step> ops::Range<A> {
     ///
     /// ```
     /// #![feature(step_by)]
-    ///
-    /// for i in (0..10).step_by(2) {
-    ///     println!("{}", i);
+    /// fn main() {
+    ///     let result: Vec<_> = (0..10).step_by(2).collect();
+    ///     assert_eq!(result, vec![0, 2, 4, 6, 8]);
     /// }
-    /// ```
-    ///
-    /// This prints:
-    ///
-    /// ```text
-    /// 0
-    /// 2
-    /// 4
-    /// 6
-    /// 8
     /// ```
     #[unstable(feature = "step_by", reason = "recent addition",
                issue = "27741")]
@@ -331,20 +316,8 @@ impl<A: Step> ops::RangeInclusive<A> {
     /// ```
     /// #![feature(step_by, inclusive_range_syntax)]
     ///
-    /// for i in (0...10).step_by(2) {
-    ///     println!("{}", i);
-    /// }
-    /// ```
-    ///
-    /// This prints:
-    ///
-    /// ```text
-    /// 0
-    /// 2
-    /// 4
-    /// 6
-    /// 8
-    /// 10
+    /// let result: Vec<_> = (0...10).step_by(2).collect();
+    /// assert_eq!(result, vec![0, 2, 4, 6, 8, 10]);
     /// ```
     #[unstable(feature = "step_by", reason = "recent addition",
                issue = "27741")]
@@ -356,7 +329,8 @@ impl<A: Step> ops::RangeInclusive<A> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
+#[unstable(feature = "step_by", reason = "recent addition",
+           issue = "27741")]
 impl<A> Iterator for StepBy<A, ops::RangeFrom<A>> where
     A: Clone,
     for<'a> &'a A: Add<&'a A, Output = A>
@@ -376,7 +350,12 @@ impl<A> Iterator for StepBy<A, ops::RangeFrom<A>> where
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
+#[unstable(feature = "fused", issue = "35602")]
+impl<A> FusedIterator for StepBy<A, ops::RangeFrom<A>>
+    where A: Clone, for<'a> &'a A: Add<&'a A, Output = A> {}
+
+#[unstable(feature = "step_by", reason = "recent addition",
+           issue = "27741")]
 impl<A: Step + Clone> Iterator for StepBy<A, ops::Range<A>> {
     type Item = A;
 
@@ -412,6 +391,9 @@ impl<A: Step + Clone> Iterator for StepBy<A, ops::Range<A>> {
         }
     }
 }
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<A: Step + Clone> FusedIterator for StepBy<A, ops::Range<A>> {}
 
 #[unstable(feature = "inclusive_range",
            reason = "recently added, follows RFC",
@@ -480,15 +462,38 @@ impl<A: Step + Clone> Iterator for StepBy<A, ops::RangeInclusive<A>> {
     }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl<A: Step + Clone> FusedIterator for StepBy<A, ops::RangeInclusive<A>> {}
+
 macro_rules! range_exact_iter_impl {
     ($($t:ty)*) => ($(
         #[stable(feature = "rust1", since = "1.0.0")]
         impl ExactSizeIterator for ops::Range<$t> { }
+    )*)
+}
 
+macro_rules! range_incl_exact_iter_impl {
+    ($($t:ty)*) => ($(
         #[unstable(feature = "inclusive_range",
                    reason = "recently added, follows RFC",
                    issue = "28237")]
         impl ExactSizeIterator for ops::RangeInclusive<$t> { }
+    )*)
+}
+
+macro_rules! range_trusted_len_impl {
+    ($($t:ty)*) => ($(
+        #[unstable(feature = "trusted_len", issue = "37572")]
+        unsafe impl TrustedLen for ops::Range<$t> { }
+    )*)
+}
+
+macro_rules! range_incl_trusted_len_impl {
+    ($($t:ty)*) => ($(
+        #[unstable(feature = "inclusive_range",
+                   reason = "recently added, follows RFC",
+                   issue = "28237")]
+        unsafe impl TrustedLen for ops::RangeInclusive<$t> { }
     )*)
 }
 
@@ -518,9 +523,19 @@ impl<A: Step> Iterator for ops::Range<A> where
     }
 }
 
-// Ranges of u64 and i64 are excluded because they cannot guarantee having
-// a length <= usize::MAX, which is required by ExactSizeIterator.
+// These macros generate `ExactSizeIterator` impls for various range types.
+// Range<{u,i}64> and RangeInclusive<{u,i}{32,64,size}> are excluded
+// because they cannot guarantee having a length <= usize::MAX, which is
+// required by ExactSizeIterator.
 range_exact_iter_impl!(usize u8 u16 u32 isize i8 i16 i32);
+range_incl_exact_iter_impl!(u8 u16 i8 i16);
+
+// These macros generate `TrustedLen` impls.
+//
+// They need to guarantee that .size_hint() is either exact, or that
+// the upper bound is None when it does not fit the type limits.
+range_trusted_len_impl!(usize isize u8 i8 u16 i16 u32 i32 i64 u64);
+range_incl_trusted_len_impl!(usize isize u8 i8 u16 i16 u32 i32 i64 u64);
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<A: Step + Clone> DoubleEndedIterator for ops::Range<A> where
@@ -538,6 +553,10 @@ impl<A: Step + Clone> DoubleEndedIterator for ops::Range<A> where
     }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl<A> FusedIterator for ops::Range<A>
+    where A: Step, for<'a> &'a A: Add<&'a A, Output = A> {}
+
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<A: Step> Iterator for ops::RangeFrom<A> where
     for<'a> &'a A: Add<&'a A, Output = A>
@@ -551,6 +570,10 @@ impl<A: Step> Iterator for ops::RangeFrom<A> where
         Some(n)
     }
 }
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<A> FusedIterator for ops::RangeFrom<A>
+    where A: Step, for<'a> &'a A: Add<&'a A, Output = A> {}
 
 #[unstable(feature = "inclusive_range", reason = "recently added, follows RFC", issue = "28237")]
 impl<A: Step> Iterator for ops::RangeInclusive<A> where
@@ -651,3 +674,6 @@ impl<A: Step> DoubleEndedIterator for ops::RangeInclusive<A> where
     }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl<A> FusedIterator for ops::RangeInclusive<A>
+    where A: Step, for<'a> &'a A: Add<&'a A, Output = A> {}

@@ -16,17 +16,14 @@
 
 #![stable(feature = "rust1", since = "1.0.0")]
 
-use clone::Clone;
 use intrinsics;
 use ops::{CoerceUnsized, Deref};
 use fmt;
 use hash;
-use option::Option::{self, Some, None};
-use marker::{Copy, PhantomData, Send, Sized, Sync, Unsize};
+use marker::{PhantomData, Unsize};
 use mem;
 use nonzero::NonZero;
 
-use cmp::{PartialEq, Eq, Ord, PartialOrd};
 use cmp::Ordering::{self, Less, Equal, Greater};
 
 // FIXME #19649: intrinsic docs don't render, so these have no docs :(
@@ -40,8 +37,37 @@ pub use intrinsics::copy;
 #[stable(feature = "rust1", since = "1.0.0")]
 pub use intrinsics::write_bytes;
 
+#[cfg(stage0)]
 #[stable(feature = "drop_in_place", since = "1.8.0")]
 pub use intrinsics::drop_in_place;
+
+#[cfg(not(stage0))]
+/// Executes the destructor (if any) of the pointed-to value.
+///
+/// This has two use cases:
+///
+/// * It is *required* to use `drop_in_place` to drop unsized types like
+///   trait objects, because they can't be read out onto the stack and
+///   dropped normally.
+///
+/// * It is friendlier to the optimizer to do this over `ptr::read` when
+///   dropping manually allocated memory (e.g. when writing Box/Rc/Vec),
+///   as the compiler doesn't need to prove that it's sound to elide the
+///   copy.
+///
+/// # Undefined Behavior
+///
+/// This has all the same safety problems as `ptr::read` with respect to
+/// invalid pointers, types, and double drops.
+#[stable(feature = "drop_in_place", since = "1.8.0")]
+#[lang="drop_in_place"]
+#[inline]
+#[allow(unconditional_recursion)]
+pub unsafe fn drop_in_place<T: ?Sized>(to_drop: *mut T) {
+    // Code here does not matter - this is replaced by the
+    // real drop glue by the compiler.
+    drop_in_place(to_drop);
+}
 
 /// Creates a null raw pointer.
 ///
@@ -77,7 +103,10 @@ pub const fn null_mut<T>() -> *mut T { 0 as *mut T }
 ///
 /// # Safety
 ///
-/// This is only unsafe because it accepts a raw pointer.
+/// This function copies the memory through the raw pointers passed to it
+/// as arguments.
+///
+/// Ensure that these pointers are valid before calling `swap`.
 #[inline]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub unsafe fn swap<T>(x: *mut T, y: *mut T) {
@@ -120,6 +149,8 @@ pub unsafe fn replace<T>(dest: *mut T, mut src: T) -> T {
 /// `zero_memory`, or `copy_memory`). Note that `*src = foo` counts as a use
 /// because it will attempt to drop the value previously at `*src`.
 ///
+/// The pointer must be aligned; use `read_unaligned` if that is not the case.
+///
 /// # Examples
 ///
 /// Basic usage:
@@ -128,7 +159,9 @@ pub unsafe fn replace<T>(dest: *mut T, mut src: T) -> T {
 /// let x = 12;
 /// let y = &x as *const i32;
 ///
-/// unsafe { println!("{}", std::ptr::read(y)); }
+/// unsafe {
+///     assert_eq!(std::ptr::read(y), 12);
+/// }
 /// ```
 #[inline(always)]
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -138,18 +171,39 @@ pub unsafe fn read<T>(src: *const T) -> T {
     tmp
 }
 
-#[allow(missing_docs)]
+/// Reads the value from `src` without moving it. This leaves the
+/// memory in `src` unchanged.
+///
+/// Unlike `read`, the pointer may be unaligned.
+///
+/// # Safety
+///
+/// Beyond accepting a raw pointer, this is unsafe because it semantically
+/// moves the value out of `src` without preventing further usage of `src`.
+/// If `T` is not `Copy`, then care must be taken to ensure that the value at
+/// `src` is not used before the data is overwritten again (e.g. with `write`,
+/// `zero_memory`, or `copy_memory`). Note that `*src = foo` counts as a use
+/// because it will attempt to drop the value previously at `*src`.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```
+/// let x = 12;
+/// let y = &x as *const i32;
+///
+/// unsafe {
+///     assert_eq!(std::ptr::read_unaligned(y), 12);
+/// }
+/// ```
 #[inline(always)]
-#[unstable(feature = "filling_drop",
-           reason = "may play a larger role in std::ptr future extensions",
-           issue = "5016")]
-pub unsafe fn read_and_drop<T>(dest: *mut T) -> T {
-    // Copy the data out from `dest`:
-    let tmp = read(&*dest);
-
-    // Now mark `dest` as dropped:
-    write_bytes(dest, mem::POST_DROP_U8, 1);
-
+#[stable(feature = "ptr_unaligned", since = "1.17.0")]
+pub unsafe fn read_unaligned<T>(src: *const T) -> T {
+    let mut tmp: T = mem::uninitialized();
+    copy_nonoverlapping(src as *const u8,
+                        &mut tmp as *mut T as *mut u8,
+                        mem::size_of::<T>());
     tmp
 }
 
@@ -164,6 +218,50 @@ pub unsafe fn read_and_drop<T>(dest: *mut T) -> T {
 /// allocations or resources, so care must be taken not to overwrite an object
 /// that should be dropped.
 ///
+/// Additionally, it does not drop `src`. Semantically, `src` is moved into the
+/// location pointed to by `dst`.
+///
+/// This is appropriate for initializing uninitialized memory, or overwriting
+/// memory that has previously been `read` from.
+///
+/// The pointer must be aligned; use `write_unaligned` if that is not the case.
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```
+/// let mut x = 0;
+/// let y = &mut x as *mut i32;
+/// let z = 12;
+///
+/// unsafe {
+///     std::ptr::write(y, z);
+///     assert_eq!(std::ptr::read(y), 12);
+/// }
+/// ```
+#[inline]
+#[stable(feature = "rust1", since = "1.0.0")]
+pub unsafe fn write<T>(dst: *mut T, src: T) {
+    intrinsics::move_val_init(&mut *dst, src)
+}
+
+/// Overwrites a memory location with the given value without reading or
+/// dropping the old value.
+///
+/// Unlike `write`, the pointer may be unaligned.
+///
+/// # Safety
+///
+/// This operation is marked unsafe because it accepts a raw pointer.
+///
+/// It does not drop the contents of `dst`. This is safe, but it could leak
+/// allocations or resources, so care must be taken not to overwrite an object
+/// that should be dropped.
+///
+/// Additionally, it does not drop `src`. Semantically, `src` is moved into the
+/// location pointed to by `dst`.
+///
 /// This is appropriate for initializing uninitialized memory, or overwriting
 /// memory that has previously been `read` from.
 ///
@@ -177,14 +275,17 @@ pub unsafe fn read_and_drop<T>(dest: *mut T) -> T {
 /// let z = 12;
 ///
 /// unsafe {
-///     std::ptr::write(y, z);
-///     println!("{}", std::ptr::read(y));
+///     std::ptr::write_unaligned(y, z);
+///     assert_eq!(std::ptr::read_unaligned(y), 12);
 /// }
 /// ```
 #[inline]
-#[stable(feature = "rust1", since = "1.0.0")]
-pub unsafe fn write<T>(dst: *mut T, src: T) {
-    intrinsics::move_val_init(&mut *dst, src)
+#[stable(feature = "ptr_unaligned", since = "1.17.0")]
+pub unsafe fn write_unaligned<T>(dst: *mut T, src: T) {
+    copy_nonoverlapping(&src as *const T as *const u8,
+                        dst as *mut u8,
+                        mem::size_of::<T>());
+    mem::forget(src);
 }
 
 /// Performs a volatile read of the value from `src` without moving it. This
@@ -220,7 +321,9 @@ pub unsafe fn write<T>(dst: *mut T, src: T) {
 /// let x = 12;
 /// let y = &x as *const i32;
 ///
-/// unsafe { println!("{}", std::ptr::read_volatile(y)); }
+/// unsafe {
+///     assert_eq!(std::ptr::read_volatile(y), 12);
+/// }
 /// ```
 #[inline]
 #[stable(feature = "volatile", since = "1.9.0")]
@@ -266,7 +369,7 @@ pub unsafe fn read_volatile<T>(src: *const T) -> T {
 ///
 /// unsafe {
 ///     std::ptr::write_volatile(y, z);
-///     println!("{}", std::ptr::read_volatile(y));
+///     assert_eq!(std::ptr::read_volatile(y), 12);
 /// }
 /// ```
 #[inline]
@@ -277,7 +380,7 @@ pub unsafe fn write_volatile<T>(dst: *mut T, src: T) {
 
 #[lang = "const_ptr"]
 impl<T: ?Sized> *const T {
-    /// Returns true if the pointer is null.
+    /// Returns `true` if the pointer is null.
     ///
     /// # Examples
     ///
@@ -331,7 +434,7 @@ impl<T: ?Sized> *const T {
     }
 
     /// Calculates the offset from a pointer. `count` is in units of T; e.g. a
-    /// `count` of 3 represents a pointer offset of `3 * sizeof::<T>()` bytes.
+    /// `count` of 3 represents a pointer offset of `3 * size_of::<T>()` bytes.
     ///
     /// # Safety
     ///
@@ -358,11 +461,88 @@ impl<T: ?Sized> *const T {
     pub unsafe fn offset(self, count: isize) -> *const T where T: Sized {
         intrinsics::offset(self, count)
     }
+
+    /// Calculates the offset from a pointer using wrapping arithmetic.
+    /// `count` is in units of T; e.g. a `count` of 3 represents a pointer
+    /// offset of `3 * size_of::<T>()` bytes.
+    ///
+    /// # Safety
+    ///
+    /// The resulting pointer does not need to be in bounds, but it is
+    /// potentially hazardous to dereference (which requires `unsafe`).
+    ///
+    /// Always use `.offset(count)` instead when possible, because `offset`
+    /// allows the compiler to optimize better.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// // Iterate using a raw pointer in increments of two elements
+    /// let data = [1u8, 2, 3, 4, 5];
+    /// let mut ptr: *const u8 = data.as_ptr();
+    /// let step = 2;
+    /// let end_rounded_up = ptr.wrapping_offset(6);
+    ///
+    /// // This loop prints "1, 3, 5, "
+    /// while ptr != end_rounded_up {
+    ///     unsafe {
+    ///         print!("{}, ", *ptr);
+    ///     }
+    ///     ptr = ptr.wrapping_offset(step);
+    /// }
+    /// ```
+    #[stable(feature = "ptr_wrapping_offset", since = "1.16.0")]
+    #[inline]
+    pub fn wrapping_offset(self, count: isize) -> *const T where T: Sized {
+        unsafe {
+            intrinsics::arith_offset(self, count)
+        }
+    }
+
+    /// Calculates the distance between two pointers. The returned value is in
+    /// units of T: the distance in bytes is divided by `mem::size_of::<T>()`.
+    ///
+    /// If the address different between the two pointers ia not a multiple of
+    /// `mem::size_of::<T>()` then the result of the division is rounded towards
+    /// zero.
+    ///
+    /// This function returns `None` if `T` is a zero-sized typed.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// #![feature(offset_to)]
+    ///
+    /// fn main() {
+    ///     let a = [0; 5];
+    ///     let ptr1: *const i32 = &a[1];
+    ///     let ptr2: *const i32 = &a[3];
+    ///     assert_eq!(ptr1.offset_to(ptr2), Some(2));
+    ///     assert_eq!(ptr2.offset_to(ptr1), Some(-2));
+    ///     assert_eq!(unsafe { ptr1.offset(2) }, ptr2);
+    ///     assert_eq!(unsafe { ptr2.offset(-2) }, ptr1);
+    /// }
+    /// ```
+    #[unstable(feature = "offset_to", issue = "41079")]
+    #[inline]
+    pub fn offset_to(self, other: *const T) -> Option<isize> where T: Sized {
+        let size = mem::size_of::<T>();
+        if size == 0 {
+            None
+        } else {
+            let diff = (other as isize).wrapping_sub(self as isize);
+            Some(diff / size as isize)
+        }
+    }
 }
 
 #[lang = "mut_ptr"]
 impl<T: ?Sized> *mut T {
-    /// Returns true if the pointer is null.
+    /// Returns `true` if the pointer is null.
     ///
     /// # Examples
     ///
@@ -416,7 +596,7 @@ impl<T: ?Sized> *mut T {
     }
 
     /// Calculates the offset from a pointer. `count` is in units of T; e.g. a
-    /// `count` of 3 represents a pointer offset of `3 * sizeof::<T>()` bytes.
+    /// `count` of 3 represents a pointer offset of `3 * size_of::<T>()` bytes.
     ///
     /// # Safety
     ///
@@ -441,6 +621,45 @@ impl<T: ?Sized> *mut T {
     #[inline]
     pub unsafe fn offset(self, count: isize) -> *mut T where T: Sized {
         intrinsics::offset(self, count) as *mut T
+    }
+
+    /// Calculates the offset from a pointer using wrapping arithmetic.
+    /// `count` is in units of T; e.g. a `count` of 3 represents a pointer
+    /// offset of `3 * size_of::<T>()` bytes.
+    ///
+    /// # Safety
+    ///
+    /// The resulting pointer does not need to be in bounds, but it is
+    /// potentially hazardous to dereference (which requires `unsafe`).
+    ///
+    /// Always use `.offset(count)` instead when possible, because `offset`
+    /// allows the compiler to optimize better.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// // Iterate using a raw pointer in increments of two elements
+    /// let mut data = [1u8, 2, 3, 4, 5];
+    /// let mut ptr: *mut u8 = data.as_mut_ptr();
+    /// let step = 2;
+    /// let end_rounded_up = ptr.wrapping_offset(6);
+    ///
+    /// while ptr != end_rounded_up {
+    ///     unsafe {
+    ///         *ptr = 0;
+    ///     }
+    ///     ptr = ptr.wrapping_offset(step);
+    /// }
+    /// assert_eq!(&data, &[0, 2, 0, 4, 0]);
+    /// ```
+    #[stable(feature = "ptr_wrapping_offset", since = "1.16.0")]
+    #[inline]
+    pub fn wrapping_offset(self, count: isize) -> *mut T where T: Sized {
+        unsafe {
+            intrinsics::arith_offset(self, count) as *mut T
+        }
     }
 
     /// Returns `None` if the pointer is null, or else returns a mutable
@@ -472,6 +691,44 @@ impl<T: ?Sized> *mut T {
             Some(&mut *self)
         }
     }
+
+    /// Calculates the distance between two pointers. The returned value is in
+    /// units of T: the distance in bytes is divided by `mem::size_of::<T>()`.
+    ///
+    /// If the address different between the two pointers ia not a multiple of
+    /// `mem::size_of::<T>()` then the result of the division is rounded towards
+    /// zero.
+    ///
+    /// This function returns `None` if `T` is a zero-sized typed.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// #![feature(offset_to)]
+    ///
+    /// fn main() {
+    ///     let mut a = [0; 5];
+    ///     let ptr1: *mut i32 = &mut a[1];
+    ///     let ptr2: *mut i32 = &mut a[3];
+    ///     assert_eq!(ptr1.offset_to(ptr2), Some(2));
+    ///     assert_eq!(ptr2.offset_to(ptr1), Some(-2));
+    ///     assert_eq!(unsafe { ptr1.offset(2) }, ptr2);
+    ///     assert_eq!(unsafe { ptr2.offset(-2) }, ptr1);
+    /// }
+    /// ```
+    #[unstable(feature = "offset_to", issue = "41079")]
+    #[inline]
+    pub fn offset_to(self, other: *const T) -> Option<isize> where T: Sized {
+        let size = mem::size_of::<T>();
+        if size == 0 {
+            None
+        } else {
+            let diff = (other as isize).wrapping_sub(self as isize);
+            Some(diff / size as isize)
+        }
+    }
 }
 
 // Equality for pointers
@@ -492,6 +749,39 @@ impl<T: ?Sized> PartialEq for *mut T {
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Eq for *mut T {}
+
+/// Compare raw pointers for equality.
+///
+/// This is the same as using the `==` operator, but less generic:
+/// the arguments have to be `*const T` raw pointers,
+/// not anything that implements `PartialEq`.
+///
+/// This can be used to compare `&T` references (which coerce to `*const T` implicitly)
+/// by their address rather than comparing the values they point to
+/// (which is what the `PartialEq for &T` implementation does).
+///
+/// # Examples
+///
+/// ```
+/// use std::ptr;
+///
+/// let five = 5;
+/// let other_five = 5;
+/// let five_ref = &five;
+/// let same_five_ref = &five;
+/// let other_five_ref = &other_five;
+///
+/// assert!(five_ref == same_five_ref);
+/// assert!(five_ref == other_five_ref);
+///
+/// assert!(ptr::eq(five_ref, same_five_ref));
+/// assert!(!ptr::eq(five_ref, other_five_ref));
+/// ```
+#[stable(feature = "ptr_eq", since = "1.17.0")]
+#[inline]
+pub fn eq<T: ?Sized>(a: *const T, b: *const T) -> bool {
+    a == b
+}
 
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> Clone for *const T {
@@ -741,7 +1031,7 @@ impl<T:?Sized> Deref for Unique<T> {
     }
 }
 
-#[stable(feature = "rust1", since = "1.0.0")]
+#[unstable(feature = "unique", issue = "27730")]
 impl<T> fmt::Pointer for Unique<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Pointer::fmt(&*self.pointer, f)
@@ -782,8 +1072,16 @@ impl<T: ?Sized> Shared<T> {
     /// # Safety
     ///
     /// `ptr` must be non-null.
-    pub unsafe fn new(ptr: *mut T) -> Self {
+    pub unsafe fn new(ptr: *const T) -> Self {
         Shared { pointer: NonZero::new(ptr), _marker: PhantomData }
+    }
+}
+
+#[unstable(feature = "shared", issue = "27730")]
+impl<T: ?Sized> Shared<T> {
+    /// Acquires the underlying pointer as a `*mut` pointer.
+    pub unsafe fn as_mut_ptr(&self) -> *mut T {
+        **self as _
     }
 }
 
@@ -802,10 +1100,10 @@ impl<T: ?Sized, U: ?Sized> CoerceUnsized<Shared<U>> for Shared<T> where T: Unsiz
 
 #[unstable(feature = "shared", issue = "27730")]
 impl<T: ?Sized> Deref for Shared<T> {
-    type Target = *mut T;
+    type Target = *const T;
 
     #[inline]
-    fn deref(&self) -> &*mut T {
+    fn deref(&self) -> &*const T {
         unsafe { mem::transmute(&*self.pointer) }
     }
 }

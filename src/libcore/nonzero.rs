@@ -13,7 +13,6 @@
             reason = "needs an RFC to flesh out the design",
             issue = "27730")]
 
-use marker::Sized;
 use ops::{CoerceUnsized, Deref};
 
 /// Unsafe trait to indicate what types are usable with the NonZero struct
@@ -31,6 +30,8 @@ unsafe impl Zeroable for i32 {}
 unsafe impl Zeroable for u32 {}
 unsafe impl Zeroable for i64 {}
 unsafe impl Zeroable for u64 {}
+unsafe impl Zeroable for i128 {}
+unsafe impl Zeroable for u128 {}
 
 /// A wrapper type for raw pointers and integers that will never be
 /// NULL or 0 that might allow certain optimizations.

@@ -29,16 +29,19 @@
 #![stable(feature = "rust1", since = "1.0.0")]
 
 use core::char::CharExt as C;
-use core::fmt;
+use core::iter::FusedIterator;
+use core::fmt::{self, Write};
 use tables::{conversions, derived_property, general_category, property};
 
 // stable reexports
 #[stable(feature = "rust1", since = "1.0.0")]
 pub use core::char::{MAX, from_digit, from_u32, from_u32_unchecked};
 #[stable(feature = "rust1", since = "1.0.0")]
-pub use core::char::{EncodeUtf16, EncodeUtf8, EscapeDebug, EscapeDefault, EscapeUnicode};
+pub use core::char::{EscapeDebug, EscapeDefault, EscapeUnicode};
 
 // unstable reexports
+#[unstable(feature = "try_from", issue = "33417")]
+pub use core::char::CharTryFromError;
 #[unstable(feature = "decode_utf8", issue = "33906")]
 pub use core::char::{DecodeUtf8, decode_utf8};
 #[unstable(feature = "unicode", issue = "27783")]
@@ -46,10 +49,10 @@ pub use tables::UNICODE_VERSION;
 
 /// Returns an iterator that yields the lowercase equivalent of a `char`.
 ///
-/// This `struct` is created by the [`to_lowercase()`] method on [`char`]. See
+/// This `struct` is created by the [`to_lowercase`] method on [`char`]. See
 /// its documentation for more.
 ///
-/// [`to_lowercase()`]: ../../std/primitive.char.html#method.to_lowercase
+/// [`to_lowercase`]: ../../std/primitive.char.html#method.to_lowercase
 /// [`char`]: ../../std/primitive.char.html
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct ToLowercase(CaseMappingIter);
@@ -62,12 +65,15 @@ impl Iterator for ToLowercase {
     }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl FusedIterator for ToLowercase {}
+
 /// Returns an iterator that yields the uppercase equivalent of a `char`.
 ///
-/// This `struct` is created by the [`to_uppercase()`] method on [`char`]. See
+/// This `struct` is created by the [`to_uppercase`] method on [`char`]. See
 /// its documentation for more.
 ///
-/// [`to_uppercase()`]: ../../std/primitive.char.html#method.to_uppercase
+/// [`to_uppercase`]: ../../std/primitive.char.html#method.to_uppercase
 /// [`char`]: ../../std/primitive.char.html
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct ToUppercase(CaseMappingIter);
@@ -80,6 +86,8 @@ impl Iterator for ToUppercase {
     }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl FusedIterator for ToUppercase {}
 
 enum CaseMappingIter {
     Three(char, char, char),
@@ -123,6 +131,40 @@ impl Iterator for CaseMappingIter {
     }
 }
 
+impl fmt::Display for CaseMappingIter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CaseMappingIter::Three(a, b, c) => {
+                f.write_char(a)?;
+                f.write_char(b)?;
+                f.write_char(c)
+            }
+            CaseMappingIter::Two(b, c) => {
+                f.write_char(b)?;
+                f.write_char(c)
+            }
+            CaseMappingIter::One(c) => {
+                f.write_char(c)
+            }
+            CaseMappingIter::Zero => Ok(()),
+        }
+    }
+}
+
+#[stable(feature = "char_struct_display", since = "1.16.0")]
+impl fmt::Display for ToLowercase {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+#[stable(feature = "char_struct_display", since = "1.16.0")]
+impl fmt::Display for ToUppercase {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
 #[lang = "char"]
 impl char {
     /// Checks if a `char` is a digit in the given radix.
@@ -130,7 +172,7 @@ impl char {
     /// A 'radix' here is sometimes also called a 'base'. A radix of two
     /// indicates a binary number, a radix of ten, decimal, and a radix of
     /// sixteen, hexadecimal, to give some common values. Arbitrary
-    /// radicum are supported.
+    /// radices are supported.
     ///
     /// Compared to `is_numeric()`, this function only recognizes the characters
     /// `0-9`, `a-z` and `A-Z`.
@@ -141,7 +183,7 @@ impl char {
     /// * `a-z`
     /// * `A-Z`
     ///
-    /// For a more comprehensive understanding of 'digit', see [`is_numeric()`][is_numeric].
+    /// For a more comprehensive understanding of 'digit', see [`is_numeric`][is_numeric].
     ///
     /// [is_numeric]: #method.is_numeric
     ///
@@ -182,7 +224,7 @@ impl char {
     /// A 'radix' here is sometimes also called a 'base'. A radix of two
     /// indicates a binary number, a radix of ten, decimal, and a radix of
     /// sixteen, hexadecimal, to give some common values. Arbitrary
-    /// radicum are supported.
+    /// radices are supported.
     ///
     /// 'Digit' is defined to be only the following characters:
     ///
@@ -232,34 +274,38 @@ impl char {
     }
 
     /// Returns an iterator that yields the hexadecimal Unicode escape of a
-    /// character, as `char`s.
+    /// character as `char`s.
     ///
-    /// All characters are escaped with Rust syntax of the form `\u{NNNNNN}`
-    /// where `NNNNNN` is the shortest hexadecimal representation.
+    /// This will escape characters with the Rust syntax of the form
+    /// `\u{NNNNNN}` where `NNNNNN` is a hexadecimal representation.
     ///
     /// # Examples
     ///
-    /// Basic usage:
+    /// As an iterator:
     ///
     /// ```
     /// for c in '❤'.escape_unicode() {
     ///     print!("{}", c);
     /// }
-    /// println!("");
+    /// println!();
     /// ```
     ///
-    /// This prints:
-    ///
-    /// ```text
-    /// \u{2764}
-    /// ```
-    ///
-    /// Collecting into a `String`:
+    /// Using `println!` directly:
     ///
     /// ```
-    /// let heart: String = '❤'.escape_unicode().collect();
+    /// println!("{}", '❤'.escape_unicode());
+    /// ```
     ///
-    /// assert_eq!(heart, r"\u{2764}");
+    /// Both are equivalent to:
+    ///
+    /// ```
+    /// println!("\\u{{2764}}");
+    /// ```
+    ///
+    /// Using `to_string`:
+    ///
+    /// ```
+    /// assert_eq!('❤'.escape_unicode().to_string(), "\\u{2764}");
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
@@ -267,34 +313,42 @@ impl char {
         C::escape_unicode(self)
     }
 
-    /// Returns an iterator that yields the literal escape code of a `char`.
+    /// Returns an iterator that yields the literal escape code of a character
+    /// as `char`s.
     ///
     /// This will escape the characters similar to the `Debug` implementations
     /// of `str` or `char`.
     ///
     /// # Examples
     ///
-    /// Basic usage:
+    /// As an iterator:
     ///
     /// ```
-    /// for i in '\n'.escape_default() {
-    ///     println!("{}", i);
+    /// # #![feature(char_escape_debug)]
+    /// for c in '\n'.escape_debug() {
+    ///     print!("{}", c);
     /// }
+    /// println!();
     /// ```
     ///
-    /// This prints:
-    ///
-    /// ```text
-    /// \
-    /// n
-    /// ```
-    ///
-    /// Collecting into a `String`:
+    /// Using `println!` directly:
     ///
     /// ```
-    /// let quote: String = '\n'.escape_default().collect();
+    /// # #![feature(char_escape_debug)]
+    /// println!("{}", '\n'.escape_debug());
+    /// ```
     ///
-    /// assert_eq!(quote, "\\n");
+    /// Both are equivalent to:
+    ///
+    /// ```
+    /// println!("\\n");
+    /// ```
+    ///
+    /// Using `to_string`:
+    ///
+    /// ```
+    /// # #![feature(char_escape_debug)]
+    /// assert_eq!('\n'.escape_debug().to_string(), "\\n");
     /// ```
     #[unstable(feature = "char_escape_debug", issue = "35068")]
     #[inline]
@@ -302,7 +356,8 @@ impl char {
         C::escape_debug(self)
     }
 
-    /// Returns an iterator that yields the literal escape code of a `char`.
+    /// Returns an iterator that yields the literal escape code of a character
+    /// as `char`s.
     ///
     /// The default is chosen with a bias toward producing literals that are
     /// legal in a variety of languages, including C++11 and similar C-family
@@ -323,27 +378,32 @@ impl char {
     ///
     /// # Examples
     ///
-    /// Basic usage:
+    /// As an iterator:
     ///
     /// ```
-    /// for i in '"'.escape_default() {
-    ///     println!("{}", i);
+    /// for c in '"'.escape_default() {
+    ///     print!("{}", c);
     /// }
+    /// println!();
     /// ```
     ///
-    /// This prints:
-    ///
-    /// ```text
-    /// \
-    /// "
-    /// ```
-    ///
-    /// Collecting into a `String`:
+    /// Using `println!` directly:
     ///
     /// ```
-    /// let quote: String = '"'.escape_default().collect();
+    /// println!("{}", '"'.escape_default());
+    /// ```
     ///
-    /// assert_eq!(quote, "\\\"");
+    ///
+    /// Both are equivalent to:
+    ///
+    /// ```
+    /// println!("\\\"");
+    /// ```
+    ///
+    /// Using `to_string`:
+    ///
+    /// ```
+    /// assert_eq!('"'.escape_default().to_string(), "\\\"");
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
@@ -405,10 +465,10 @@ impl char {
     /// Returns the number of 16-bit code units this `char` would need if
     /// encoded in UTF-16.
     ///
-    /// See the documentation for [`len_utf8()`] for more explanation of this
+    /// See the documentation for [`len_utf8`] for more explanation of this
     /// concept. This function is a mirror, but for UTF-16 instead of UTF-8.
     ///
-    /// [`len_utf8()`]: #method.len_utf8
+    /// [`len_utf8`]: #method.len_utf8
     ///
     /// # Examples
     ///
@@ -427,50 +487,86 @@ impl char {
         C::len_utf16(self)
     }
 
-    /// Returns an iterator over the bytes of this character as UTF-8.
+    /// Encodes this character as UTF-8 into the provided byte buffer,
+    /// and then returns the subslice of the buffer that contains the encoded character.
     ///
-    /// The returned iterator also has an `as_slice()` method to view the
-    /// encoded bytes as a byte slice.
+    /// # Panics
+    ///
+    /// Panics if the buffer is not large enough.
+    /// A buffer of length four is large enough to encode any `char`.
     ///
     /// # Examples
     ///
-    /// ```
-    /// #![feature(unicode)]
+    /// In both of these examples, 'ß' takes two bytes to encode.
     ///
-    /// let iterator = 'ß'.encode_utf8();
-    /// assert_eq!(iterator.as_slice(), [0xc3, 0x9f]);
-    ///
-    /// for (i, byte) in iterator.enumerate() {
-    ///     println!("byte {}: {:x}", i, byte);
-    /// }
     /// ```
-    #[unstable(feature = "unicode", issue = "27784")]
+    /// let mut b = [0; 2];
+    ///
+    /// let result = 'ß'.encode_utf8(&mut b);
+    ///
+    /// assert_eq!(result, "ß");
+    ///
+    /// assert_eq!(result.len(), 2);
+    /// ```
+    ///
+    /// A buffer that's too small:
+    ///
+    /// ```
+    /// use std::thread;
+    ///
+    /// let result = thread::spawn(|| {
+    ///     let mut b = [0; 1];
+    ///
+    ///     // this panics
+    ///    'ß'.encode_utf8(&mut b);
+    /// }).join();
+    ///
+    /// assert!(result.is_err());
+    /// ```
+    #[stable(feature = "unicode_encode_char", since = "1.15.0")]
     #[inline]
-    pub fn encode_utf8(self) -> EncodeUtf8 {
-        C::encode_utf8(self)
+    pub fn encode_utf8(self, dst: &mut [u8]) -> &mut str {
+        C::encode_utf8(self, dst)
     }
 
-    /// Returns an iterator over the `u16` entries of this character as UTF-16.
+    /// Encodes this character as UTF-16 into the provided `u16` buffer,
+    /// and then returns the subslice of the buffer that contains the encoded character.
     ///
-    /// The returned iterator also has an `as_slice()` method to view the
-    /// encoded form as a slice.
+    /// # Panics
+    ///
+    /// Panics if the buffer is not large enough.
+    /// A buffer of length 2 is large enough to encode any `char`.
     ///
     /// # Examples
     ///
-    /// ```
-    /// #![feature(unicode)]
+    /// In both of these examples, '𝕊' takes two `u16`s to encode.
     ///
-    /// let iterator = '𝕊'.encode_utf16();
-    /// assert_eq!(iterator.as_slice(), [0xd835, 0xdd4a]);
-    ///
-    /// for (i, val) in iterator.enumerate() {
-    ///     println!("entry {}: {:x}", i, val);
-    /// }
     /// ```
-    #[unstable(feature = "unicode", issue = "27784")]
+    /// let mut b = [0; 2];
+    ///
+    /// let result = '𝕊'.encode_utf16(&mut b);
+    ///
+    /// assert_eq!(result.len(), 2);
+    /// ```
+    ///
+    /// A buffer that's too small:
+    ///
+    /// ```
+    /// use std::thread;
+    ///
+    /// let result = thread::spawn(|| {
+    ///     let mut b = [0; 1];
+    ///
+    ///     // this panics
+    ///     '𝕊'.encode_utf16(&mut b);
+    /// }).join();
+    ///
+    /// assert!(result.is_err());
+    /// ```
+    #[stable(feature = "unicode_encode_char", since = "1.15.0")]
     #[inline]
-    pub fn encode_utf16(self) -> EncodeUtf16 {
-        C::encode_utf16(self)
+    pub fn encode_utf16(self, dst: &mut [u16]) -> &mut [u16] {
+        C::encode_utf16(self, dst)
     }
 
     /// Returns true if this `char` is an alphabetic code point, and false if not.
@@ -682,9 +778,11 @@ impl char {
         }
     }
 
-    /// Returns an iterator that yields the lowercase equivalent of a `char`.
+    /// Returns an iterator that yields the lowercase equivalent of a `char`
+    /// as one or more `char`s.
     ///
-    /// If no conversion is possible then an iterator with just the input character is returned.
+    /// If a character does not have a lowercase equivalent, the same character
+    /// will be returned back by the iterator.
     ///
     /// This performs complex unconditional mappings with no tailoring: it maps
     /// one Unicode character to its lowercase equivalent according to the
@@ -702,16 +800,38 @@ impl char {
     ///
     /// # Examples
     ///
-    /// Basic usage:
+    /// As an iterator:
     ///
     /// ```
-    /// assert_eq!('C'.to_lowercase().collect::<String>(), "c");
+    /// for c in 'İ'.to_lowercase() {
+    ///     print!("{}", c);
+    /// }
+    /// println!();
+    /// ```
+    ///
+    /// Using `println!` directly:
+    ///
+    /// ```
+    /// println!("{}", 'İ'.to_lowercase());
+    /// ```
+    ///
+    /// Both are equivalent to:
+    ///
+    /// ```
+    /// println!("i\u{307}");
+    /// ```
+    ///
+    /// Using `to_string`:
+    ///
+    /// ```
+    /// assert_eq!('C'.to_lowercase().to_string(), "c");
     ///
     /// // Sometimes the result is more than one character:
-    /// assert_eq!('İ'.to_lowercase().collect::<String>(), "i\u{307}");
+    /// assert_eq!('İ'.to_lowercase().to_string(), "i\u{307}");
     ///
-    /// // Japanese scripts do not have case, and so:
-    /// assert_eq!('山'.to_lowercase().collect::<String>(), "山");
+    /// // Characters that do not have both uppercase and lowercase
+    /// // convert into themselves.
+    /// assert_eq!('山'.to_lowercase().to_string(), "山");
     /// ```
     #[stable(feature = "rust1", since = "1.0.0")]
     #[inline]
@@ -719,9 +839,11 @@ impl char {
         ToLowercase(CaseMappingIter::new(conversions::to_lower(self)))
     }
 
-    /// Returns an iterator that yields the uppercase equivalent of a `char`.
+    /// Returns an iterator that yields the uppercase equivalent of a `char`
+    /// as one or more `char`s.
     ///
-    /// If no conversion is possible then an iterator with just the input character is returned.
+    /// If a character does not have an uppercase equivalent, the same character
+    /// will be returned back by the iterator.
     ///
     /// This performs complex unconditional mappings with no tailoring: it maps
     /// one Unicode character to its uppercase equivalent according to the
@@ -739,17 +861,41 @@ impl char {
     ///
     /// # Examples
     ///
-    /// Basic usage:
+    /// As an iterator:
     ///
     /// ```
-    /// assert_eq!('c'.to_uppercase().collect::<String>(), "C");
+    /// for c in 'ß'.to_uppercase() {
+    ///     print!("{}", c);
+    /// }
+    /// println!();
+    /// ```
+    ///
+    /// Using `println!` directly:
+    ///
+    /// ```
+    /// println!("{}", 'ß'.to_uppercase());
+    /// ```
+    ///
+    /// Both are equivalent to:
+    ///
+    /// ```
+    /// println!("SS");
+    /// ```
+    ///
+    /// Using `to_string`:
+    ///
+    /// ```
+    /// assert_eq!('c'.to_uppercase().to_string(), "C");
     ///
     /// // Sometimes the result is more than one character:
-    /// assert_eq!('ß'.to_uppercase().collect::<String>(), "SS");
+    /// assert_eq!('ß'.to_uppercase().to_string(), "SS");
     ///
-    /// // Japanese does not have case, and so:
-    /// assert_eq!('山'.to_uppercase().collect::<String>(), "山");
+    /// // Characters that do not have both uppercase and lowercase
+    /// // convert into themselves.
+    /// assert_eq!('山'.to_uppercase().to_string(), "山");
     /// ```
+    ///
+    /// # Note on locale
     ///
     /// In Turkish, the equivalent of 'i' in Latin has five forms instead of two:
     ///
@@ -759,7 +905,7 @@ impl char {
     /// Note that the lowercase dotted 'i' is the same as the Latin. Therefore:
     ///
     /// ```
-    /// let upper_i: String = 'i'.to_uppercase().collect();
+    /// let upper_i = 'i'.to_uppercase().to_string();
     /// ```
     ///
     /// The value of `upper_i` here relies on the language of the text: if we're
@@ -767,7 +913,7 @@ impl char {
     /// be `"İ"`. `to_uppercase()` does not take this into account, and so:
     ///
     /// ```
-    /// let upper_i: String = 'i'.to_uppercase().collect();
+    /// let upper_i = 'i'.to_uppercase().to_string();
     ///
     /// assert_eq!(upper_i, "I");
     /// ```

@@ -17,16 +17,11 @@
 #![allow(missing_docs)]
 
 #[stable(feature = "rust1", since = "1.0.0")]
-#[allow(deprecated)]
-pub use core::num::{Zero, One};
-#[stable(feature = "rust1", since = "1.0.0")]
 pub use core::num::{FpCategory, ParseIntError, ParseFloatError, TryFromIntError};
 #[stable(feature = "rust1", since = "1.0.0")]
 pub use core::num::Wrapping;
 
-#[cfg(test)] use cmp::PartialEq;
 #[cfg(test)] use fmt;
-#[cfg(test)] use marker::Copy;
 #[cfg(test)] use ops::{Add, Sub, Mul, Div, Rem};
 
 /// Helper function for testing numeric operations
@@ -52,7 +47,6 @@ mod tests {
     use u32;
     use u64;
     use usize;
-    use string::ToString;
     use ops::Mul;
 
     #[test]
@@ -175,6 +169,7 @@ mod tests {
 
     macro_rules! test_checked_next_power_of_two {
         ($test_name:ident, $T:ident) => (
+            #[cfg_attr(target_os = "emscripten", ignore)] // FIXME(#39119)
             fn $test_name() {
                 #![test]
                 assert_eq!((0 as $T).checked_next_power_of_two(), Some(1));
@@ -287,7 +282,6 @@ mod tests {
 mod bench {
     extern crate test;
     use self::test::Bencher;
-    use prelude::v1::*;
 
     #[bench]
     fn bench_pow_function(b: &mut Bencher) {

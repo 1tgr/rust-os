@@ -61,13 +61,13 @@ pub const MAX_10_EXP: i32 = 38;
 
 /// Not a Number (NaN).
 #[stable(feature = "rust1", since = "1.0.0")]
-pub const NAN: f32 = 0.0_f32/0.0_f32;
+pub const NAN: f32 = 0.0_f32 / 0.0_f32;
 /// Infinity (∞).
 #[stable(feature = "rust1", since = "1.0.0")]
-pub const INFINITY: f32 = 1.0_f32/0.0_f32;
+pub const INFINITY: f32 = 1.0_f32 / 0.0_f32;
 /// Negative infinity (-∞).
 #[stable(feature = "rust1", since = "1.0.0")]
-pub const NEG_INFINITY: f32 = -1.0_f32/0.0_f32;
+pub const NEG_INFINITY: f32 = -1.0_f32 / 0.0_f32;
 
 /// Basic mathematical constants.
 #[stable(feature = "rust1", since = "1.0.0")]
@@ -143,27 +143,11 @@ pub mod consts {
            reason = "stable interface is via `impl f{32,64}` in later crates",
            issue = "32110")]
 impl Float for f32 {
-    #[inline]
-    fn nan() -> f32 { NAN }
-
-    #[inline]
-    fn infinity() -> f32 { INFINITY }
-
-    #[inline]
-    fn neg_infinity() -> f32 { NEG_INFINITY }
-
-    #[inline]
-    fn zero() -> f32 { 0.0 }
-
-    #[inline]
-    fn neg_zero() -> f32 { -0.0 }
-
-    #[inline]
-    fn one() -> f32 { 1.0 }
-
     /// Returns `true` if the number is NaN.
     #[inline]
-    fn is_nan(self) -> bool { self != self }
+    fn is_nan(self) -> bool {
+        self != self
+    }
 
     /// Returns `true` if the number is infinite.
     #[inline]
@@ -192,27 +176,12 @@ impl Float for f32 {
 
         let bits: u32 = unsafe { mem::transmute(self) };
         match (bits & MAN_MASK, bits & EXP_MASK) {
-            (0, 0)        => Fp::Zero,
-            (_, 0)        => Fp::Subnormal,
+            (0, 0) => Fp::Zero,
+            (_, 0) => Fp::Subnormal,
             (0, EXP_MASK) => Fp::Infinite,
             (_, EXP_MASK) => Fp::Nan,
-            _             => Fp::Normal,
+            _ => Fp::Normal,
         }
-    }
-
-    /// Returns the mantissa, exponent and sign as integers.
-    fn integer_decode(self) -> (u64, i16, i8) {
-        let bits: u32 = unsafe { mem::transmute(self) };
-        let sign: i8 = if bits >> 31 == 0 { 1 } else { -1 };
-        let mut exponent: i16 = ((bits >> 23) & 0xff) as i16;
-        let mantissa = if exponent == 0 {
-            (bits & 0x7fffff) << 1
-        } else {
-            (bits & 0x7fffff) | 0x800000
-        };
-        // Exponent bias + mantissa shift
-        exponent -= 127 + 23;
-        (mantissa as u64, exponent, sign)
     }
 
     /// Computes the absolute value of `self`. Returns `Float::nan()` if the
@@ -252,7 +221,9 @@ impl Float for f32 {
 
     /// Returns the reciprocal (multiplicative inverse) of the number.
     #[inline]
-    fn recip(self) -> f32 { 1.0 / self }
+    fn recip(self) -> f32 {
+        1.0 / self
+    }
 
     #[inline]
     fn powi(self, n: i32) -> f32 {
@@ -261,7 +232,9 @@ impl Float for f32 {
 
     /// Converts to degrees, assuming the number is in radians.
     #[inline]
-    fn to_degrees(self) -> f32 { self * (180.0f32 / consts::PI) }
+    fn to_degrees(self) -> f32 {
+        self * (180.0f32 / consts::PI)
+    }
 
     /// Converts to radians, assuming the number is in degrees.
     #[inline]

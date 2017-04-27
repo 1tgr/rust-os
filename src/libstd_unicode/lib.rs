@@ -20,7 +20,7 @@
 //! provide for basic string-related manipulations. This crate does not
 //! (yet) aim to provide a full set of Unicode tables.
 
-#![crate_name = "rustc_unicode"]
+#![crate_name = "std_unicode"]
 #![unstable(feature = "unicode", issue = "27783")]
 #![crate_type = "rlib"]
 #![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
@@ -29,15 +29,16 @@
        html_playground_url = "https://play.rust-lang.org/",
        issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/",
        test(no_crate_inject, attr(allow(unused_variables), deny(warnings))))]
-#![cfg_attr(not(stage0), deny(warnings))]
+#![deny(warnings)]
 #![no_std]
 
 #![feature(char_escape_debug)]
 #![feature(core_char_ext)]
 #![feature(decode_utf8)]
+#![feature(fused)]
 #![feature(lang_items)]
 #![feature(staged_api)]
-#![feature(unicode)]
+#![feature(try_from)]
 
 mod tables;
 mod u_str;
@@ -46,7 +47,6 @@ pub mod char;
 #[allow(deprecated)]
 pub mod str {
     pub use u_str::{SplitWhitespace, UnicodeStr};
-    pub use u_str::{is_utf16, utf8_char_width};
     pub use u_str::Utf16Encoder;
 }
 

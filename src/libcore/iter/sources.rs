@@ -8,20 +8,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use clone::Clone;
-use default::Default;
 use fmt;
 use marker;
-use option::Option::{self, Some, None};
 use usize;
 
-use super::{DoubleEndedIterator, IntoIterator, Iterator, ExactSizeIterator};
+use super::{FusedIterator, TrustedLen};
 
 /// An iterator that repeats an element endlessly.
 ///
-/// This `struct` is created by the [`repeat()`] function. See its documentation for more.
+/// This `struct` is created by the [`repeat`] function. See its documentation for more.
 ///
-/// [`repeat()`]: fn.repeat.html
+/// [`repeat`]: fn.repeat.html
 #[derive(Clone, Debug)]
 #[stable(feature = "rust1", since = "1.0.0")]
 pub struct Repeat<A> {
@@ -44,15 +41,18 @@ impl<A: Clone> DoubleEndedIterator for Repeat<A> {
     fn next_back(&mut self) -> Option<A> { Some(self.element.clone()) }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl<A: Clone> FusedIterator for Repeat<A> {}
+
 /// Creates a new iterator that endlessly repeats a single element.
 ///
 /// The `repeat()` function repeats a single value over and over and over and
 /// over and over and 🔁.
 ///
 /// Infinite iterators like `repeat()` are often used with adapters like
-/// [`take()`], in order to make them finite.
+/// [`take`], in order to make them finite.
 ///
-/// [`take()`]: trait.Iterator.html#method.take
+/// [`take`]: trait.Iterator.html#method.take
 ///
 /// # Examples
 ///
@@ -74,7 +74,7 @@ impl<A: Clone> DoubleEndedIterator for Repeat<A> {
 /// assert_eq!(Some(4), fours.next());
 /// ```
 ///
-/// Going finite with [`take()`]:
+/// Going finite with [`take`]:
 ///
 /// ```
 /// use std::iter;
@@ -98,9 +98,9 @@ pub fn repeat<T: Clone>(elt: T) -> Repeat<T> {
 
 /// An iterator that yields nothing.
 ///
-/// This `struct` is created by the [`empty()`] function. See its documentation for more.
+/// This `struct` is created by the [`empty`] function. See its documentation for more.
 ///
-/// [`empty()`]: fn.empty.html
+/// [`empty`]: fn.empty.html
 #[stable(feature = "iter_empty", since = "1.2.0")]
 pub struct Empty<T>(marker::PhantomData<T>);
 
@@ -137,6 +137,12 @@ impl<T> ExactSizeIterator for Empty<T> {
         0
     }
 }
+
+#[unstable(feature = "trusted_len", issue = "37572")]
+unsafe impl<T> TrustedLen for Empty<T> {}
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<T> FusedIterator for Empty<T> {}
 
 // not #[derive] because that adds a Clone bound on T,
 // which isn't necessary.
@@ -177,9 +183,9 @@ pub fn empty<T>() -> Empty<T> {
 
 /// An iterator that yields an element exactly once.
 ///
-/// This `struct` is created by the [`once()`] function. See its documentation for more.
+/// This `struct` is created by the [`once`] function. See its documentation for more.
 ///
-/// [`once()`]: fn.once.html
+/// [`once`]: fn.once.html
 #[derive(Clone, Debug)]
 #[stable(feature = "iter_once", since = "1.2.0")]
 pub struct Once<T> {
@@ -213,14 +219,20 @@ impl<T> ExactSizeIterator for Once<T> {
     }
 }
 
+#[unstable(feature = "trusted_len", issue = "37572")]
+unsafe impl<T> TrustedLen for Once<T> {}
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<T> FusedIterator for Once<T> {}
+
 /// Creates an iterator that yields an element exactly once.
 ///
-/// This is commonly used to adapt a single value into a [`chain()`] of other
+/// This is commonly used to adapt a single value into a [`chain`] of other
 /// kinds of iteration. Maybe you have an iterator that covers almost
 /// everything, but you need an extra special case. Maybe you have a function
 /// which works on iterators, but you only need to process one value.
 ///
-/// [`chain()`]: trait.Iterator.html#method.chain
+/// [`chain`]: trait.Iterator.html#method.chain
 ///
 /// # Examples
 ///

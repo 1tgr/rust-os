@@ -20,16 +20,11 @@
             issue = "27778")]
 
 use borrow::{Borrow, BorrowMut};
-use clone::Clone;
-use cmp::{PartialEq, Eq, PartialOrd, Ord, Ordering};
-use convert::{AsRef, AsMut};
-use default::Default;
+use cmp::Ordering;
 use fmt;
 use hash::{Hash, self};
-use iter::IntoIterator;
-use marker::{Copy, Sized, Unsize};
-use option::Option;
-use slice::{Iter, IterMut, SliceExt};
+use marker::Unsize;
+use slice::{Iter, IterMut};
 
 /// Utility trait implemented only on arrays of fixed size
 ///
@@ -98,6 +93,7 @@ macro_rules! __impl_slice_eq2 {
 macro_rules! array_impls {
     ($($N:expr)+) => {
         $(
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl<T> AsRef<[T]> for [T; $N] {
                 #[inline]
                 fn as_ref(&self) -> &[T] {
@@ -105,6 +101,7 @@ macro_rules! array_impls {
                 }
             }
 
+            #[stable(feature = "rust1", since = "1.0.0")]
             impl<T> AsMut<[T]> for [T; $N] {
                 #[inline]
                 fn as_mut(&mut self) -> &mut [T] {

@@ -10,8 +10,6 @@
 
 //! Decodes a floating-point value into individual parts and error ranges.
 
-use prelude::v1::*;
-
 use {f32, f64};
 use num::FpCategory;
 use num::dec2flt::rawfp::RawFloat;
@@ -23,7 +21,7 @@ use num::dec2flt::rawfp::RawFloat;
 /// - Any number from `(mant - minus) * 2^exp` to `(mant + plus) * 2^exp` will
 ///   round to the original value. The range is inclusive only when
 ///   `inclusive` is true.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Decoded {
     /// The scaled mantissa.
     pub mant: u64,
@@ -40,7 +38,7 @@ pub struct Decoded {
 }
 
 /// Decoded unsigned value.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FullDecoded {
     /// Not-a-number.
     Nan,
@@ -69,7 +67,7 @@ impl DecodableFloat for f64 {
 /// Returns a sign (true when negative) and `FullDecoded` value
 /// from given floating point number.
 pub fn decode<T: DecodableFloat>(v: T) -> (/*negative?*/ bool, FullDecoded) {
-    let (mant, exp, sign) = v.integer_decode2();
+    let (mant, exp, sign) = v.integer_decode();
     let even = (mant & 1) == 0;
     let decoded = match v.classify() {
         FpCategory::Nan => FullDecoded::Nan,
@@ -83,7 +81,7 @@ pub fn decode<T: DecodableFloat>(v: T) -> (/*negative?*/ bool, FullDecoded) {
                                           exp: exp, inclusive: even })
         }
         FpCategory::Normal => {
-            let minnorm = <T as DecodableFloat>::min_pos_norm_value().integer_decode2();
+            let minnorm = <T as DecodableFloat>::min_pos_norm_value().integer_decode();
             if mant == minnorm.0 {
                 // neighbors: (maxmant, exp - 1) -- (minnormmant, exp) -- (minnormmant + 1, exp)
                 // where maxmant = minnormmant * 2 - 1

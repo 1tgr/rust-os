@@ -14,10 +14,7 @@
 
 // FIXME: #6220 Implement floating point formatting
 
-use prelude::v1::*;
-
 use fmt;
-use num::Zero;
 use ops::{Div, Rem, Sub};
 use str;
 use slice;
@@ -25,25 +22,29 @@ use ptr;
 use mem;
 
 #[doc(hidden)]
-trait Int: Zero + PartialEq + PartialOrd + Div<Output=Self> + Rem<Output=Self> +
+trait Int: PartialEq + PartialOrd + Div<Output=Self> + Rem<Output=Self> +
            Sub<Output=Self> + Copy {
+    fn zero() -> Self;
     fn from_u8(u: u8) -> Self;
     fn to_u8(&self) -> u8;
     fn to_u16(&self) -> u16;
     fn to_u32(&self) -> u32;
     fn to_u64(&self) -> u64;
+    fn to_u128(&self) -> u128;
 }
 
 macro_rules! doit {
     ($($t:ident)*) => ($(impl Int for $t {
+        fn zero() -> $t { 0 }
         fn from_u8(u: u8) -> $t { u as $t }
         fn to_u8(&self) -> u8 { *self as u8 }
         fn to_u16(&self) -> u16 { *self as u16 }
         fn to_u32(&self) -> u32 { *self as u32 }
         fn to_u64(&self) -> u64 { *self as u64 }
+        fn to_u128(&self) -> u128 { *self as u128 }
     })*)
 }
-doit! { i8 i16 i32 i64 isize u8 u16 u32 u64 usize }
+doit! { i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize }
 
 /// A type that represents a specific radix
 #[doc(hidden)]
@@ -61,11 +62,11 @@ trait GenericRadix {
 
     /// Format an integer using the radix using a formatter.
     fn fmt_int<T: Int>(&self, mut x: T, f: &mut fmt::Formatter) -> fmt::Result {
-        // The radix can be as low as 2, so we need a buffer of at least 64
+        // The radix can be as low as 2, so we need a buffer of at least 128
         // characters for a base 2 number.
         let zero = T::zero();
         let is_nonnegative = x >= zero;
-        let mut buf = [0; 64];
+        let mut buf = [0; 128];
         let mut curr = buf.len();
         let base = T::from_u8(self.base());
         if is_nonnegative {
@@ -184,6 +185,7 @@ integer! { i8, u8 }
 integer! { i16, u16 }
 integer! { i32, u32 }
 integer! { i64, u64 }
+integer! { i128, u128 }
 
 const DEC_DIGITS_LUT: &'static[u8] =
     b"0001020304050607080910111213141516171819\
@@ -205,14 +207,15 @@ macro_rules! impl_Display {
                 // convert the negative num to positive by summing 1 to it's 2 complement
                 (!self.$conv_fn()).wrapping_add(1)
             };
-            let mut buf: [u8; 20] = unsafe { mem::uninitialized() };
+            let mut buf: [u8; 39] = unsafe { mem::uninitialized() };
             let mut curr = buf.len() as isize;
             let buf_ptr = buf.as_mut_ptr();
             let lut_ptr = DEC_DIGITS_LUT.as_ptr();
 
             unsafe {
-                // eagerly decode 4 characters at a time
-                if <$t>::max_value() as u64 >= 10000 {
+                // need at least 16 bits for the 4-characters-at-a-time to work.
+                if ::mem::size_of::<$t>() >= 2 {
+                    // eagerly decode 4 characters at a time
                     while n >= 10000 {
                         let rem = (n % 10000) as isize;
                         n /= 10000;
@@ -258,6 +261,7 @@ macro_rules! impl_Display {
 
 impl_Display!(i8, u8, i16, u16, i32, u32: to_u32);
 impl_Display!(i64, u64: to_u64);
+impl_Display!(i128, u128: to_u128);
 #[cfg(target_pointer_width = "16")]
 impl_Display!(isize, usize: to_u16);
 #[cfg(target_pointer_width = "32")]

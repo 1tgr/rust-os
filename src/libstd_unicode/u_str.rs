@@ -14,11 +14,17 @@
 //! methods provided by the unicode parts of the CharExt trait.
 
 use core::char;
-use core::iter::Filter;
+use core::iter::{Filter, FusedIterator};
 use core::str::Split;
 
 /// An iterator over the non-whitespace substrings of a string,
 /// separated by any amount of whitespace.
+///
+/// This struct is created by the [`split_whitespace`] method on [`str`].
+/// See its documentation for more.
+///
+/// [`split_whitespace`]: ../../std/primitive.str.html#method.split_whitespace
+/// [`str`]: ../../std/primitive.str.html
 #[stable(feature = "split_whitespace", since = "1.1.0")]
 pub struct SplitWhitespace<'a> {
     inner: Filter<Split<'a, fn(char) -> bool>, fn(&&str) -> bool>,
@@ -77,54 +83,6 @@ impl UnicodeStr for str {
     }
 }
 
-// https://tools.ietf.org/html/rfc3629
-static UTF8_CHAR_WIDTH: [u8; 256] = [
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // 0x1F
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // 0x3F
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // 0x5F
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, // 0x7F
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0x9F
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0xBF
-0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2, // 0xDF
-3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3, // 0xEF
-4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0, // 0xFF
-];
-
-/// Given a first byte, determine how many bytes are in this UTF-8 character
-#[inline]
-pub fn utf8_char_width(b: u8) -> usize {
-    return UTF8_CHAR_WIDTH[b as usize] as usize;
-}
-
-/// Determines if a vector of `u16` contains valid UTF-16
-pub fn is_utf16(v: &[u16]) -> bool {
-    let mut it = v.iter();
-    macro_rules! next { ($ret:expr) => {
-            match it.next() { Some(u) => *u, None => return $ret }
-        }
-    }
-    loop {
-        let u = next!(true);
-
-        match char::from_u32(u as u32) {
-            Some(_) => {}
-            None => {
-                let u2 = next!(false);
-                if u < 0xD7FF || u > 0xDBFF || u2 < 0xDC00 || u2 > 0xDFFF {
-                    return false;
-                }
-            }
-        }
-    }
-}
-
 /// Iterator adaptor for encoding `char`s to UTF-16.
 #[derive(Clone)]
 pub struct Utf16Encoder<I> {
@@ -157,13 +115,13 @@ impl<I> Iterator for Utf16Encoder<I>
             return Some(tmp);
         }
 
+        let mut buf = [0; 2];
         self.chars.next().map(|ch| {
-            let n = CharExt::encode_utf16(ch);
-            let n = n.as_slice();
-            if n.len() == 2 {
-                self.extra = n[1];
+            let n = CharExt::encode_utf16(ch, &mut buf).len();
+            if n == 2 {
+                self.extra = buf[1];
             }
-            n[0]
+            buf[0]
         })
     }
 
@@ -177,6 +135,11 @@ impl<I> Iterator for Utf16Encoder<I>
     }
 }
 
+#[unstable(feature = "fused", issue = "35602")]
+impl<I> FusedIterator for Utf16Encoder<I>
+    where I: FusedIterator<Item = char> {}
+
+#[stable(feature = "split_whitespace", since = "1.1.0")]
 impl<'a> Iterator for SplitWhitespace<'a> {
     type Item = &'a str;
 
@@ -184,8 +147,13 @@ impl<'a> Iterator for SplitWhitespace<'a> {
         self.inner.next()
     }
 }
+
+#[stable(feature = "split_whitespace", since = "1.1.0")]
 impl<'a> DoubleEndedIterator for SplitWhitespace<'a> {
     fn next_back(&mut self) -> Option<&'a str> {
         self.inner.next_back()
     }
 }
+
+#[unstable(feature = "fused", issue = "35602")]
+impl<'a> FusedIterator for SplitWhitespace<'a> {}
