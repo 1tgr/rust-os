@@ -22,7 +22,7 @@ if __name__ == '__main__':
                     if result == 0:
                         print('Success')
                     elif result == 1:
-                        (message,) = p.match.groups()
+                        (message,) = child.match.groups()
                         print('Failed: %s' % message)
                     elif result == 2:
                         print('Timed out')
