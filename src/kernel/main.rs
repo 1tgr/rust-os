@@ -43,25 +43,26 @@ pub mod arch;
 #[path="arch/x86/mod.rs"]
 pub mod arch;
 
-pub mod bit_vec;
-pub mod console;
-pub mod deferred;
-pub mod elf;
-pub mod io;
-pub mod ksyscall;
 pub mod libc_helpers;
-pub mod logging;
-pub mod multiboot;
-pub mod once;
 pub mod phys_mem;
-pub mod prelude;
-pub mod process;
-pub mod ptr;
-pub mod singleton;
-pub mod tar;
-pub mod thread;
 pub mod unwind;
-pub mod virt_mem;
+
+mod bit_vec;
+mod console;
+mod deferred;
+mod elf;
+mod io;
+mod ksyscall;
+mod logging;
+mod multiboot;
+mod once;
+mod prelude;
+mod process;
+mod ptr;
+mod singleton;
+mod tar;
+mod thread;
+mod virt_mem;
 
 #[cfg(feature = "test")]
 mod demo;
