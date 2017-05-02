@@ -20,7 +20,7 @@ impl Console {
                 if keys.intersects(keys::BUCKY_RELEASE | keys::BUCKY_CTRL | keys::BUCKY_ALT | keys::BUCKY_ALTGR) {
                     Vec::new()
                 } else if let Some(c) = char::from_u32(c) {
-                    let mut bytes = Vec::with_capacity(4);
+                    let mut bytes = vec![0; 4];
                     let byte_count = char::encode_utf8(c, &mut bytes[..]).len();
                     bytes.truncate(byte_count);
 

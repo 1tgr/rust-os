@@ -17,7 +17,7 @@ INITRD += ../apps/input/target/amd64/release/input
 all: bootable.iso
 
 initrd.tar: $(INITRD)
-	tar --transform 's/.*\///g' -cf $@ $<
+	tar --transform 's/.*\///g' -cf $@ $(INITRD)
 
 initrd.tar.gz: initrd.tar
 	gzip -fk $<

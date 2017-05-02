@@ -73,7 +73,7 @@ impl<T: AsyncRead> Read for T {
     fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let p = self.read_async(vec![0; buf.len()]);
         let v = try!(p.get());
-        buf.copy_from_slice(&v);
+        &mut buf[..v.len()].copy_from_slice(&v);
         Ok(v.len())
     }
 }
