@@ -7,7 +7,7 @@ all: target/amd64/release/hello
 clean:
 	$(RUSTUP_RUN) cargo clean
 
-target/amd64/release/hello target/amd64/release/hello.d:
+target/amd64/release/hello target/amd64/release/hello.d: Cargo.toml
 	$(RUSTUP_RUN) cargo build --release
 	sed -i -e "s?`pwd`/??g" target/amd64/release/hello.d
 

@@ -15,7 +15,7 @@ clean:
 	$(RUSTUP_RUN) cargo clean
 	rm $(OBJS) kernel kernel.txt
 
-target/amd64-kernel/release/kernel target/amd64-kernel/release/kernel.d: $(OBJS)
+target/amd64-kernel/release/kernel target/amd64-kernel/release/kernel.d: Cargo.toml $(OBJS)
 	$(RUSTUP_RUN) cargo build --release
 	sed -i -e "s?`pwd`/??g" target/amd64-kernel/release/kernel.d
 
