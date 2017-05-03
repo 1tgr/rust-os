@@ -1,10 +1,9 @@
 FROM travisci/ci-garnet:packer-1490989530
-RUN add-apt-repository -y 'deb http://ppa.launchpad.net/jonathonf/tup/ubuntu trusty main' && apt-get update
-RUN apt-get install -y genisoimage
-RUN apt-get install -y python3-pip
-RUN apt-get install -y qemu
-RUN apt-get install -y --allow-unauthenticated tup
-RUN git clone --depth=1 https://github.com/1tgr/rust-os.git /host-bootstrap  # 2b4c91158
+RUN apt-get update -qq
+RUN apt-get install -qq -y genisoimage
+RUN apt-get install -qq -y python3-pip
+RUN apt-get install -qq -y qemu
+RUN git clone --depth=1 https://github.com/1tgr/rust-os.git /host-bootstrap  # 22b11fa0
 WORKDIR /host-bootstrap
 RUN ./travis-setup.sh
 ADD build.sh /docker/
