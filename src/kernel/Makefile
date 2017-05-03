@@ -1,8 +1,7 @@
-OBJS = arch/amd64/start.o arch/amd64/setjmp.o
-RUST_TOOLCHAIN = nightly-2017-04-26
-TARGET = x86_64-elf
+include ../config.txt
 
-RUSTUP_RUN = RUST_TARGET_PATH=../libsyscall/arch rustup run $(RUST_TOOLCHAIN)
+OBJS = arch/amd64/start.o arch/amd64/setjmp.o
+RUSTUP_RUN = RUST_TARGET_PATH=../libsyscall/arch rustup run $(CONFIG_RUST_TOOLCHAIN)
 CC = gcc
 OBJDUMP = $(TARGET)-objdump
 OBJCOPY = $(TARGET)-objcopy
