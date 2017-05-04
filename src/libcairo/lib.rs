@@ -7,6 +7,16 @@
 extern crate collections;
 extern crate libc;
 
+#[link(name = "c")]
+#[link(name = "cairo")]
+#[link(name = "pixman-1")]
+#[link(name = "png16")]
+#[link(name = "z")]
+#[link(name = "gcc")]
+#[link(name = "m")]
+extern {
+}
+
 pub mod cairo;
 pub mod bindings;
 pub mod surface;

@@ -1,3 +1,6 @@
+#![feature(link_args)]
+#![feature(start)]
+
 extern crate cairo;
 extern crate libc;
 extern crate syscall;
@@ -11,8 +14,7 @@ use std::mem;
 use std::os::OSMem;
 use std::ptr;
 
-#[no_mangle]
-pub unsafe fn main() -> i32 {
+unsafe fn main() -> isize {
     let lfb = OSMem::from_raw(syscall::init_video_mode(800, 600, 32).unwrap());
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
     let surface = CairoSurface::from_raw(&lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride);
@@ -58,5 +60,16 @@ pub unsafe fn main() -> i32 {
     cairo_set_source_rgb(*cr, 0.0, 0.0, 0.0);
     cairo_move_to(*cr, 128.0 - extents.x_advance / 2.0, 128.0 + ((cairo_image_surface_get_height(*image) / 2) as f64) + extents.height);
     cairo_show_text(*cr, message);
-    0x1234
+    0
+}
+
+#[cfg(target_arch="x86_64")]
+#[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
+extern {
+}
+
+#[start]
+#[no_mangle]
+pub fn start(_: isize, _: *const *const u8) -> isize {
+    unsafe { main() }
 }

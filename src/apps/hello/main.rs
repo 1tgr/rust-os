@@ -29,7 +29,8 @@ macro_rules! println {
     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
 }
 
-#[cfg_attr(target_arch = "x86_64", link_args = "-T ../../libsyscall/arch/amd64/link.ld ../../newlib/x86_64-elf/lib/libc.a -z max-page-size=0x1000")]
+#[cfg(target_arch="x86_64")]
+#[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
 extern {
 }
 

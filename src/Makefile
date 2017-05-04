@@ -1,3 +1,4 @@
+DIRS += apps/cairo_demo
 DIRS += apps/hello
 DIRS += apps/input
 DIRS += kernel

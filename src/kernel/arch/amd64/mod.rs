@@ -36,9 +36,8 @@ pub fn restore_interrupts(token: usize) {
 }
 
 #[link_args = "-T arch/amd64/link.ld"]
-#[link_args = "arch/amd64/setjmp.o"]
-#[link_args = "arch/amd64/start.o"]
-#[link_args = "../newlib/x86_64-elf/lib/libc.a"]
-#[link_args = "-z max-page-size=0x1000"]
+#[link_args = "-L arch/amd64"]
+#[link(name = ":setjmp.o")]
+#[link(name = ":start.o")]
 extern {
 }

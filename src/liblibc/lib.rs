@@ -77,6 +77,10 @@
 #[cfg(test)] extern crate std;
 #[cfg(test)] extern crate test;
 
+#[link(name = "c")]
+extern {
+}
+
 // Explicit export lists for the intersection (provided here) mean that
 // you can write more-platform-agnostic code if you stick to just these
 // symbols.

@@ -12,6 +12,12 @@
     "executables": true,
     "linker": "x86_64-elf-ld",
     "linker-flavor": "ld",
+    "pre-link-args": {
+        "ld": [
+            "-z", "max-page-size=0x1000",
+            "--strip-all"
+        ]
+    },
     "dynamic-linking-available": false,
     "code-model": "kernel"
 }

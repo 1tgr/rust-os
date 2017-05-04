@@ -1,3 +1,0 @@
-: main.rs | $(LIBS) $(ROOT)/libsyscall/libsyscall_kernel.rlib |> !RUSTC_OBJ |> %d.o {objs}
-: {objs} $(LIBS) $(LIBS1) | $(ROOT)/libsyscall/arch/@(ARCH)/link.ld |> !LD |> %d-debug {bins_debug}
-: {bins_debug} |> $(OBJCOPY) -S %f %o |> %d

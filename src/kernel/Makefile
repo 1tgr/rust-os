@@ -8,23 +8,16 @@ OBJCOPY = $(TARGET)-objcopy
 ASFLAGS += -m64
 ASFLAGS += -g -I ../newlib/$(TARGET)/include
 
-all: kernel kernel.txt
+.PHONY: all clean
+
+all: $(OBJS)
+	$(RUSTUP_RUN) cargo build --release
+	$(OBJCOPY) -F elf32-i386 target/amd64-kernel/release/kernel kernel
+	$(OBJDUMP) -d target/amd64-kernel/release/kernel > kernel.txt
 
 clean:
 	$(RUSTUP_RUN) cargo clean
 	rm $(OBJS) kernel kernel.txt
 
-target/amd64-kernel/release/kernel target/amd64-kernel/release/kernel.d: Cargo.toml $(OBJS)
-	$(RUSTUP_RUN) cargo build --release
-	sed -i -e "s?`pwd`/??g" target/amd64-kernel/release/kernel.d
-
-kernel: target/amd64-kernel/release/kernel
-	$(OBJCOPY) -SF elf32-i386 $< $@
-
-kernel.txt: target/amd64-kernel/release/kernel
-	$(OBJDUMP) -d $< > $@
-
 .S.o:
 	$(CC) $(ASFLAGS) -c -o $@ $<
-
-include target/amd64-kernel/release/kernel.d

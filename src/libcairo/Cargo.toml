@@ -1,14 +1,16 @@
 [package]
-name = "libc"
+name = "cairo"
 version = "0.0.0"
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 build = "build.rs"
-links = "libc"
+links = "cairo"
 
 [lib]
-name = "libc"
+name = "cairo"
 path = "lib.rs"
 test = false
 
 [dependencies]
 core = { path = "../../rust/src/libcore" }
+collections = { path = "../../rust/src/libcollections" }
+libc = { path = "../liblibc" }

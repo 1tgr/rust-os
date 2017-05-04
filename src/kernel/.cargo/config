@@ -1,2 +1,5 @@
 [build]
 target = "amd64-kernel"
+
+[target.amd64-kernel.libc]
+rustc-link-search = ["../newlib/x86_64-elf/lib"]
