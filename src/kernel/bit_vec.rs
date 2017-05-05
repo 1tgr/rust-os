@@ -91,7 +91,7 @@ use core::default::Default;
 use core::fmt;
 use core::hash;
 use core::iter::FromIterator;
-use core::iter::{Chain, Enumerate, Repeat, Skip, Take, repeat};
+use core::iter::repeat;
 use core::iter::{DoubleEndedIterator, ExactSizeIterator};
 use core::iter::{Iterator, Extend, IntoIterator};
 use core::marker::Copy;
@@ -101,7 +101,6 @@ use core::slice;
 use core::{u8, usize};
 
 type MutBlocks<'a, B> = slice::IterMut<'a, B>;
-type MatchWords<'a, B> = Chain<Enumerate<Blocks<'a, B>>, Skip<Take<Enumerate<Repeat<B>>>>>;
 
 use core::ops::*;
 

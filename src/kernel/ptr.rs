@@ -1,5 +1,3 @@
-use core::slice;
-
 pub fn bytes_between<T>(ptr1: *const T, ptr2: *const T) -> usize {
     if ptr2 > ptr1 {
         ptr2 as usize - ptr1 as usize
@@ -52,18 +50,6 @@ impl<T> Align for *const T {
     fn is_aligned(value: *const T, round: usize) -> bool {
         Align::is_aligned(value as usize, round)
     }
-}
-
-pub unsafe fn align_slice<T>(slice: &[T], round: usize) -> &[T] {
-    let (ptr, len) = (slice.as_ptr(), slice.len());
-    let (ptr, len) = Align::range(ptr, len, round);
-    slice::from_raw_parts(ptr, len)
-}
-
-pub unsafe fn align_slice_mut<T>(slice: &mut [T], round: usize) -> &mut [T] {
-    let (ptr, len) = (slice.as_mut_ptr(), slice.len());
-    let (ptr, len) = Align::range(ptr, len, round);
-    slice::from_raw_parts_mut(ptr, len)
 }
 
 impl<T> Align for *mut T {

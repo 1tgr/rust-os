@@ -60,50 +60,6 @@ pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     memchr_specific(needle, haystack)
 }
 
-/// A safe interface to `memrchr`.
-///
-/// Returns the index corresponding to the last occurrence of `needle` in
-/// `haystack`, or `None` if one is not found.
-///
-/// # Example
-///
-/// This shows how to find the last position of a byte in a byte string.
-///
-/// ```rust,ignore
-/// use memchr::memrchr;
-///
-/// let haystack = b"the quick brown fox";
-/// assert_eq!(memrchr(b'o', haystack), Some(17));
-/// ```
-pub fn memrchr(needle: u8, haystack: &[u8]) -> Option<usize> {
-
-    #[cfg(target_os = "linux")]
-    fn memrchr_specific(needle: u8, haystack: &[u8]) -> Option<usize> {
-        use libc;
-
-        // GNU's memrchr() will - unlike memchr() - error if haystack is empty.
-        if haystack.is_empty() {return None}
-        let p = unsafe {
-            libc::memrchr(
-                haystack.as_ptr() as *const libc::c_void,
-                needle as libc::c_int,
-                haystack.len() as libc::size_t)
-        };
-        if p.is_null() {
-            None
-        } else {
-            Some(p as usize - (haystack.as_ptr() as usize))
-        }
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    fn memrchr_specific(needle: u8, haystack: &[u8]) -> Option<usize> {
-        fallback::memrchr(needle, haystack)
-    }
-
-    memrchr_specific(needle, haystack)
-}
-
 #[allow(dead_code)]
 mod fallback {
     use cmp;
