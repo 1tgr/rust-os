@@ -11,6 +11,4 @@ path = "lib.rs"
 test = false
 
 [dependencies]
-core = { path = "../../rust/src/libcore" }
-collections = { path = "../../rust/src/libcollections" }
 libc = { path = "../liblibc" }

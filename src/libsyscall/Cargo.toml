@@ -9,7 +9,6 @@ path = "lib.rs"
 test = false
 
 [dependencies]
-core = { path = "../../rust/src/libcore" }
 libc = { path = "../liblibc" }
 
 [features]

@@ -9,9 +9,5 @@ path = "lib.rs"
 test = false
 
 [dependencies]
-alloc = { path = "../../rust/src/liballoc" }
-collections = { path = "../../rust/src/libcollections" }
-core = { path = "../../rust/src/libcore" }
 libc = { path = "../liblibc" }
-std_unicode = { path = "../../rust/src/libstd_unicode" }
 syscall = { path = "../libsyscall" }

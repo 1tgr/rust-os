@@ -9,6 +9,3 @@ links = "libc"
 name = "libc"
 path = "lib.rs"
 test = false
-
-[dependencies]
-core = { path = "../../rust/src/libcore" }

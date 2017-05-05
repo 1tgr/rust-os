@@ -13,12 +13,8 @@ default = ["test"]
 test = []
 
 [dependencies]
-alloc = { path = "../../rust/src/liballoc" }
 alloc_system = { path = "../liballoc_system" }
-collections = { path = "../../rust/src/libcollections" }
-core = { path = "../../rust/src/libcore" }
 libc = { path = "../liblibc" }
-std_unicode = { path = "../../rust/src/libstd_unicode" }
 
 [dependencies.syscall]
 path = "../libsyscall"
