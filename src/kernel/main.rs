@@ -24,8 +24,8 @@
 
 /// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use] extern crate collections;
+#[macro_use] extern crate bitflags;
 
-#[macro_use] pub mod bitflags;
 #[macro_use] pub mod lazy_static;
 #[macro_use] pub mod mutex;
 #[macro_use] pub mod macros;

@@ -15,5 +15,6 @@ test = []
 [dependencies]
 alloc_system = { path = "../liballoc_system" }
 bit-vec = { git = "https://github.com/1tgr/bit-vec", features = ["nightly"] }
+bitflags = "0.8.2"
 libc = { path = "../liblibc" }
 syscall = { path = "../libsyscall", features = ["kernel"] }

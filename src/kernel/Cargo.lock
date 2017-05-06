@@ -4,6 +4,7 @@ version = "0.0.0"
 dependencies = [
  "alloc_system 0.0.0",
  "bit-vec 0.4.3 (git+https://github.com/1tgr/bit-vec)",
+ "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.0.0",
  "syscall 0.0.0",
 ]
@@ -21,6 +22,11 @@ version = "0.4.3"
 source = "git+https://github.com/1tgr/bit-vec#c81195b8847f3c1a6f926de1fdc646c7f7b6b2c8"
 
 [[package]]
+name = "bitflags"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "libc"
 version = "0.0.0"
 
@@ -33,3 +39,4 @@ dependencies = [
 
 [metadata]
 "checksum bit-vec 0.4.3 (git+https://github.com/1tgr/bit-vec)" = "<none>"
+"checksum bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1370e9fc2a6ae53aea8b7a5110edbd08836ed87c88736dfabccade1c2b44bff4"

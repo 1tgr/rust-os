@@ -9,7 +9,7 @@ use ptr::Align;
 use syscall::Result;
 
 bitflags! {
-    flags PageFlags: usize {
+    pub flags PageFlags: usize {
         const PAGE_PRESENT = 0x001,
         const PAGE_WRITABLE = 0x002,
         const PAGE_USER = 0x004,

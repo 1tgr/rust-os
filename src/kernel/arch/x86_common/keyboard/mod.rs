@@ -14,7 +14,7 @@ pub struct Key(u32, u32, u32, u32, u32, u32);
 pub mod keys {
     // "bucky bits"
     bitflags! {
-        flags Bucky: u32 {
+        pub flags Bucky: u32 {
             const BUCKY_RELEASE =   0x01000000, // Key was released
             const BUCKY_ALT =       0x02000000, // Alt is pressed
             const BUCKY_CTRL =      0x04000000, // Ctrl is pressed
@@ -23,16 +23,6 @@ pub mod keys {
             const BUCKY_NUM =       0x20000000, // NumLock is on
             const BUCKY_SCRL =      0x40000000, // ScrollLock is on
             const BUCKY_ALTGR =     0x80000000  // AltGr is pressed
-        }
-    }
-
-    impl Bucky {
-        pub fn set(&mut self, other: Bucky, set: bool) {
-            if set {
-                self.insert(other)
-            } else {
-                self.remove(other)
-            }
         }
     }
 
