@@ -32,6 +32,7 @@
 #[macro_use] mod test;
 
 extern crate alloc;
+extern crate bit_vec;
 extern crate libc;
 extern crate syscall;
 
@@ -47,7 +48,6 @@ pub mod libc_helpers;
 pub mod phys_mem;
 pub mod unwind;
 
-mod bit_vec;
 mod console;
 mod deferred;
 mod elf;

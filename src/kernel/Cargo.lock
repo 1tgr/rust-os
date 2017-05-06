@@ -3,6 +3,7 @@ name = "kernel"
 version = "0.0.0"
 dependencies = [
  "alloc_system 0.0.0",
+ "bit-vec 0.4.3 (git+https://github.com/1tgr/bit-vec)",
  "libc 0.0.0",
  "syscall 0.0.0",
 ]
@@ -15,6 +16,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-vec"
+version = "0.4.3"
+source = "git+https://github.com/1tgr/bit-vec#c81195b8847f3c1a6f926de1fdc646c7f7b6b2c8"
+
+[[package]]
 name = "libc"
 version = "0.0.0"
 
@@ -25,3 +31,5 @@ dependencies = [
  "libc 0.0.0",
 ]
 
+[metadata]
+"checksum bit-vec 0.4.3 (git+https://github.com/1tgr/bit-vec)" = "<none>"
