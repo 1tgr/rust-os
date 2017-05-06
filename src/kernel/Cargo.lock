@@ -5,6 +5,7 @@ dependencies = [
  "alloc_system 0.0.0",
  "bit-vec 0.4.3 (git+https://github.com/1tgr/bit-vec)",
  "bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.0.0",
  "syscall 0.0.0",
 ]
@@ -27,8 +28,21 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "lazy_static"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "spin 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "libc"
 version = "0.0.0"
+
+[[package]]
+name = "spin"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "syscall"
@@ -40,3 +54,5 @@ dependencies = [
 [metadata]
 "checksum bit-vec 0.4.3 (git+https://github.com/1tgr/bit-vec)" = "<none>"
 "checksum bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1370e9fc2a6ae53aea8b7a5110edbd08836ed87c88736dfabccade1c2b44bff4"
+"checksum lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3b37545ab726dd833ec6420aaba8231c5b320814b9029ad585555d2a03e94fbf"
+"checksum spin 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "1d16a26e2b789f86aabddbe91cb82ee2e822beb8a59840d631941b625ef77e53"
