@@ -6,6 +6,5 @@ build = "build.rs"
 links = "libc"
 
 [lib]
-name = "libc"
 path = "lib.rs"
 test = false

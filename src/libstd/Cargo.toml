@@ -4,7 +4,6 @@ name = "std"
 version = "0.0.0"
 
 [lib]
-name = "std"
 path = "lib.rs"
 test = false
 

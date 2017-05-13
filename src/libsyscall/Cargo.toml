@@ -4,7 +4,6 @@ name = "syscall"
 version = "0.0.0"
 
 [lib]
-name = "syscall"
 path = "lib.rs"
 test = false
 

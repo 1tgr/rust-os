@@ -6,7 +6,6 @@ build = "build.rs"
 links = "cairo"
 
 [lib]
-name = "cairo"
 path = "lib.rs"
 test = false
 

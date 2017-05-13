@@ -4,7 +4,6 @@ version = "0.0.0"
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 
 [lib]
-name = "graphics"
 path = "lib.rs"
 test = false
 
