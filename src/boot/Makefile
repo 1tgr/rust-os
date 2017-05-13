@@ -1,3 +1,5 @@
+include ../config.txt
+
 ISO += ../kernel/kernel
 ISO += initrd.tar.gz
 ISO += menu.lst
@@ -8,11 +10,11 @@ ISO_LAYOUT += initrd.tar.gz
 ISO_LAYOUT += boot/grub/menu.lst=menu.lst
 ISO_LAYOUT += boot/grub/stage2_eltorito=stage2_eltorito_temp
 
-INITRD += ../apps/target/amd64/release/cairo_demo
-# INITRD += ../apps/graphics_client/graphics_client
-# INITRD += ../apps/graphics_server/graphics_server
-INITRD += ../apps/target/amd64/release/hello
-INITRD += ../apps/target/amd64/release/input
+INITRD += ../apps/target/$(CONFIG_TARGET)/release/cairo_demo
+INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_client
+INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_server
+INITRD += ../apps/target/$(CONFIG_TARGET)/release/hello
+INITRD += ../apps/target/$(CONFIG_TARGET)/release/input
 
 all: bootable.iso
 

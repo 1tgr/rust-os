@@ -1,3 +1,6 @@
+#![feature(link_args)]
+#![feature(start)]
+
 extern crate cairo;
 extern crate graphics;
 extern crate syscall;
@@ -79,7 +82,13 @@ fn run() -> Result<()> {
     }
 }
 
+#[cfg(target_arch="x86_64")]
+#[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
+extern {
+}
+
+#[start]
 #[no_mangle]
-pub fn main() -> i32 {
-    run().map(|()| 0).unwrap_or_else(|num| -(num as i32))
+pub fn start(_: isize, _: *const *const u8) -> isize {
+    run().map(|()| 0).unwrap_or_else(|num| -(num as isize))
 }
