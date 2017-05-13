@@ -9,4 +9,3 @@ test = false
 
 [dependencies]
 cairo = { path = "../libcairo" }
-std = { path = "../libstd" }

@@ -10,5 +10,4 @@ test = false
 
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
-std = { path = "../../libstd" }
 syscall = { path = "../../libsyscall" }

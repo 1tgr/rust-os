@@ -3,7 +3,6 @@ name = "input"
 version = "0.0.0"
 dependencies = [
  "alloc_system 0.0.0",
- "std 0.0.0",
  "syscall 0.0.0",
 ]
 
@@ -28,7 +27,6 @@ dependencies = [
  "alloc_system 0.0.0",
  "cairo 0.0.0",
  "libc 0.0.0",
- "std 0.0.0",
  "syscall 0.0.0",
 ]
 
@@ -37,7 +35,6 @@ name = "graphics"
 version = "0.0.0"
 dependencies = [
  "cairo 0.0.0",
- "std 0.0.0",
 ]
 
 [[package]]
@@ -47,7 +44,6 @@ dependencies = [
  "alloc_system 0.0.0",
  "cairo 0.0.0",
  "graphics 0.0.0",
- "std 0.0.0",
  "syscall 0.0.0",
 ]
 
@@ -58,7 +54,6 @@ dependencies = [
  "alloc_system 0.0.0",
  "cairo 0.0.0",
  "graphics 0.0.0",
- "std 0.0.0",
  "syscall 0.0.0",
 ]
 
@@ -67,21 +62,12 @@ name = "hello"
 version = "0.0.0"
 dependencies = [
  "alloc_system 0.0.0",
- "std 0.0.0",
  "syscall 0.0.0",
 ]
 
 [[package]]
 name = "libc"
 version = "0.0.0"
-
-[[package]]
-name = "std"
-version = "0.0.0"
-dependencies = [
- "libc 0.0.0",
- "syscall 0.0.0",
-]
 
 [[package]]
 name = "syscall"
