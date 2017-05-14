@@ -32,4 +32,10 @@ impl Client {
     pub fn wait_for_event(&mut self) -> Result<Event> {
         ipc::read_message(&mut self.buf, &mut self.server2client)
     }
+
+    pub fn checkpoint(&mut self) -> Result<usize> {
+        let id = alloc_id();
+        self.send_command(Command::Checkpoint { id })?;
+        Ok(id)
+    }
 }

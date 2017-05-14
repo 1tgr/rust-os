@@ -10,7 +10,7 @@ extern crate syscall;
 use cairo::CairoObj;
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
-use graphics::{Client,Window};
+use graphics::{Client,Event,Window};
 use os::Result;
 use std::cell::RefCell;
 
@@ -37,9 +37,21 @@ fn run() -> Result<()> {
         windows.push(window);
     }
 
+    let checkpoint_id = client.borrow_mut().checkpoint()?;
+
     loop {
-        client.borrow_mut().wait_for_event()?;
-    }
+        let e = client.borrow_mut().wait_for_event()?;
+        println!("[Client] {:?}", e);
+        match e {
+            Event::Checkpoint { id } => {
+                if id == checkpoint_id {
+                    println!("System ready");
+                }
+            },
+
+            _ => { },
+        }
+    } 
 }
 
 #[cfg(target_arch="x86_64")]

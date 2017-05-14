@@ -8,6 +8,10 @@ pub struct Rect {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Command {
+    Checkpoint {
+        id: usize,
+    },
+
     CreateWindow {
         id: usize,
         pos: Rect,
@@ -30,6 +34,10 @@ pub enum Command {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Event {
+    Checkpoint {
+        id: usize,
+    },
+
     KeyPress {
         window_id: usize,
         code: char,

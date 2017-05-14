@@ -14,23 +14,23 @@ if __name__ == '__main__':
         child_args = sys.argv[1:] + ['-serial', 'pipe:' + fifo_name]
         print('> %s' % subprocess.list2cmdline(child_args))
         with Popen(child_args) as child_proc:
-            print('Started process %d' % child_proc.pid)
+            print('[test.py] Started process %d' % child_proc.pid)
             try:
                 with open(fifo_name, 'rb') as fifo:
                     child = fdpexpect.fdspawn(fifo, encoding='utf8', logfile=sys.stdout, timeout=10)
-                    result = child.expect([r'\[kernel\] end kmain', r'\[kernel::unwind\] (.*)', pexpect.TIMEOUT])
+                    result = child.expect([r'\[kernel\] end kmain|System ready', r'\[kernel::unwind\] (.*)', pexpect.TIMEOUT])
                     if result == 0:
-                        print('Success')
+                        print('[test.py] Success')
                     elif result == 1:
                         (message,) = child.match.groups()
-                        print('Failed: %s' % message)
+                        print('[test.py] Failed: %s' % message)
                     elif result == 2:
-                        print('Timed out')
+                        print('[test.py] Timed out')
 
             finally:
-                print('Stopping process %d' % child_proc.pid)
+                print('[test.py] Stopping process %d' % child_proc.pid)
                 child_proc.kill()
-                print('Waiting for process %d to exit... ' % child_proc.pid, end='', flush=True)
+                print('[test.py] Waiting for process %d to exit... ' % child_proc.pid, end='', flush=True)
                 child_proc.wait()
                 print('done')
 

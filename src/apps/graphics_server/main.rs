@@ -18,7 +18,7 @@ use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
 use collections::vec_deque::VecDeque;
-use graphics::{Command,Rect};
+use graphics::{Command,Event,Rect};
 use intrusive_collections::{LinkedList,RBTree};
 use os::{File,Mutex,OSMem,Process,Result};
 use std::rc::Rc;
@@ -97,10 +97,14 @@ impl Server {
         })
     }
 
-    pub fn handle_command(&self, client_process: &Process, command: Command) -> Result<()> {
+    pub fn handle_command(&self, client_process: &Process, server2client: &mut File, command: Command) -> Result<()> {
         let handle = client_process.handle().get();
         println!("[Server] {:?}", command);
         match command {
+            Command::Checkpoint { id } => {
+                graphics::send_message(server2client, Event::Checkpoint { id })?;
+            },
+
             Command::CreateWindow { id, pos, shared_mem_handle } => {
                 let window = Window::new(client_process, id, pos, shared_mem_handle)?;
                 self.state.lock()?.add_window(window);
@@ -152,7 +156,7 @@ impl<'a> Connection<'a> {
         let mut buf = VecDeque::new();
         loop {
             let c = graphics::read_message(&mut buf, &mut self.client2server)?;
-            self.server.handle_command(&self.process, c)?;
+            self.server.handle_command(&self.process, &mut self.server2client, c)?;
         }
     }
 }
