@@ -9,3 +9,7 @@ test = false
 
 [dependencies]
 cairo = { path = "../libcairo" }
+corepack = { git = "https://github.com/jrasky/corepack.git", branch = "jrasky/serde-0.9-upgrade", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["collections"]}
+serde_derive = "1.0"
+syscall = { path = "../libsyscall" }

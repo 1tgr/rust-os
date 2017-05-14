@@ -443,3 +443,16 @@ macro_rules! panic {
         $crate::panicking::panic_fmt(format_args!($fmt, $($arg)*), &_FILE_LINE)
     });
 }
+
+#[macro_export]
+#[stable(feature = "rust-os", since = "1.0.0")]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::io::file::print(format_args!($($arg)*)));
+}
+
+#[macro_export]
+#[stable(feature = "rust-os", since = "1.0.0")]
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+}

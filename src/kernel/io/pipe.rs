@@ -35,7 +35,8 @@ impl IoRequest {
             *data = right
         }
 
-        if self.current >= self.buf.len() {
+        if self.current > 0 || self.buf.len() == 0 {
+            self.buf.truncate(self.current);
             self.d.resolve(Ok(self.buf));
             None
         } else {
@@ -152,6 +153,7 @@ pub mod test {
         fn blocks_when_out_of_data() {
             let pipe = Pipe::new();
             Write::write(&pipe, b"hello").unwrap();
+            test_read(&pipe, b"hello");
 
             let d = pipe.read_async(vec![0; 10]);
             assert!(d.try_get().is_err());

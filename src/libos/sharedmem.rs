@@ -13,7 +13,6 @@ fn align_up(value: usize, round: usize) -> usize {
 pub struct SharedMem {
     handle: OSHandle,
     writable: bool,
-    len: usize,
     ptr: Option<OSMem>
 }
 
@@ -27,7 +26,6 @@ impl SharedMem {
         SharedMem {
             handle: handle,
             writable: writable,
-            len: 0,
             ptr: None
         }
     }
@@ -37,15 +35,16 @@ impl SharedMem {
     }
 
     pub fn resize(&mut self, new_len: usize) -> Result<()> {
-        if align_up(new_len, 4096) == align_up(self.len, 4096) {
+        let old_len = self.ptr.as_ref().map_or(0, |ptr| ptr.len());
+        if align_up(new_len, 4096) == align_up(old_len, 4096) {
             return Ok(());
         }
 
-        self.len = new_len;
         if new_len == 0 {
             self.ptr = None;
         } else {
-            self.ptr = Some(OSMem::from_raw(syscall::map_shared_mem(self.handle.get(), self.len, self.writable)?));
+            let ptr = syscall::map_shared_mem(self.handle.get(), new_len, self.writable)?;
+            self.ptr = Some(unsafe { OSMem::from_raw(ptr, new_len) });
         }
 
         Ok(())

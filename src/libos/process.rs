@@ -1,6 +1,5 @@
-use collections::Vec;
 use super::{OSHandle,Result};
-use syscall;
+use syscall::{self,Handle};
 
 pub struct Process(OSHandle);
 
@@ -9,9 +8,8 @@ impl Process {
         Process(handle)
     }
 
-    pub fn spawn(filename: &str, inherit: &[&OSHandle]) -> Result<Self> {
-        let inherit : Vec<syscall::Handle> = inherit.iter().map(|handle| handle.get()).collect();
-        Ok(Process(OSHandle::from_raw(syscall::spawn(filename, &inherit)?)))
+    pub fn spawn(filename: &str, inherit: &[Handle]) -> Result<Self> {
+        Ok(Process(OSHandle::from_raw(syscall::spawn(filename, inherit)?)))
     }
 
     pub fn handle(&self) -> &OSHandle {

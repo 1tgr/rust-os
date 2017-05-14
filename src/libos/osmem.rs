@@ -1,21 +1,28 @@
-use core::ops::Deref;
+use core::ops::{Deref,DerefMut};
 use core::ptr::Unique;
+use core::slice;
 use syscall;
 
-pub struct OSMem(Unique<u8>);
+pub struct OSMem(Unique<u8>, usize);
 
 impl OSMem {
-    pub fn from_raw(ptr: *mut u8) -> Self {
+    pub unsafe fn from_raw(ptr: *mut u8, len: usize) -> Self {
         assert!(!ptr.is_null());
-        OSMem(unsafe { Unique::new(ptr) })
+        OSMem(Unique::new(ptr), len)
     }
 }
 
 impl Deref for OSMem {
-    type Target = Unique<u8>;
+    type Target = [u8];
 
-    fn deref(&self) -> &Unique<u8> {
-        &self.0
+    fn deref(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.0.as_ptr(), self.1) }
+    }
+}
+
+impl DerefMut for OSMem {
+    fn deref_mut(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.0.as_ptr(), self.1) }
     }
 }
 

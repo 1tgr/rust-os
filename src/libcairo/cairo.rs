@@ -37,7 +37,7 @@ impl Cairo {
         self
     }
 
-    pub fn set_source_surface(&self, surface: CairoSurface, x: f64, y: f64) -> &Self {
+    pub fn set_source_surface(&self, surface: &CairoSurface, x: f64, y: f64) -> &Self {
         unsafe { cairo_set_source_surface(self.0.as_ptr(), surface.as_ptr(), x, y) };
         self
     }
