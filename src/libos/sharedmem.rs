@@ -1,4 +1,4 @@
-use core::ops::Deref;
+use core::ops::{Deref,DerefMut};
 use super::{OSHandle,OSMem,Result};
 use syscall;
 
@@ -17,17 +17,17 @@ pub struct SharedMem {
 }
 
 impl SharedMem {
-    pub fn create(writable: bool) -> Result<Self> {
-        let handle = OSHandle::from_raw(syscall::create_shared_mem()?);
-        Ok(SharedMem::open(handle, writable))
-    }
-
-    pub fn open(handle: OSHandle, writable: bool) -> Self {
+    pub fn from_raw(handle: OSHandle, writable: bool) -> Self {
         SharedMem {
             handle: handle,
             writable: writable,
             ptr: None
         }
+    }
+
+    pub fn new(writable: bool) -> Result<Self> {
+        let handle = OSHandle::from_raw(syscall::create_shared_mem()?);
+        Ok(SharedMem::from_raw(handle, writable))
     }
 
     pub fn handle(&self) -> &OSHandle {
@@ -56,5 +56,11 @@ impl Deref for SharedMem {
 
     fn deref(&self) -> &OSMem {
         self.ptr.as_ref().unwrap()
+    }
+}
+
+impl DerefMut for SharedMem {
+    fn deref_mut(&mut self) -> &mut OSMem {
+        self.ptr.as_mut().unwrap()
     }
 }

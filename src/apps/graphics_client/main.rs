@@ -6,17 +6,17 @@ extern crate graphics;
 extern crate os;
 extern crate syscall;
 
-use graphics::{Command,Event};
-use os::{File,OSHandle,Result};
+use graphics::{Client,Window};
+use os::Result;
+use std::cell::RefCell;
 
 fn run() -> Result<()> {
-    let mut client2server = File::from_raw(OSHandle::from_raw(2));
-    let mut server2client = File::from_raw(OSHandle::from_raw(3));
+    let client = RefCell::new(Client::new());
     println!("[Client] Sending command");
-    graphics::send_message(&mut client2server, Command::CreateWindow)?;
+    let window = Window::new(&client, 0.0, 0.0, 100.0, 100.0)?;
     loop {
         println!("[Client] Waiting for event");
-        let e : Event = graphics::read_message(&mut server2client)?;
+        let e = client.borrow_mut().wait_for_event()?;
         println!("[Client] Got event: {:?}", e);
     }
     Ok(())

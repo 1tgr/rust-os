@@ -67,6 +67,10 @@ impl<'a, T: ?Sized+'a> KObjRef<T> {
 
         Ok(KObjRef { kobj: kobj, ptr: unsafe { NonZero::new(ptr) } })
     }
+
+    pub fn get(&self) -> &Arc<KObj> {
+        &self.kobj
+    }
 }
 
 impl<T: ?Sized> Clone for KObjRef<T> {

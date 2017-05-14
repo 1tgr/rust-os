@@ -120,4 +120,10 @@ impl HandleSyscall for SyscallHandler {
     fn create_pipe(&self) -> Result<Handle> {
         Ok(process::make_handle(Arc::new(Pipe::new())))
     }
+
+    fn open_handle(&self, from_process: Handle, from_handle: usize) -> Result<Handle> {
+        let from_process = process::resolve_handle_ref(from_process, |kobj| kobj.process())?;
+        let from_handle = from_process.resolve_handle_ref(from_handle, |kobj| Some(kobj))?;
+        Ok(process::make_handle(from_handle.get().clone()))
+    }
 }

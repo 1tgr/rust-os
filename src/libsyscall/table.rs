@@ -27,5 +27,6 @@ syscalls! {
     fn wait_for_exit(process: Handle) -> i32 => 9,
     fn create_shared_mem() -> Handle => 10,
     fn map_shared_mem(block: Handle, len: usize, writable: bool) -> *mut u8 => 11,
-    fn create_pipe() -> Handle => 12
+    fn create_pipe() -> Handle => 12,
+    fn open_handle(from_process: Handle, from_handle: usize) -> Handle => 13
 }

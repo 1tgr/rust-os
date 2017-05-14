@@ -20,4 +20,8 @@ impl Process {
         syscall::wait_for_exit(self.0.get())?;
         Ok(())
     }
+
+    pub fn open_handle(&self, from_handle: usize) -> Result<OSHandle> {
+        Ok(OSHandle::from_raw(syscall::open_handle(self.handle().get(), from_handle)?))
+    }
 }
