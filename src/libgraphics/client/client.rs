@@ -1,3 +1,4 @@
+use collections::vec_deque::VecDeque;
 use ipc;
 use os::{File,OSHandle};
 use std::sync::atomic::{AtomicUsize,Ordering};
@@ -10,6 +11,7 @@ pub fn alloc_id() -> usize {
 }
 
 pub struct Client {
+    buf: VecDeque<u8>,
     client2server: File,
     server2client: File,
 }
@@ -17,6 +19,7 @@ pub struct Client {
 impl Client {
     pub fn new() -> Self {
         Client {
+            buf: VecDeque::new(),
             client2server: File::from_raw(OSHandle::from_raw(2)),
             server2client: File::from_raw(OSHandle::from_raw(3)),
         }
@@ -27,6 +30,6 @@ impl Client {
     }
 
     pub fn wait_for_event(&mut self) -> Result<Event> {
-        ipc::read_message(&mut self.server2client)
+        ipc::read_message(&mut self.buf, &mut self.server2client)
     }
 }

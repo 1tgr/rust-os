@@ -1,3 +1,4 @@
+use cairo::surface::CairoSurface;
 use client::{self,Client};
 use frame_buffer::FrameBuffer;
 use os::{Result,SharedMem};
@@ -40,6 +41,10 @@ impl<'a> Window<'a> {
         self.y = pos.y;
         self.buffer.resize(pos.width, pos.height)?;
         self.client.borrow_mut().send_command(Command::MoveWindow { id: self.id, pos })
+    }
+
+    pub fn create_surface(&mut self) -> CairoSurface {
+        self.buffer.create_surface()
     }
 }
 

@@ -76,6 +76,7 @@ dependencies = [
  "alloc_system 0.0.0",
  "cairo 0.0.0",
  "graphics 0.0.0",
+ "intrusive-collections 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "os 0.0.0",
  "serde 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "syscall 0.0.0",
@@ -87,6 +88,11 @@ version = "0.0.0"
 dependencies = [
  "alloc_system 0.0.0",
 ]
+
+[[package]]
+name = "intrusive-collections"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libc"
@@ -162,6 +168,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [metadata]
 "checksum byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c40977b0ee6b9885c9013cd41d9feffdd22deb3bb4dc3a71d901cc7a77de18c8"
 "checksum corepack 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0a0d4ff7949e24d0b7c8107bdc2f92e48289f4a093a26f04dca07743a88ec491"
+"checksum intrusive-collections 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "933e4546961542c92c5e3e4c5c5901998b6c7ef558d90516224a0e14aecad3d7"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum serde 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c0c3d79316a6051231925504f6ef893d45088e8823c77a8331a3dcf427ee9087"
 "checksum serde_derive 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "0019cd5b9f0529a1a0e145a912e9a2d60c325c58f7f260fc36c71976e9d76aee"

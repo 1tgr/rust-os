@@ -1,22 +1,31 @@
+use collections::vec_deque::VecDeque;
 use corepack;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use std::io::{Read,Write};
 use syscall::{ErrNum,Result};
 
-pub fn read_message<T: DeserializeOwned>(file: &mut Read) -> Result<T> {
-    let mut buf = Vec::new();
-    loop {
-        let offset = buf.len();
-        buf.resize(offset + 16, 0);
+struct FromFrontIter<'a, T: 'a>(&'a mut VecDeque<T>);
 
-        let bytes_read = file.read(&mut buf[offset..])?;
-        buf.truncate(offset + bytes_read);
-        match corepack::from_bytes(&buf) {
+impl<'a, T: 'a> Iterator for FromFrontIter<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.0.pop_front()
+    }
+}
+
+pub fn read_message<T: DeserializeOwned>(buf: &mut VecDeque<u8>, file: &mut Read) -> Result<T> {
+    let mut temp = vec![0; 4096];
+    loop {
+        match corepack::from_iter(FromFrontIter(buf)) {
             Ok(message) => { return Ok(message) },
             Err(corepack::error::Error::EndOfStream) => { },
             Err(e) => panic!("Unexpected corepack error: {}", e)
         }
+
+        let bytes_read = file.read(&mut temp)?;
+        buf.extend(&temp[..bytes_read]);
     }
 }
 
