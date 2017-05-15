@@ -254,7 +254,6 @@
 #![feature(try_from)]
 #![feature(unboxed_closures)]
 #![feature(unicode)]
-#![feature(unique)]
 #![feature(untagged_unions)]
 #![feature(unwind_attributes)]
 #![cfg_attr(test, feature(update_panic_count))]
@@ -291,6 +290,7 @@ extern crate alloc;
 extern crate std_unicode;
 extern crate libc;
 
+extern crate os;
 extern crate syscall;
 
 #[stable(feature = "rust-os", since = "1.0.0")]
@@ -412,7 +412,6 @@ pub mod f64;
 pub mod error;
 pub mod io;
 pub mod num;
-pub mod os;
 
 mod memchr;
 

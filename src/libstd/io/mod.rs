@@ -268,6 +268,7 @@ use memchr;
 pub use self::error::{Result, Error, ErrorKind};
 
 mod error;
+mod file;
 
 const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 

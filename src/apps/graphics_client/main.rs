@@ -4,13 +4,14 @@
 
 extern crate cairo;
 extern crate graphics;
+extern crate os;
 extern crate syscall;
 
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use os::{File,OSHandle,Result,SharedMem};
 use std::io::{Read,Write};
-use std::os::{File,OSHandle,Result,SharedMem};
 
 struct Window<'a> {
     shared_mem: SharedMem,

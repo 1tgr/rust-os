@@ -4,13 +4,14 @@
 
 extern crate cairo;
 extern crate graphics;
+extern crate os;
 extern crate syscall;
 
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use os::{File,OSHandle,OSMem,Result,SharedMem};
 use std::io::Read;
-use std::os::{File,OSHandle,OSMem,Result,SharedMem};
 use syscall::libc_helpers;
 
 struct Window {
@@ -57,9 +58,9 @@ fn start_client(window: &Window, client2server: &File) -> Result<OSHandle> {
     let inherit = [
         stdin,
         stdout,
-        **window.shared_mem.handle(),
+        window.shared_mem.handle().get(),
         stdin,
-        **client2server.handle()
+        client2server.handle().get()
     ];
 
     Ok(OSHandle::from_raw(syscall::spawn("graphics_client", &inherit)?))

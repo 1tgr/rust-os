@@ -4,15 +4,16 @@
 
 extern crate cairo;
 extern crate libc;
+extern crate os;
 extern crate syscall;
 
 use cairo::{CairoFunc,CairoObj};
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use os::OSMem;
 use std::f64::consts;
 use std::mem;
-use std::os::OSMem;
 use std::ptr;
 
 unsafe fn main() -> isize {

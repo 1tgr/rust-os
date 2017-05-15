@@ -1,6 +1,6 @@
 [package]
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
-name = "std"
+name = "os"
 version = "0.0.0"
 
 [lib]
@@ -9,5 +9,4 @@ test = false
 
 [dependencies]
 libc = { path = "../liblibc" }
-os = { path = "../libos" }
 syscall = { path = "../libsyscall" }
