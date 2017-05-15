@@ -1,5 +1,6 @@
 #![feature(link_args)]
 #![feature(start)]
+#![feature(unique)]
 
 extern crate cairo;
 extern crate graphics;
@@ -43,7 +44,7 @@ impl<'a> Window<'a> {
     }
 
     pub fn paint(&mut self, f: &mut FnMut(&Cairo)) -> Result<()> {
-        let surface = CairoSurface::from_raw(&*self.shared_mem, self.format, (self.width + 0.5) as u16, (self.height + 0.5) as u16, self.stride());
+        let surface = CairoSurface::from_raw(self.shared_mem.as_ptr(), self.format, (self.width + 0.5) as u16, (self.height + 0.5) as u16, self.stride());
         f(&Cairo::new(surface));
         try!(self.client2server.write(b"!"));
         Ok(())

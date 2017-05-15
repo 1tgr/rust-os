@@ -17,16 +17,16 @@ impl OSMem {
 
 #[stable(feature = "rust-os", since = "1.0.0")]
 impl Deref for OSMem {
-    type Target = *mut u8;
+    type Target = Unique<u8>;
 
-    fn deref(&self) -> &*mut u8 {
-        &*self.0
+    fn deref(&self) -> &Unique<u8> {
+        &self.0
     }
 }
 
 #[stable(feature = "rust-os", since = "1.0.0")]
 impl Drop for OSMem {
     fn drop(&mut self) {
-        let _ = syscall::free_pages(*self.0);
+        let _ = syscall::free_pages(self.0.as_ptr());
     }
 }

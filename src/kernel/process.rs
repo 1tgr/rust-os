@@ -68,7 +68,7 @@ impl<T: ?Sized> Deref for KObjRef<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        let ptr: *const T = *self.ptr;
+        let ptr = self.ptr.get();
         unsafe { &*ptr }
     }
 }
@@ -141,7 +141,7 @@ impl Pager {
                 }
 
                 match pages[index] {
-                    Some(addr) => Some(*addr),
+                    Some(addr) => Some(addr.get()),
                     None => {
                         alloc_page().ok().map(|addr| {
                             assert!(addr != 0);

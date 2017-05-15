@@ -1,5 +1,6 @@
 #![feature(link_args)]
 #![feature(start)]
+#![feature(unique)]
 
 extern crate cairo;
 extern crate graphics;
@@ -46,7 +47,7 @@ impl Window {
     }
 
     pub fn draw_to(&self, cr: &Cairo) {
-        let surface = CairoSurface::from_raw(&*self.shared_mem, self.format, (self.width + 0.5) as u16, (self.height + 0.5) as u16, self.stride());
+        let surface = CairoSurface::from_raw(self.shared_mem.as_ptr(), self.format, (self.width + 0.5) as u16, (self.height + 0.5) as u16, self.stride());
         cr.set_source_surface(surface, self.x, self.y).paint();
     }
 }
@@ -71,7 +72,7 @@ fn run() -> Result<()> {
 
     let lfb_mem = OSMem::from_raw(try!(syscall::init_video_mode(800, 600, 32)));
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-    let cr = Cairo::new(CairoSurface::from_raw(&lfb_mem, CAIRO_FORMAT_ARGB32, 800, 600, stride));
+    let cr = Cairo::new(CairoSurface::from_raw(lfb_mem.as_ptr(), CAIRO_FORMAT_ARGB32, 800, 600, stride));
     let mut buf = Vec::new();
     loop {
         buf.resize(1, 0);

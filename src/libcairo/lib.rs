@@ -77,21 +77,21 @@ impl<T: CairoDrop> CairoObj<T> {
 
 impl<T: CairoDrop> Clone for CairoObj<T> {
     fn clone(&self) -> Self {
-        CairoObj(unsafe { Unique::new(CairoDrop::reference_cairo(*self.0)) })
+        CairoObj(unsafe { Unique::new(CairoDrop::reference_cairo(self.0.as_ptr())) })
     }
 }
 
 impl<T: CairoDrop> Deref for CairoObj<T> {
-    type Target = *mut T;
+    type Target = Unique<T>;
 
-    fn deref(&self) -> &*mut T {
-        &*self.0
+    fn deref(&self) -> &Unique<T> {
+        &self.0
     }
 }
 
 impl<T: CairoDrop> Drop for CairoObj<T> {
     fn drop(&mut self) {
-        unsafe { CairoDrop::drop_cairo(*self.0) }
+        unsafe { CairoDrop::drop_cairo(self.0.as_ptr()) }
     }
 }
 
