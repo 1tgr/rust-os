@@ -112,8 +112,8 @@ unsafe fn init() -> Result<()> {
         ptr = ptr.offset(1);
     }
 
-    stdin = try!(syscall::open("stdin"));
-    stdout = try!(syscall::open("stdout"));
+    stdin = syscall::open("stdin")?;
+    stdout = syscall::open("stdout")?;
     Ok(())
 }
 

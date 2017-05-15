@@ -15,12 +15,12 @@ impl File {
 
     #[stable(feature = "rust-os", since = "1.0.0")]
     pub fn open(filename: &str) -> Result<Self> {
-        Ok(File(OSHandle::from_raw(try!(syscall::open(filename)))))
+        Ok(File(OSHandle::from_raw(syscall::open(filename)?)))
     }
 
     #[stable(feature = "rust-os", since = "1.0.0")]
     pub fn create_pipe() -> Result<Self> {
-        Ok(File(OSHandle::from_raw(try!(syscall::create_pipe()))))
+        Ok(File(OSHandle::from_raw(syscall::create_pipe()?)))
     }
 
     #[stable(feature = "rust-os", since = "1.0.0")]

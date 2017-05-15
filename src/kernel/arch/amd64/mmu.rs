@@ -63,7 +63,7 @@ impl<T> PageEntry<T> {
             assert!(self.addr() == 0);
             flags.insert(PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
 
-            let addr = try!(bitmap.alloc_page());
+            let addr = bitmap.alloc_page()?;
             assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
             self.entry = join(addr, flags);
         }
@@ -101,7 +101,7 @@ impl<T> PageEntry<T> {
 impl<T> Debug for PageEntry<T> {
     fn fmt(&self, fmt: &mut Formatter) -> result::Result<(), Error> {
         let (addr, flags) = self.entry();
-        try!(write!(fmt, "{{ addr = {:-16x}, flags = ", addr));
+        write!(fmt, "{{ addr = {:-16x}, flags = ", addr)?;
 
         static ALL_FLAGS: &'static [(&'static str, PageFlags)] = &[
             ("G", PAGE_GLOBAL),
@@ -117,7 +117,7 @@ impl<T> Debug for PageEntry<T> {
 
         for &(s, flag) in ALL_FLAGS.iter() {
             let s = if flags.contains(flag) { s } else { "." };
-            try!(fmt.write_str(s));
+            fmt.write_str(s)?;
         }
 
         write!(fmt, " }} @ {:p}", &self.entry)
@@ -195,7 +195,7 @@ pub struct AddressSpace {
 
 impl AddressSpace {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace> {
-        let pml4_addr = try!(bitmap.alloc_page());
+        let pml4_addr = bitmap.alloc_page()?;
         let kernel_base_ptr = unsafe { &KERNEL_BASE } as *const u8;
         let two_meg = 2 * 1024 * 1024;
         let pml4_index = pml4_index(kernel_base_ptr);
@@ -207,10 +207,10 @@ impl AddressSpace {
             pml4[MMU_RECURSIVE_SLOT].map(pml4_addr, false, true);
 
             let pml4_entry = &mut pml4[pml4_index];
-            try!(pml4_entry.ensure_present(&bitmap));
+            pml4_entry.ensure_present(&bitmap)?;
 
             let pdpt_entry = &mut pml4_entry.as_mut_ref()[pdpt_index];
-            try!(pdpt_entry.ensure_present(&bitmap));
+            pdpt_entry.ensure_present(&bitmap)?;
 
             for i in 0..4 {
                 let pd_index = pd_index + i;
@@ -239,10 +239,10 @@ impl AddressSpace {
         let pdpt_entry = pdpt_entry(ptr);
         let pd_entry = pd_entry(ptr);
         let pt_entry = pt_entry(ptr);
-        try!(pml4_entry.ensure_present(&self.bitmap));
-        try!(pdpt_entry.ensure_present(&self.bitmap));
+        pml4_entry.ensure_present(&self.bitmap)?;
+        pdpt_entry.ensure_present(&self.bitmap)?;
         assert!(!pd_entry.big());
-        try!(pd_entry.ensure_present(&self.bitmap));
+        pd_entry.ensure_present(&self.bitmap)?;
         pt_entry.map(addr, user, writable);
         cpu::invlpg(ptr);
         Ok(())

@@ -25,9 +25,9 @@ pub fn init(xres: u16, yres: u16, bpp: u8) -> Result<&'static mut [u8]> {
     let _d = lock!(MUTEX);
     unsafe {
         let bus_slot =
-            try!(pci::find(0x1234, 0x1111)              // QEmu
+            pci::find(0x1234, 0x1111)                   // QEmu
                 .or_else(|| pci::find(0x80EE, 0xBEEF))  // VirtualBox
-                .ok_or(ErrNum::NotSupported));
+                .ok_or(ErrNum::NotSupported)?;
 
         let bar0 = pci::inl(bus_slot, 0, 0x10);
         let bar1 = pci::inl(bus_slot, 0, 0x14);

@@ -172,7 +172,7 @@ pub struct Process {
 
 impl Process {
     fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree<MemBlock>>, handles: Vec<Option<Arc<KObj>>>) -> Result<Self> {
-        let arch = try!(ArchProcess::new(phys.clone()));
+        let arch = ArchProcess::new(phys.clone())?;
         let user_virt = VirtualTree::new();
         user_virt.reserve(
             unsafe { slice::from_raw_parts_mut(0 as *mut u8, 4096) },
@@ -216,7 +216,7 @@ impl Process {
         let mut handles = Vec::new();
         let state = lock!(self.state);
         for handle in inherit {
-            handles.push(Some(try!(state.resolve_handle(handle))));
+            handles.push(Some(state.resolve_handle(handle)?));
         }
 
         Process::new(self.phys.clone(), self.kernel_virt.clone(), handles)
@@ -253,7 +253,7 @@ impl Process {
 
 pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Result<(Arc<Process>, Deferred<i32>)> {
     let current = thread::current_process();
-    let process = Arc::new(try!(current.spawn(inherit)));
+    let process = Arc::new(current.spawn(inherit)?);
 
     let init_in_new_process = move || {
         let image_slice = unsafe {
@@ -269,7 +269,7 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
                 phys_mem::phys2virt(mods[0].mod_start as usize),
                 (mods[0].mod_end - mods[0].mod_start) as usize);
 
-            try!(tar::locate(mod_data, &executable).ok_or(ErrNum::FileNotFound))
+            tar::locate(mod_data, &executable).ok_or(ErrNum::FileNotFound)?
         };
 
         mem::drop(executable);
@@ -376,7 +376,7 @@ impl<T> Allocation<T> {
         let base = self.base.map(|ptr| ptr as *mut u8);
         let len = self.len * mem::size_of::<T>();
         unsafe {
-            let ptr = try!(process.alloc_inner(base, len, self.user, self.writable, self.pager));
+            let ptr = process.alloc_inner(base, len, self.user, self.writable, self.pager)?;
             Ok(slice::from_raw_parts_mut(ptr as *mut T, self.len))
         }
     }
@@ -425,7 +425,7 @@ pub fn make_handle(obj: Arc<KObj>) -> Handle {
 
 pub fn resolve_handle<'a, T: 'a+?Sized, F: FnOnce(&'a KObj) -> Option<&'a T>>(handle: Handle, f: F) -> Result<KObjRef<T>> {
     let process = thread::current_process();
-    let kobj = try!(lock!(process.state).resolve_handle(handle));
+    let kobj = lock!(process.state).resolve_handle(handle)?;
     KObjRef::new(kobj, f)
 }
 

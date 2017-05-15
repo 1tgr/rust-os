@@ -10,7 +10,7 @@ pub struct ArchProcess {
 impl ArchProcess {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<ArchProcess> {
         Ok(ArchProcess {
-            address_space: try!(AddressSpace::new(bitmap))
+            address_space: AddressSpace::new(bitmap)?
         })
     }
 

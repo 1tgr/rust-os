@@ -34,7 +34,7 @@ fn read_line() -> Result<String> {
     let mut v = Vec::new();
     loop {
         let mut buf = vec![0; 100];
-        let bytes = try!(syscall::read(unsafe { stdin }, &mut buf[..]));
+        let bytes = syscall::read(unsafe { stdin }, &mut buf[..])?;
         if bytes < buf.len() {
             buf.truncate(bytes);
             v.extend(buf);

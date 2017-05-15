@@ -137,7 +137,7 @@ impl<T> VirtualTree<T> {
     }
 
     pub fn alloc(&self, len: usize, tag: T) -> Result<&mut [u8]> {
-        let slice: &'static mut [u8] = try!(lock!(self.state).alloc(len, tag));
+        let slice: &'static mut [u8] = lock!(self.state).alloc(len, tag)?;
         let slice: &mut [u8] = unsafe { mem::transmute(slice) };
         Ok(slice)
     }

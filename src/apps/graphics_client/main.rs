@@ -30,7 +30,7 @@ impl<'a> Window<'a> {
             height: height
         };
 
-        try!(w.resize());
+        w.resize()?;
         Ok(w)
     }
 
@@ -46,7 +46,7 @@ impl<'a> Window<'a> {
     pub fn paint(&mut self, f: &mut FnMut(&Cairo)) -> Result<()> {
         let surface = CairoSurface::from_raw(self.shared_mem.as_ptr(), self.format, (self.width + 0.5) as u16, (self.height + 0.5) as u16, self.stride());
         f(&Cairo::new(surface));
-        try!(self.client2server.write(b"!"));
+        self.client2server.write(b"!")?;
         Ok(())
     }
 }
@@ -62,7 +62,7 @@ fn read_byte(server2client: &mut File) -> Result<u8> {
                 let start = buf.len();
                 buf.resize(1, 0);
 
-                let len = try!(server2client.read(&mut buf[start..]));
+                let len = server2client.read(&mut buf[start..])?;
                 buf.truncate(len);
             }
         }
@@ -73,7 +73,7 @@ fn run() -> Result<()> {
     let shared_mem = SharedMem::open(OSHandle::from_raw(2), true);
     let mut server2client = File::from_raw(OSHandle::from_raw(3));
     let mut client2server = File::from_raw(OSHandle::from_raw(4));
-    let mut window = try!(Window::open(shared_mem, &mut client2server, CAIRO_FORMAT_ARGB32, 100.0, 100.0));
+    let mut window = Window::open(shared_mem, &mut client2server, CAIRO_FORMAT_ARGB32, 100.0, 100.0)?;
 
     let mut paint = {
         let width = window.width;
@@ -91,8 +91,8 @@ fn run() -> Result<()> {
     };
 
     loop {
-        try!(window.paint(&mut paint));
-        try!(read_byte(&mut server2client));
+        window.paint(&mut paint)?;
+        read_byte(&mut server2client)?;
     }
 }
 

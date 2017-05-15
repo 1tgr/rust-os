@@ -43,12 +43,12 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn write(&self, file: Handle, bytes: &[u8]) -> Result<usize> {
-        let file = try!(process::resolve_handle(file, |kobj| kobj.write()));
+        let file = process::resolve_handle(file, |kobj| kobj.write())?;
         file.write(bytes)
     }
 
     fn read(&self, file: Handle, buf: &mut [u8]) -> Result<usize> {
-        let file = try!(process::resolve_handle(file, |kobj| kobj.read()));
+        let file = process::resolve_handle(file, |kobj| kobj.read())?;
         file.read(buf)
     }
 
@@ -83,18 +83,18 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn init_video_mode(&self, width: u16, height: u16, bpp: u8) -> Result<*mut u8> {
-        let slice = try!(vga_bochs::init(width, height, bpp));
+        let slice = vga_bochs::init(width, height, bpp)?;
         Ok(slice.as_mut_ptr())
     }
 
     fn spawn(&self, executable: &str, inherit: &[Handle]) -> Result<Handle> {
         let inherit = inherit.iter().map(|handle| *handle);
-        let (_, deferred) = try!(process::spawn(String::from(executable), inherit));
+        let (_, deferred) = process::spawn(String::from(executable), inherit)?;
         Ok(process::make_handle(Arc::new(deferred)))
     }
 
     fn wait_for_exit(&self, process: Handle) -> Result<i32> {
-        let deferred = try!(process::resolve_handle(process, |kobj| kobj.deferred_i32()));
+        let deferred = process::resolve_handle(process, |kobj| kobj.deferred_i32())?;
         Ok((*deferred).clone().get())
     }
 
@@ -103,8 +103,8 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn map_shared_mem(&self, block: Handle, len: usize, writable: bool) -> Result<*mut u8> {
-        let block = try!(process::resolve_handle(block, |kobj| kobj.shared_mem_block()));
-        let slice = try!(process::map_shared(block, len, true, writable));
+        let block = process::resolve_handle(block, |kobj| kobj.shared_mem_block())?;
+        let slice = process::map_shared(block, len, true, writable)?;
         Ok(slice.as_mut_ptr())
     }
 

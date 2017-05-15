@@ -23,7 +23,7 @@ pub struct SharedMem {
 impl SharedMem {
     #[stable(feature = "rust-os", since = "1.0.0")]
     pub fn create(writable: bool) -> Result<Self> {
-        let handle = OSHandle::from_raw(try!(syscall::create_shared_mem()));
+        let handle = OSHandle::from_raw(syscall::create_shared_mem()?);
         Ok(SharedMem::open(handle, writable))
     }
 
@@ -52,7 +52,7 @@ impl SharedMem {
         if new_len == 0 {
             self.ptr = None;
         } else {
-            self.ptr = Some(OSMem::from_raw(try!(syscall::map_shared_mem(*self.handle, self.len, self.writable))));
+            self.ptr = Some(OSMem::from_raw(syscall::map_shared_mem(*self.handle, self.len, self.writable)?));
         }
 
         Ok(())

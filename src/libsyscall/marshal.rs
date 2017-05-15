@@ -182,7 +182,7 @@ impl<'a, T> SyscallArgs for &'a [T] {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        let (ptr, len) = try!(SyscallArgs::from_args(args));
+        let (ptr, len) = SyscallArgs::from_args(args)?;
         Ok(unsafe { slice::from_raw_parts(ptr, len) })
     }
 }
@@ -193,7 +193,7 @@ impl<'a, T> SyscallArgs for &'a mut [T] {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        let (ptr, len) = try!(SyscallArgs::from_args(args));
+        let (ptr, len) = SyscallArgs::from_args(args)?;
         Ok(unsafe { slice::from_raw_parts_mut(ptr, len) })
     }
 }
@@ -204,7 +204,7 @@ impl<'a> SyscallArgs for &'a str {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        let bytes = try!(SyscallArgs::from_args(args));
+        let bytes = SyscallArgs::from_args(args)?;
         match str::from_utf8(bytes) {
             Ok(s) => Ok(s),
             Err(_) => Err(ErrNum::Utf8Error)
@@ -218,7 +218,7 @@ impl<T: SyscallArgs> SyscallArgs for (T,) {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok((try!(SyscallArgs::from_args(args)),))
+        Ok((SyscallArgs::from_args(args)?,))
     }
 }
 
@@ -229,8 +229,8 @@ impl<T1: SyscallArgs, T2: SyscallArgs> SyscallArgs for (T1, T2) {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        let a = try!(SyscallArgs::from_args(args));
-        let b = try!(SyscallArgs::from_args(args));
+        let a = SyscallArgs::from_args(args)?;
+        let b = SyscallArgs::from_args(args)?;
         Ok((a, b))
     }
 }
@@ -243,9 +243,9 @@ impl<T1: SyscallArgs, T2: SyscallArgs, T3: SyscallArgs> SyscallArgs for (T1, T2,
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        let a = try!(SyscallArgs::from_args(args));
-        let b = try!(SyscallArgs::from_args(args));
-        let c = try!(SyscallArgs::from_args(args));
+        let a = SyscallArgs::from_args(args)?;
+        let b = SyscallArgs::from_args(args)?;
+        let c = SyscallArgs::from_args(args)?;
         Ok((a, b, c))
     }
 }
