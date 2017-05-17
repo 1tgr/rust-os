@@ -34,24 +34,27 @@ macro_rules! syscalls {
     ) => {
         use $crate::ErrNum;
         use $crate::marshal::{PackedArgs,SyscallArgs,SyscallResult};
-        use core::fmt::Write;
+        use core::fmt;
 
         pub trait HandleSyscall {
+            fn log_entry(&self, msg: fmt::Arguments);
+            fn log_exit(&self, msg: fmt::Arguments);
+
             $(
                 fn $name<'a>(&self, $($arg_name: $arg_ty),*) -> Result<$result, ErrNum>;
             )+
         }
 
-        pub fn dispatch<T: HandleSyscall, W: Write>(handler: &T, writer: &mut W, num: usize, mut args: PackedArgs) -> isize {
+        pub fn dispatch<T: HandleSyscall>(handler: &T, num: usize, mut args: PackedArgs) -> isize {
             match num {
                 $(
                     $num =>
                         (match SyscallArgs::from_args(&mut args) {
                             Ok(tuple) => {
-                                let _ = write!(writer, concat!(stringify!($name), "{:?}"), tuple);
+                                handler.log_entry(format_args!("{}{:?}", stringify!($name), tuple));
                                 let ($($arg_name,)*) = tuple;
                                 let result = handler.$name($($arg_name),*);
-                                let _ = writeln!(writer, " => {:?}", result);
+                                handler.log_exit(format_args!("{:?}", result));
                                 result
                             },
                             Err(num) => Err(num)

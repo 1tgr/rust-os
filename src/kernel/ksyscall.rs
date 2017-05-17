@@ -1,6 +1,7 @@
 use alloc::arc::Arc;
 use arch::vga_bochs;
 use console::Console;
+use core::fmt::{self,Write};
 use io::Pipe;
 use logging::Writer;
 use prelude::*;
@@ -23,7 +24,7 @@ pub fn register_handler(handler: SyscallHandler) -> DropSyscallHandler {
 
 pub fn dispatch(num: usize, args: PackedArgs) -> isize {
     if let Some(handler) = HANDLER.get() {
-        syscall::dispatch(handler, &mut Writer, num, args)
+        syscall::dispatch(handler, num, args)
     } else {
         0
     }
@@ -38,6 +39,14 @@ impl SyscallHandler {
 }
 
 impl HandleSyscall for SyscallHandler {
+    fn log_entry(&self, msg: fmt::Arguments) {
+        let _ = write!(&mut Writer, "[{}] {}", thread::current_process().name(), msg);
+    }
+
+    fn log_exit(&self, msg: fmt::Arguments) {
+        let _ = writeln!(&mut Writer, " => {:?}", msg);
+    }
+
     fn exit_thread(&self, code: i32) -> Result<()> {
         thread::exit(code)
     }

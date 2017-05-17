@@ -163,6 +163,7 @@ struct MemBlock {
 }
 
 pub struct Process {
+    name: String,
     arch: ArchProcess,
     phys: Arc<PhysicalBitmap>,
     user_virt: VirtualTree<MemBlock>,
@@ -171,7 +172,7 @@ pub struct Process {
 }
 
 impl Process {
-    fn new(phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree<MemBlock>>, handles: Vec<Option<Arc<KObj>>>) -> Result<Self> {
+    fn new(name: String, phys: Arc<PhysicalBitmap>, kernel_virt: Arc<VirtualTree<MemBlock>>, handles: Vec<Option<Arc<KObj>>>) -> Result<Self> {
         let arch = ArchProcess::new(phys.clone())?;
         let user_virt = VirtualTree::new();
         user_virt.reserve(
@@ -183,6 +184,7 @@ impl Process {
             });
 
         Ok(Process {
+            name: name,
             arch: arch,
             phys: phys,
             user_virt: user_virt,
@@ -209,17 +211,21 @@ impl Process {
                 pager: None
             });
 
-        Process::new(phys, kernel_virt, Vec::new())
+        Process::new("<kernel>".into(), phys, kernel_virt, Vec::new())
     }
 
-    pub fn spawn<I: IntoIterator<Item=Handle>>(&self, inherit: I) -> Result<Self> {
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    pub fn spawn<I: IntoIterator<Item=Handle>>(&self, name: String, inherit: I) -> Result<Self> {
         let mut handles = Vec::new();
         let state = lock!(self.state);
         for handle in inherit {
             handles.push(Some(state.resolve_handle(handle)?));
         }
 
-        Process::new(self.phys.clone(), self.kernel_virt.clone(), handles)
+        Process::new(name, self.phys.clone(), self.kernel_virt.clone(), handles)
     }
 
     pub unsafe fn switch(&self) {
@@ -253,7 +259,7 @@ impl Process {
 
 pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Result<(Arc<Process>, Deferred<i32>)> {
     let current = thread::current_process();
-    let process = Arc::new(current.spawn(inherit)?);
+    let process = Arc::new(current.spawn(executable.clone(), inherit)?);
 
     let init_in_new_process = move || {
         let image_slice = unsafe {
@@ -462,14 +468,14 @@ pub mod test {
             thread::with_scheduler(|| {
                 let p = thread::current_process();
 
-                let d1 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
+                let d1 = thread::spawn_remote(Arc::new(p.spawn("user_addresses_are_separate(d1)".into(), vec![]).unwrap()), || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
                     0
                 });
 
-                let d2 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
+                let d2 = thread::spawn_remote(Arc::new(p.spawn("user_addresses_are_separate(d2)".into(), vec![]).unwrap()), || unsafe {
                     let slice = alloc_at(0x1000 as *mut _, 0x1000, true, true).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 456);
@@ -488,7 +494,7 @@ pub mod test {
                 let shared1 = shared.clone();
                 let shared2 = shared.clone();
 
-                let d1 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
+                let d1 = thread::spawn_remote(Arc::new(p.spawn("can_share_memory(d1)".into(), vec![]).unwrap()), || unsafe {
                     let slice = Allocation::shared(0x1000, shared1).base(0x1000_0000 as *mut u8).user(true).writable(true).allocate().unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
@@ -497,7 +503,7 @@ pub mod test {
 
                 d1.get();
 
-                let d2 = thread::spawn_remote(Arc::new(p.spawn(vec![]).unwrap()), || unsafe {
+                let d2 = thread::spawn_remote(Arc::new(p.spawn("can_share_memory(d2)".into(), vec![]).unwrap()), || unsafe {
                     let slice = Allocation::shared(0x1000, shared2).base(0x2000_0000 as *mut u8).user(true).allocate().unwrap();
                     assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
                     0
