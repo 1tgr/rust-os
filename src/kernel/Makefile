@@ -12,7 +12,7 @@ ASFLAGS += -g -I ../newlib/$(TARGET)/include
 
 all: $(OBJS)
 	$(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET)-kernel --release
-	$(OBJCOPY) -F elf32-i386 target/$(CONFIG_TARGET)-kernel/release/kernel kernel
+	$(OBJCOPY) -SF elf32-i386 target/$(CONFIG_TARGET)-kernel/release/kernel kernel
 	$(OBJDUMP) -d target/$(CONFIG_TARGET)-kernel/release/kernel > kernel.txt
 
 clean:

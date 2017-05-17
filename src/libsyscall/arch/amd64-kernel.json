@@ -14,8 +14,7 @@
     "linker-flavor": "ld",
     "pre-link-args": {
         "ld": [
-            "-z", "max-page-size=0x1000",
-            "--strip-all"
+            "-z", "max-page-size=0x1000"
         ]
     },
     "dynamic-linking-available": false,
