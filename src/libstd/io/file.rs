@@ -4,7 +4,7 @@ use fmt;
 use io::{self,Read,Write};
 use os::File;
 use syscall;
-use syscall::libc_helpers::stdout;
+use syscall::libc_helpers;
 
 #[stable(feature = "rust-os", since = "1.0.0")]
 impl Read for File {
@@ -24,18 +24,7 @@ impl Write for File {
     }
 }
 
-struct StdoutWriter;
-
-impl fmt::Write for StdoutWriter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        match syscall::write(unsafe { stdout }, s.as_bytes()) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(fmt::Error)
-        }
-    }
-}
-
 #[stable(feature = "rust-os", since = "1.0.0")]
 pub fn print(args: fmt::Arguments) {
-     fmt::Write::write_fmt(&mut StdoutWriter, args).unwrap()
+     fmt::Write::write_fmt(&mut libc_helpers::StdoutWriter, args).unwrap()
  }

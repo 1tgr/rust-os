@@ -269,7 +269,7 @@ use prelude::v1::*;
 // Access to Bencher, etc.
 #[cfg(test)] extern crate test;
 
-#[macro_reexport(assert, assert_eq, write, writeln)]
+#[macro_reexport(assert, assert_eq, panic, write, writeln)]
 extern crate core as __core;
 
 #[macro_reexport(vec, format)]
@@ -421,27 +421,6 @@ pub mod sync {
     pub use alloc::arc::{Arc, Weak};
     #[stable(feature = "dummy", since = "1.0.0")]
     pub use core::sync::atomic;
-}
-
-#[macro_export]
-#[allow_internal_unstable]
-#[stable(feature = "rust-os", since = "1.0.0")]
-macro_rules! panic {
-    () => (
-        panic!("explicit panic")
-    );
-    ($msg:expr) => ({
-        static _MSG_FILE_LINE: (&'static str, &'static str, u32) = ($msg, file!(), line!());
-        $crate::panicking::panic(&_MSG_FILE_LINE)
-    });
-    ($fmt:expr, $($arg:tt)*) => ({
-        // The leading _'s are to avoid dead code warnings if this is
-        // used inside a dead function. Just `#[allow(dead_code)]` is
-        // insufficient, since the user may have
-        // `#[forbid(dead_code)]` and which cannot be overridden.
-        static _FILE_LINE: (&'static str, u32) = (file!(), line!());
-        $crate::panicking::panic_fmt(format_args!($fmt, $($arg)*), &_FILE_LINE)
-    });
 }
 
 #[macro_export]

@@ -1,3 +1,4 @@
+use core::fmt;
 use libc::{c_char,c_int,c_void,size_t,ssize_t,off_t,mode_t};
 use table as syscall;
 use ::{Handle,Result};
@@ -17,6 +18,17 @@ pub static mut stdin: Handle = 0;
 
 #[allow(non_upper_case_globals)]
 pub static mut stdout: Handle = 0;
+
+pub struct StdoutWriter;
+
+impl fmt::Write for StdoutWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        match syscall::write(unsafe { stdout }, s.as_bytes()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(fmt::Error)
+        }
+    }
+}
 
 #[no_mangle]
 pub unsafe extern fn __errno() -> *mut c_int {

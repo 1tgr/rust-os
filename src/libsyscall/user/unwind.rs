@@ -9,13 +9,15 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
-use core::fmt::Arguments;
+use core::fmt::{self,Write};
+use libc_helpers;
 use table;
 
 #[cfg(not(test))]
 #[lang="panic_fmt"]
 #[no_mangle]
-pub extern fn rust_begin_unwind(_msg: Arguments, _file: &'static str, line: u32) -> ! {
+pub extern fn rust_begin_unwind(msg: fmt::Arguments, file: &'static str, line: u32) -> ! {
+    let _ = writeln!(&mut libc_helpers::StdoutWriter, "Panic at {}({}): {}", file, line, msg);
     let _ = table::exit_thread(-(line as i32));
     unreachable!()
 }
