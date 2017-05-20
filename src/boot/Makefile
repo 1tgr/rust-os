@@ -16,10 +16,16 @@ INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_server
 INITRD += ../apps/target/$(CONFIG_TARGET)/release/hello
 INITRD += ../apps/target/$(CONFIG_TARGET)/release/input
 
+ifeq ($(shell uname),Darwin)
+TARFLAGS += -s ',.*/,,g'
+all: initrd.tar
+else
+TARFLAGS = --transform 's/.*\///g'
 all: bootable.iso
+endif
 
 initrd.tar: $(INITRD)
-	tar --transform 's/.*\///g' -cf $@ $(INITRD)
+	tar $(TARFLAGS) -cf $@ $(INITRD)
 
 initrd.tar.gz: initrd.tar
 	gzip -fk $<
