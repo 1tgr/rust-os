@@ -63,7 +63,7 @@ impl<T> PageEntry<T> {
             assert!(self.addr() == 0);
             flags.insert(PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
 
-            let addr = bitmap.alloc_page()?;
+            let addr = bitmap.alloc_zeroed_page()?;
             assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
             self.entry = join(addr, flags);
         }
@@ -195,7 +195,7 @@ pub struct AddressSpace {
 
 impl AddressSpace {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace> {
-        let pml4_addr = bitmap.alloc_page()?;
+        let pml4_addr = bitmap.alloc_zeroed_page()?;
         let kernel_base_ptr = unsafe { &KERNEL_BASE } as *const u8;
         let two_meg = 2 * 1024 * 1024;
         let pml4_index = pml4_index(kernel_base_ptr);

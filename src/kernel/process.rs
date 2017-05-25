@@ -1,6 +1,7 @@
 use alloc::arc::Arc;
 use arch::process::ArchProcess;
 use arch::thread as arch_thread;
+use core::intrinsics;
 use core::mem;
 use core::nonzero::NonZero;
 use core::ops::Deref;
@@ -19,7 +20,16 @@ use tar;
 use thread;
 use virt_mem::VirtualTree;
 
-macro_rules! try_option {
+macro_rules! try_or_none {
+    ($e:expr) => ({
+        match $e {
+            Some(e) => e,
+            None => return None,
+        }
+    })
+}
+
+macro_rules! try_or_false {
     ($e:expr) => ({
         match $e {
             Some(e) => e,
@@ -128,30 +138,32 @@ enum Pager {
 }
 
 impl Pager {
-    fn alloc<AllocPage: Fn() -> Result<usize>>(&self, offset: usize, alloc_page: AllocPage) -> Option<usize> {
-        match self {
-            &Pager::Zeroed => alloc_page().ok(),
-            &Pager::Physical(addr) => Some(addr + offset),
+    fn alloc<AllocPage: Fn() -> Option<usize>>(&self, offset: usize, alloc_page: AllocPage) -> Option<(bool, usize)> {
+        let result =
+            match self {
+                &Pager::Zeroed => (true, try_or_none!(alloc_page())),
+                &Pager::Physical(addr) => (false, addr + offset),
 
-            &Pager::Shared(ref pages) => {
-                let mut pages = lock!(pages.0);
-                let index = offset / phys_mem::PAGE_SIZE;
-                if pages.len() <= index {
-                    pages.resize(index + 1, None);
-                }
+                &Pager::Shared(ref pages) => {
+                    let mut pages = lock!(pages.0);
+                    let index = offset / phys_mem::PAGE_SIZE;
+                    if pages.len() <= index {
+                        pages.resize(index + 1, None);
+                    }
 
-                match pages[index] {
-                    Some(addr) => Some(addr.get()),
-                    None => {
-                        alloc_page().ok().map(|addr| {
+                    match pages[index] {
+                        Some(addr) => (false, addr.get()),
+                        None => {
+                            let addr = try_or_none!(alloc_page());
                             assert!(addr != 0);
                             pages[index] = Some(unsafe { NonZero::new(addr) });
-                            addr
-                        })
+                            (true, addr)
+                        }
                     }
                 }
-            }
-        }
+            };
+
+        Some(result)
     }
 }
 
@@ -411,16 +423,22 @@ pub fn free(p: *mut u8) -> bool {
 pub fn resolve_page_fault(ptr: *mut u8) -> bool {
     let process = thread::current_process();
     let ptr = Align::down(ptr, phys_mem::PAGE_SIZE);
-    let (slice, block) = try_option!(process.user_virt.tag_at(ptr).or_else(|| process.kernel_virt.tag_at(ptr)));
+    let (slice, block) = try_or_false!(process.user_virt.tag_at(ptr).or_else(|| process.kernel_virt.tag_at(ptr)));
     assert!(slice.as_mut_ptr() <= ptr && ptr < unsafe { slice.as_mut_ptr().offset(slice.len() as isize) });
 
-    let pager = try_option!(block.pager);
+    let pager = try_or_false!(block.pager);
     let offset = ptr::bytes_between(slice.as_mut_ptr(), ptr);
-    let addr = try_option!(pager.alloc(offset, || process.phys.alloc_page()));
+    let (dirty, addr) = try_or_false!(pager.alloc(offset, || process.phys.alloc_page().ok()));
 
     unsafe {
-        process.arch.map(ptr, addr, block.user, block.writable).is_ok()
+        try_or_false!(process.arch.map(ptr, addr, block.user, block.writable).ok());
+
+        if dirty {
+            intrinsics::write_bytes(ptr, 0, phys_mem::PAGE_SIZE);
+        }
     }
+
+    true
 }
 
 pub fn make_handle(obj: Arc<KObj>) -> Handle {
@@ -453,6 +471,8 @@ pub mod test {
             thread::with_scheduler(|| {
                 let len = 4096;
                 let slice = alloc::<u16>(len, false, true).unwrap();
+                assert!(slice.iter().all(|&b| b == 0));
+
                 let sentinel = 0xaa55;
                 for i in 0..len {
                     let ptr = &mut slice[i] as *mut u16;

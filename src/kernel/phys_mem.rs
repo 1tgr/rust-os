@@ -107,17 +107,19 @@ impl PhysicalBitmap {
     }
 
     pub fn alloc_page(&self) -> Result<usize> {
-        let addr = {
-            let mut free = lock!(self.free);
-            match free.iter().position(|x| x) {
-                Some(i) => {
-                    free.set(i, false);
-                    i * PAGE_SIZE
-                }
-
-                None => { return Err(ErrNum::OutOfMemory); }
+        let mut free = lock!(self.free);
+        match free.iter().position(|x| x) {
+            Some(i) => {
+                free.set(i, false);
+                Ok(i * PAGE_SIZE)
             }
-        };
+
+            None => Err(ErrNum::OutOfMemory)
+        }
+    }
+
+    pub fn alloc_zeroed_page(&self) -> Result<usize> {
+        let addr = self.alloc_page()?;
 
         unsafe {
             let ptr: &mut u8 = phys2virt(addr);
@@ -215,9 +217,9 @@ pub mod test {
             assert!(free_bytes < total_bytes);
         }
 
-        fn alloc_returns_zeroed_memory() {
+        fn can_alloc_zeroed_memory() {
             let bitmap = PhysicalBitmap::parse_multiboot();
-            let addr = bitmap.alloc_page().unwrap();
+            let addr = bitmap.alloc_zeroed_page().unwrap();
             let ptr: &[u8; PAGE_SIZE] = unsafe { phys2virt(addr) };
             assert!(ptr.iter().all(|&b| b == 0));
         }
