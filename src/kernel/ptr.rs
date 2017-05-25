@@ -71,6 +71,16 @@ impl<T> Align for *mut T {
     }
 }
 
+pub trait PointerInSlice<T> {
+    fn contains_ptr(&self, ptr: *const T) -> bool;
+}
+
+impl PointerInSlice<u8> for [u8] {
+    fn contains_ptr(&self, ptr: *const u8) -> bool {
+        self.as_ptr() <= ptr && ptr < unsafe { self.as_ptr().offset(self.len() as isize) }
+    }
+}
+
 #[cfg(feature = "test")]
 pub mod test {
     use super::*;

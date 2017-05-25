@@ -6,7 +6,7 @@ use core::slice;
 use libc::{c_int,c_void};
 use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_module_t,multiboot_uint32_t};
 use mutex::Mutex;
-use ptr;
+use ptr::{self,Align,PointerInSlice};
 use syscall::{ErrNum,Result};
 
 extern {
@@ -134,16 +134,41 @@ impl PhysicalBitmap {
     }
 }
 
+pub fn identity_range() -> &'static [u8] {
+    let two_meg = 2 * 1024 * 1024;
+    unsafe {
+        let base_ptr = &KERNEL_BASE as *const u8;
+        let end_ptr = Align::up(&kernel_end as *const u8, 4 * two_meg);
+        let len = ptr::bytes_between(base_ptr, end_ptr);
+        slice::from_raw_parts(base_ptr, len)
+    }
+}
+
+fn check_identity(addr: usize, ptr: *const u8) {
+    let identity = identity_range();
+    if !identity.contains_ptr(ptr) {
+        panic!("physical {:x}/virtual {:p} can't be contained in the identity mapping {:p}..{:p}",
+            addr,
+            ptr,
+            identity.as_ptr(),
+            unsafe { identity.as_ptr().offset(identity.len() as isize) });
+    }
+}
+
 pub unsafe fn phys2virt<T>(addr: usize) -> &'static mut T {
     let kernel_base_ptr: *mut u8 = &mut KERNEL_BASE as *mut u8;
     let ptr: *mut u8 = kernel_base_ptr.offset(addr as isize);
+    check_identity(addr, ptr);
+
     let ptr: *mut T = ptr as *mut T;
     &mut *ptr
 }
 
 pub fn virt2phys<T>(ptr: *const T) -> usize {
     let kernel_base_ptr: *const u8 = unsafe { &KERNEL_BASE as *const u8 };
-    ptr as usize - kernel_base_ptr as usize
+    let addr = ptr as usize - kernel_base_ptr as usize;
+    check_identity(addr, ptr as *const u8);
+    addr
 }
 
 pub fn multiboot_info() -> &'static multiboot_info_t {

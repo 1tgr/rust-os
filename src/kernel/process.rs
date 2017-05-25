@@ -194,17 +194,17 @@ impl Process {
     }
 
     pub fn for_kernel() -> Result<Self> {
-        extern {
-            static kernel_end: u8;
-        }
-
         let phys = Arc::new(PhysicalBitmap::parse_multiboot());
         let kernel_virt = Arc::new(VirtualTree::new());
-        let two_meg = 2 * 1024 * 1024;
-        let kernel_end_ptr = Align::up(unsafe { &kernel_end } as *const u8, 4 * two_meg);
-        let identity = unsafe { slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize) };
+        let identity = phys_mem::identity_range();
+
+        let user_plus_identity = unsafe {
+            let kernel_end_ptr = identity.as_ptr().offset(identity.len() as isize);
+            slice::from_raw_parts_mut(0 as *mut u8, kernel_end_ptr as usize)
+        };
+
         kernel_virt.reserve(
-            identity,
+            user_plus_identity,
             MemBlock {
                 user: false,
                 writable: false,
