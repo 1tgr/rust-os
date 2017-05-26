@@ -107,6 +107,14 @@ macro_rules! lock_sched {
     () => (lock!(current_sched()))
 }
 
+pub fn try_current_process() -> Option<Arc<Process>> {
+    if let Some(sched) = SCHEDULER.get() {
+        Some(lock!(sched).current.process.clone())
+    } else {
+        None
+    }
+}
+
 pub fn current_process() -> Arc<Process> {
     lock_sched!().current.process.clone()
 }

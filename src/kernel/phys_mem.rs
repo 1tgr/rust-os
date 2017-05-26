@@ -137,10 +137,10 @@ impl PhysicalBitmap {
 }
 
 pub fn identity_range() -> &'static [u8] {
-    let two_meg = 2 * 1024 * 1024;
+    let gigabyte = 1024 * 1024 * 1024;
     unsafe {
         let base_ptr = &KERNEL_BASE as *const u8;
-        let end_ptr = Align::up(&kernel_end as *const u8, 4 * two_meg);
+        let end_ptr = Align::up(&kernel_end as *const u8, gigabyte);
         let len = ptr::bytes_between(base_ptr, end_ptr);
         slice::from_raw_parts(base_ptr, len)
     }
