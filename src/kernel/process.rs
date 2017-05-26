@@ -14,7 +14,7 @@ use mutex::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use prelude::*;
 use process;
-use ptr::{self,Align};
+use ptr::{self,Align,PointerInSlice};
 use syscall::{ErrNum,Handle,Result};
 use tar;
 use thread;
@@ -44,8 +44,9 @@ pub trait KObj {
     fn async_read(&self) -> Option<&AsyncRead> { None }
     fn read(&self) -> Option<&Read> { None }
     fn write(&self) -> Option<&Write> { None }
-    fn deferred_i32(&self) -> Option<&Deferred<i32>> { None }
+    fn deferred_i32(&self) -> Option<Deferred<i32>> { None }
     fn shared_mem_block(&self) -> Option<&SharedMemBlock> { None }
+    fn process(&self) -> Option<&Process> { None }
 }
 
 pub struct KObjRef<T: ?Sized> {
@@ -96,13 +97,15 @@ impl KObj for SharedMemBlock {
 }
 
 struct ProcessState {
-    handles: Vec<Option<Arc<KObj>>>
+    handles: Vec<Option<Arc<KObj>>>,
+    exit_code: Deferred<i32>
 }
 
 impl ProcessState {
     fn new(handles: Vec<Option<Arc<KObj>>>) -> Self {
         ProcessState {
-            handles: handles
+            handles: handles,
+            exit_code: Deferred::new()
         }
     }
 
@@ -112,7 +115,7 @@ impl ProcessState {
         handle
     }
 
-    fn resolve_handle(&self, handle: Handle) -> Result<Arc<KObj>> {
+    fn resolve_handle_ref(&self, handle: Handle) -> Result<Arc<KObj>> {
         self.handles
             .get(handle)
             .map(|ref o| (*o).clone())
@@ -127,6 +130,10 @@ impl ProcessState {
         } else {
             false
         }
+    }
+
+    fn set_deferred(&mut self, d: Deferred<i32>) {
+        self.exit_code = d;
     }
 }
 
@@ -234,7 +241,7 @@ impl Process {
         let mut handles = Vec::new();
         let state = lock!(self.state);
         for handle in inherit {
-            handles.push(Some(state.resolve_handle(handle)?));
+            handles.push(Some(state.resolve_handle_ref(handle)?));
         }
 
         Process::new(name, self.phys.clone(), self.kernel_virt.clone(), handles)
@@ -267,9 +274,42 @@ impl Process {
             None => virt.alloc(len, block).map(|slice| slice.as_mut_ptr())
         }
     }
+
+    pub fn make_handle(&self, obj: Arc<KObj>) -> Handle {
+        let mut state = lock!(self.state);
+        state.make_handle(obj)
+    }
+
+    pub fn resolve_handle_ref<'a, T: 'a+?Sized, F: FnOnce(&'a KObj) -> Option<&'a T>>(&self, handle: Handle, f: F) -> Result<KObjRef<T>> {
+        let kobj = lock!(self.state).resolve_handle_ref(handle)?;
+        KObjRef::new(kobj, f)
+    }
+
+    pub fn resolve_handle<T: Clone, F: FnOnce(&KObj) -> Option<T>>(&self, handle: Handle, f: F) -> Result<T> {
+        let kobj = lock!(self.state).resolve_handle_ref(handle)?;
+        f(&*kobj).ok_or(ErrNum::NotSupported)
+    }
+
+    pub fn exit_code(&self) -> Deferred<i32> {
+        lock!(self.state).exit_code.clone()
+    }
+
+    pub fn set_exit_code(&self, d: Deferred<i32>) {
+        lock!(self.state).set_deferred(d)
+    }
 }
 
-pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Result<(Arc<Process>, Deferred<i32>)> {
+impl KObj for Process {
+    fn deferred_i32(&self) -> Option<Deferred<i32>> {
+        Some(self.exit_code())
+    }
+
+    fn process(&self) -> Option<&Process> {
+        Some(self)
+    }
+}
+
+pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Result<(Arc<Process>)> {
     let current = thread::current_process();
     let process = Arc::new(current.spawn(executable.clone(), inherit)?);
 
@@ -316,10 +356,7 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
             slices.push(slice);
         }
 
-        assert!(slices.iter().any(|ref slice| {
-            let slice_end = unsafe { slice.as_ptr().offset(slice.len() as isize) };
-            entry >= slice.as_ptr() && entry < slice_end
-        }));
+        assert!(slices.iter().any(|slice| slice.contains_ptr(entry)));
 
         let stack_slice = process::alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
         log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
@@ -340,7 +377,8 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
         }
     });
 
-    Ok((process.clone(), deferred))
+    process.set_exit_code(deferred);
+    Ok(process)
 }
 
 pub struct Allocation<T> {
@@ -442,15 +480,15 @@ pub fn resolve_page_fault(ptr: *mut u8) -> bool {
 }
 
 pub fn make_handle(obj: Arc<KObj>) -> Handle {
-    let process = thread::current_process();
-    let mut state = lock!(process.state);
-    state.make_handle(obj)
+    thread::current_process().make_handle(obj)
 }
 
-pub fn resolve_handle<'a, T: 'a+?Sized, F: FnOnce(&'a KObj) -> Option<&'a T>>(handle: Handle, f: F) -> Result<KObjRef<T>> {
-    let process = thread::current_process();
-    let kobj = lock!(process.state).resolve_handle(handle)?;
-    KObjRef::new(kobj, f)
+pub fn resolve_handle_ref<'a, T: 'a+?Sized, F: FnOnce(&'a KObj) -> Option<&'a T>>(handle: Handle, f: F) -> Result<KObjRef<T>> {
+    thread::current_process().resolve_handle_ref(handle, f)
+}
+
+pub fn resolve_handle<T: Clone, F: FnOnce(&KObj) -> Option<T>>(handle: Handle, f: F) -> Result<T> {
+    thread::current_process().resolve_handle(handle, f)
 }
 
 pub fn close_handle(handle: Handle) -> bool {

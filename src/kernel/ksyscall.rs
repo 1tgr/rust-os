@@ -52,12 +52,12 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn write(&self, file: Handle, bytes: &[u8]) -> Result<usize> {
-        let file = process::resolve_handle(file, |kobj| kobj.write())?;
+        let file = process::resolve_handle_ref(file, |kobj| kobj.write())?;
         file.write(bytes)
     }
 
     fn read(&self, file: Handle, buf: &mut [u8]) -> Result<usize> {
-        let file = process::resolve_handle(file, |kobj| kobj.read())?;
+        let file = process::resolve_handle_ref(file, |kobj| kobj.read())?;
         file.read(buf)
     }
 
@@ -98,13 +98,13 @@ impl HandleSyscall for SyscallHandler {
 
     fn spawn(&self, executable: &str, inherit: &[Handle]) -> Result<Handle> {
         let inherit = inherit.iter().map(|handle| *handle);
-        let (_, deferred) = process::spawn(String::from(executable), inherit)?;
-        Ok(process::make_handle(Arc::new(deferred)))
+        let process = process::spawn(String::from(executable), inherit)?;
+        Ok(process::make_handle(process))
     }
 
     fn wait_for_exit(&self, process: Handle) -> Result<i32> {
         let deferred = process::resolve_handle(process, |kobj| kobj.deferred_i32())?;
-        Ok((*deferred).clone().get())
+        Ok(deferred.get())
     }
 
     fn create_shared_mem(&self) -> Result<Handle> {
@@ -112,7 +112,7 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn map_shared_mem(&self, block: Handle, len: usize, writable: bool) -> Result<*mut u8> {
-        let block = process::resolve_handle(block, |kobj| kobj.shared_mem_block())?;
+        let block = process::resolve_handle_ref(block, |kobj| kobj.shared_mem_block())?;
         let slice = process::map_shared(block, len, true, writable)?;
         Ok(slice.as_mut_ptr())
     }

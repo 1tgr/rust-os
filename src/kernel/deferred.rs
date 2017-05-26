@@ -72,7 +72,7 @@ impl<A> Clone for Deferred<A> {
 }
 
 impl KObj for Deferred<i32> {
-    fn deferred_i32(&self) -> Option<&Self> {
-        Some(self)
+    fn deferred_i32(&self) -> Option<Self> {
+        Some(self.clone())
     }
 }

@@ -37,8 +37,8 @@ test! {
                     KObjRef::new(Arc::new(Vga::new()), |kobj| kobj.write()).unwrap())));
 
             let _x = ksyscall::register_handler(handler);
-            let (_, process_exit) = process::spawn(String::from("hello"), Vec::new()).unwrap();
-            assert_eq!(0, process_exit.poll());
+            let process = process::spawn(String::from("hello"), Vec::new()).unwrap();
+            assert_eq!(0, process.exit_code().poll());
         });
     }
 }
