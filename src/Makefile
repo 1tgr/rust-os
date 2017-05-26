@@ -1,11 +1,11 @@
-DIRS += kernel
-
 DIRS += apps/cairo_demo
 DIRS += apps/graphics_client
 DIRS += apps/graphics_server
 DIRS += apps/hello
 DIRS += apps/input
+DIRS += kernel
+
+DIRS += boot
 
 all:
-	echo $(DIRS) | xargs -P2 -I_ -n1 make -C _
-	make -C boot
+	for dir in $(DIRS); do make -C $$dir; done
