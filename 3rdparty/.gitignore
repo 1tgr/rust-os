@@ -1,3 +1,6 @@
+bin
+binutils-2.27
+binutils-2.27.tar.gz
 cairo-1.14.2
 cairo-1.14.2.tar.xz
 libpng-1.6.18
@@ -6,5 +9,8 @@ newlib-2.2.0.20150924
 newlib-2.2.0.20150924.tar.gz
 pixman-0.32.8
 pixman-0.32.8.tar.gz
+qemu
+share
+var
 zlib-1.2.8
 zlib-1.2.8.tar.gz

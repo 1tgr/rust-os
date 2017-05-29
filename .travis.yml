@@ -2,8 +2,11 @@ addons:
     apt:
         packages:
             - genisoimage
+            - libfdt-dev
+            - libglib2.0-dev
+            - libpixman-1-dev
             - python3-pip
-            - qemu
+            - zlib1g-dev
 
 before_install: ./travis-setup.sh
 
