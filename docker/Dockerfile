@@ -7,7 +7,7 @@ RUN apt-get install -qq -y \
     libpixman-1-dev \
     python3-pip \
     zlib1g-dev
-RUN git clone --depth=1 https://github.com/1tgr/rust-os.git /host-bootstrap  # d6af7650
+RUN git clone --depth=1 https://github.com/1tgr/rust-os.git /host-bootstrap  # ed21e1de
 WORKDIR /host-bootstrap
 RUN ./travis-setup.sh
 ADD build.sh /docker/
