@@ -1,11 +1,18 @@
-DIRS += apps/cairo_demo
-DIRS += apps/graphics_client
-DIRS += apps/graphics_server
-DIRS += apps/hello
-DIRS += apps/input
-DIRS += kernel
+DIRS_SRC += apps/cairo_demo
+DIRS_SRC += apps/graphics_client
+DIRS_SRC += apps/graphics_server
+DIRS_SRC += apps/hello
+DIRS_SRC += apps/input
+DIRS_SRC += kernel
 
+DIRS += $(DIRS_SRC)
 DIRS += boot
 
-all:
-	for dir in $(DIRS); do make -C $$dir; done
+.PHONY: all $(DIRS)
+
+all: $(DIRS)
+
+$(DIRS):
+	make -C $@
+
+boot: $(DIRS_SRC)
