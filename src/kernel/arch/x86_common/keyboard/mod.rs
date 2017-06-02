@@ -4,9 +4,9 @@ use arch::isr::{self,DropIrqHandler};
 use core::char;
 use core::mem;
 use io::{AsyncRead,Pipe,Write};
-use mutex::Mutex;
+use spin::Mutex;
 use prelude::*;
-use process::KObj;
+use kobj::KObj;
 
 //                  S    C    C+S  AGr  AGr+S
 pub struct Key(u32, u32, u32, u32, u32, u32);

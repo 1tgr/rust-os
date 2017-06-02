@@ -4,9 +4,10 @@ use arch::keyboard::Keyboard;
 use arch::vga::Vga;
 use console::Console;
 use deferred::Deferred;
+use kobj::KObjRef;
 use ksyscall::{self,SyscallHandler};
 use prelude::*;
-use process::{self,KObjRef};
+use process;
 use thread;
 
 impl<A> Deferred<A> {

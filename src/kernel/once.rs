@@ -17,7 +17,7 @@ use core::isize;
 use core::mem::drop;
 use core::ops::FnOnce;
 use core::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
-use mutex::{StaticMutex, STATIC_MUTEX_INIT};
+use spin::{StaticMutex, STATIC_MUTEX_INIT};
 
 /// A synchronization primitive which can be used to run a one-time global
 /// initialization. Useful for one-time initialization for FFI or related

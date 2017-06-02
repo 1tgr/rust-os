@@ -27,8 +27,8 @@
 #[macro_use] extern crate bitflags;
 #[macro_use] extern crate lazy_static;
 
-#[macro_use] mod mutex;
 #[macro_use] mod macros;
+#[macro_use] mod spin;
 #[macro_use] mod test;
 
 extern crate alloc;
@@ -52,6 +52,7 @@ mod console;
 mod deferred;
 mod elf;
 mod io;
+mod kobj;
 mod ksyscall;
 mod logging;
 mod multiboot;

@@ -5,7 +5,7 @@ use core::mem;
 use core::slice;
 use libc::{c_int,c_void};
 use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_module_t,multiboot_uint32_t};
-use mutex::Mutex;
+use spin::Mutex;
 use ptr::{self,Align,PointerInSlice};
 use syscall::{ErrNum,Result};
 

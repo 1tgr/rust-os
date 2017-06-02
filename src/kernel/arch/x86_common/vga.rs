@@ -1,9 +1,9 @@
 use arch::cpu;
 use core::intrinsics;
 use io::Write;
-use mutex::Mutex;
+use spin::Mutex;
 use phys_mem;
-use process::KObj;
+use kobj::KObj;
 use syscall::Result;
 
 struct VgaState {

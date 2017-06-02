@@ -1,8 +1,8 @@
 use alloc::arc::Arc;
 use collections::vec_deque::VecDeque;
 use core::mem;
-use mutex::Mutex;
-use process::KObj;
+use spin::Mutex;
+use kobj::KObj;
 use thread::{self,BlockedThread};
 
 struct DeferredState<A> {

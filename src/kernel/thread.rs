@@ -10,7 +10,7 @@ use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use deferred::Deferred;
 use libc::{self,jmp_buf};
-use mutex::Mutex;
+use spin::Mutex;
 use prelude::*;
 use process::Process;
 use ptr::Align;

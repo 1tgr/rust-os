@@ -1,9 +1,9 @@
 use alloc::arc::Arc;
 use collections::vec_deque::VecDeque;
 use io::{AsyncRead,Promise};
-use mutex::Mutex;
+use kobj::KObjRef;
 use prelude::*;
-use process::KObjRef;
+use spin::Mutex;
 use syscall::Result;
 
 struct FlatMapShared {

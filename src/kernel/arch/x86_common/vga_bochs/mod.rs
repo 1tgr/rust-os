@@ -1,7 +1,7 @@
 use arch::cpu;
 use arch::pci;
-use mutex::{StaticMutex,STATIC_MUTEX_INIT};
 use process;
+use spin::{StaticMutex,STATIC_MUTEX_INIT};
 use syscall::{ErrNum,Result};
 
 static MUTEX: StaticMutex = STATIC_MUTEX_INIT;

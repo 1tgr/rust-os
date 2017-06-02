@@ -2,9 +2,9 @@ use collections::vec_deque::VecDeque;
 use core::cmp;
 use deferred::Deferred;
 use io::{AsyncRead,Promise,Read,Write};
-use mutex::Mutex;
+use spin::Mutex;
 use prelude::*;
-use process::KObj;
+use kobj::KObj;
 use syscall::Result;
 
 struct IoRequest {

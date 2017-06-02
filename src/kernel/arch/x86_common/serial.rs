@@ -1,19 +1,19 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * arch/x86/debug.rs
  * - Debug output channel
  *
  * Writes debug to the standard PC serial port (0x3F8 .. 0x3FF)
- * 
+ *
  * == LICENCE ==
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
 use arch::cpu;
 use libc::c_char;
-use mutex::{StaticMutex,STATIC_MUTEX_INIT};
+use spin::{StaticMutex,STATIC_MUTEX_INIT};
 
 static MUTEX: StaticMutex = STATIC_MUTEX_INIT;
 
@@ -25,7 +25,7 @@ unsafe fn putb(b: u8) {
 
     // Send the byte out the serial port
     cpu::outb(0x3F8, b);
-    
+
     // Also send to the bochs 0xe9 hack
     cpu::outb(0xe9, b);
 }
@@ -45,4 +45,3 @@ pub unsafe fn put_cstr(s: *const c_char) {
         s = s.offset(1);
     }
 }
-

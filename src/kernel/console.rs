@@ -2,7 +2,7 @@ use arch::keyboard::keys;
 use core::char;
 use io::{AsyncRead,FlatMap,Read,Write};
 use prelude::*;
-use process::{KObj,KObjRef};
+use kobj::{KObj,KObjRef};
 
 pub struct Console {
     input: FlatMap,

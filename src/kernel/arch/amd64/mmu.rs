@@ -3,7 +3,7 @@ use arch::cpu;
 use core::fmt::{Debug,Error,Formatter};
 use core::marker::PhantomData;
 use core::result;
-use mutex::Mutex;
+use spin::Mutex;
 use phys_mem::{self,PhysicalBitmap};
 use ptr::Align;
 use syscall::Result;
@@ -253,7 +253,6 @@ impl Drop for AddressSpace {
     fn drop(&mut self) {
         if cpu::read_cr3() == self.cr3 {
             let cr3 = phys_mem::virt2phys(unsafe { &init_pml4 });
-            log!("drop: {:x} -> {:x}", self.cr3, cr3);
             unsafe { cpu::write_cr3(cr3) };
         }
 
