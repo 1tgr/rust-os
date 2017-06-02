@@ -56,6 +56,7 @@ mod kobj;
 mod ksyscall;
 mod logging;
 mod multiboot;
+mod mutex;
 mod once;
 mod prelude;
 mod process;
@@ -83,6 +84,7 @@ fn run_tests() {
 
         thread::test::TESTS,
 
+        mutex::test::TESTS,
         process::test::TESTS,
         demo::TESTS
     ];

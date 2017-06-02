@@ -5,6 +5,7 @@ use core::fmt::{self,Write};
 use io::Pipe;
 use kobj::KObj;
 use logging::Writer;
+use mutex::UntypedMutex;
 use prelude::*;
 use process::{self,SharedMemBlock};
 use singleton::{DropSingleton,Singleton};
@@ -126,5 +127,19 @@ impl HandleSyscall for SyscallHandler {
         let from_process = process::resolve_handle_ref(from_process, |kobj| kobj.process())?;
         let from_handle = from_process.resolve_handle_ref(from_handle, |kobj| Some(kobj))?;
         Ok(process::make_handle(from_handle.get().clone()))
+    }
+
+    fn create_mutex(&self) -> Result<Handle> {
+        Ok(process::make_handle(Arc::new(UntypedMutex::new())))
+    }
+
+    fn lock_mutex(&self, mutex: Handle) -> Result<()> {
+        let mutex = process::resolve_handle_ref(mutex, |kobj| kobj.mutex())?;
+        unsafe { mutex.lock_unsafe() }
+    }
+
+    fn unlock_mutex(&self, mutex: Handle) -> Result<()> {
+        let mutex = process::resolve_handle_ref(mutex, |kobj| kobj.mutex())?;
+        unsafe { mutex.unlock_unsafe() }
     }
 }

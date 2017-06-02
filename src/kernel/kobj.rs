@@ -4,6 +4,7 @@ use core::nonzero::NonZero;
 use core::ops::Deref;
 use deferred::Deferred;
 use io::{AsyncRead,Read,Write};
+use mutex::UntypedMutex;
 use process::{Process,SharedMemBlock};
 use syscall::{ErrNum,Result};
 
@@ -14,6 +15,7 @@ pub trait KObj {
     fn deferred_i32(&self) -> Option<Deferred<i32>> { None }
     fn shared_mem_block(&self) -> Option<&SharedMemBlock> { None }
     fn process(&self) -> Option<&Process> { None }
+    fn mutex(&self) -> Option<&UntypedMutex> { None }
 }
 
 pub struct KObjRef<T: ?Sized> {

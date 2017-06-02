@@ -28,5 +28,8 @@ syscalls! {
     fn create_shared_mem() -> Handle => 10,
     fn map_shared_mem(block: Handle, len: usize, writable: bool) -> *mut u8 => 11,
     fn create_pipe() -> Handle => 12,
-    fn open_handle(from_process: Handle, from_handle: usize) -> Handle => 13
+    fn open_handle(from_process: Handle, from_handle: usize) -> Handle => 13,
+    fn create_mutex() -> Handle => 14,
+    fn lock_mutex(mutex: Handle) -> () => 15,
+    fn unlock_mutex(mutex: Handle) -> () => 16
 }
