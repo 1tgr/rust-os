@@ -1,9 +1,12 @@
 use arch::cpu;
+use core::fmt::Write;
 use core::intrinsics;
-use io::Write;
-use spin::Mutex;
-use phys_mem;
+use core::str;
+use io;
 use kobj::KObj;
+use logging::Writer;
+use phys_mem;
+use spin::Mutex;
 use syscall::Result;
 
 struct VgaState {
@@ -89,6 +92,10 @@ impl VgaState {
     }
 
     pub fn write(&mut self, buf: &[u8]) {
+        if let Ok(s) = str::from_utf8(buf) {
+            let _ = write!(Writer, "{}", s);
+        }
+
         for b in buf {
             self.putb(*b);
         }
@@ -105,7 +112,7 @@ impl Vga {
     }
 }
 
-impl Write for Vga {
+impl io::Write for Vga {
     fn write(&self, buf: &[u8]) -> Result<usize> {
         lock!(self.0).write(buf);
         Ok(buf.len())
@@ -113,7 +120,7 @@ impl Write for Vga {
 }
 
 impl KObj for Vga {
-    fn write(&self) -> Option<&Write> {
+    fn write(&self) -> Option<&io::Write> {
         Some(self)
     }
 }

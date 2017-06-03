@@ -1,10 +1,9 @@
 use alloc::arc::Arc;
 use arch::vga_bochs;
 use console::Console;
-use core::fmt::{self,Write};
+use core::fmt;
 use io::Pipe;
 use kobj::KObj;
-use logging::Writer;
 use mutex::UntypedMutex;
 use prelude::*;
 use process::{self,SharedMemBlock};
@@ -41,12 +40,10 @@ impl SyscallHandler {
 }
 
 impl HandleSyscall for SyscallHandler {
-    fn log_entry(&self, msg: fmt::Arguments) {
-        let _ = write!(&mut Writer, "[{}] {}", thread::current_process().name(), msg);
+    fn log_entry(&self, _msg: fmt::Arguments) {
     }
 
-    fn log_exit(&self, msg: fmt::Arguments) {
-        let _ = writeln!(&mut Writer, " => {:?}", msg);
+    fn log_exit(&self, _msg: fmt::Arguments) {
     }
 
     fn exit_thread(&self, code: i32) -> Result<()> {
