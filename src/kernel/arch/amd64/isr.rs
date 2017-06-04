@@ -167,7 +167,7 @@ pub extern fn irq(num: usize, _: &Regs) {
 #[no_mangle]
 pub extern fn exception(num: u8, regs: &Regs) {
     let cr2: *mut u8 = cpu::read_cr2();
-    if num == 14 && process::resolve_page_fault(cr2) {
+    if num == 14 && (regs.error & 1) == 0 && process::resolve_page_fault(cr2) {
         return;
     }
 
@@ -185,9 +185,10 @@ pub extern fn exception(num: u8, regs: &Regs) {
     log!("");
 
     if num == 14 {
-        log!("page fault: {} {} in {} mode",
+        log!("page fault: {} {} address {:p} in {} mode",
              if (regs.error & 1) != 0 { "protection violation" } else { "page not present" },
              if (regs.error & 2) != 0 { "writing" } else { "reading" },
+             cr2,
              if (regs.error & 4) != 0 { "user" } else { "kernel" });
 
         log!("cr3 = {:x}", cpu::read_cr3());

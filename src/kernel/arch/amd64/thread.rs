@@ -49,7 +49,7 @@ pub fn new_jmp_buf<'a>(p: Box<FnBox() + 'a>, stack_ptr: *mut u8) -> jmp_buf {
     }
 }
 
-pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *mut u8) -> ! {
+pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *mut u8, rdi: usize) -> ! {
     assert!(Align::is_aligned(rsp, 16));
     let rsp = (rsp as *mut usize).offset(-1); // fake return address
     *rsp = 0;
@@ -64,6 +64,6 @@ pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *mut u8) -> ! {
         cpu::wrmsr(cpu::IA32_SFMASK, RFLAGS_IF);
     });
 
-    log!("jmp_user_mode({:p}, {:p})", rip, rsp);
-    cpu::sysret(rip, rsp, 1 << 9)
+    log!("jmp_user_mode({:p}, {:p}, {:x})", rip, rsp, rdi);
+    cpu::sysret(rip, rsp, rdi, 1 << 9)
 }

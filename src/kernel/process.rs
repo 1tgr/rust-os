@@ -322,7 +322,12 @@ pub fn spawn<I: IntoIterator<Item=Handle>>(executable: String, inherit: I) -> Re
         let result : Result<_> = init_in_new_process();
         match result {
             Ok((entry, stack_slice)) => {
-                unsafe { arch_thread::jmp_user_mode(entry, stack_slice.as_mut_ptr().offset(stack_slice.len() as isize)) }
+                unsafe {
+                    arch_thread::jmp_user_mode(
+                        entry,
+                        stack_slice.as_mut_ptr().offset(stack_slice.len() as isize),
+                        0)
+                }
                 // TODO: free stack
             },
 

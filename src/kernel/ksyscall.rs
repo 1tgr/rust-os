@@ -1,10 +1,12 @@
 use alloc::arc::Arc;
+use arch::thread as arch_thread;
 use arch::vga_bochs;
 use console::Console;
 use core::fmt;
 use io::Pipe;
 use kobj::KObj;
 use mutex::UntypedMutex;
+use phys_mem;
 use prelude::*;
 use process::{self,SharedMemBlock};
 use singleton::{DropSingleton,Singleton};
@@ -95,7 +97,7 @@ impl HandleSyscall for SyscallHandler {
         Ok(slice.as_mut_ptr())
     }
 
-    fn spawn(&self, executable: &str, inherit: &[Handle]) -> Result<Handle> {
+    fn spawn_process(&self, executable: &str, inherit: &[Handle]) -> Result<Handle> {
         let inherit = inherit.iter().map(|handle| *handle);
         let process = process::spawn(String::from(executable), inherit)?;
         Ok(process::make_handle(process))
@@ -138,5 +140,29 @@ impl HandleSyscall for SyscallHandler {
     fn unlock_mutex(&self, mutex: Handle) -> Result<()> {
         let mutex = process::resolve_handle_ref(mutex, |kobj| kobj.mutex())?;
         unsafe { mutex.unlock_unsafe() }
+    }
+
+    fn spawn_thread(&self, entry: extern fn(usize), context: usize) -> Result<Handle> {
+        let entry = entry as *const u8;
+
+        let kernel_entry = || {
+            let stack_slice = process::alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+            log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
+            unsafe {
+                arch_thread::jmp_user_mode(
+                    entry,
+                    stack_slice.as_mut_ptr().offset(stack_slice.len() as isize),
+                    context)
+            }
+            // TODO: free stack
+        };
+
+        let thread = thread::spawn(kernel_entry);
+        Ok(process::make_handle(Arc::new(thread)))
+    }
+
+    fn schedule(&self) -> Result<()> {
+        thread::schedule();
+        Ok(())
     }
 }

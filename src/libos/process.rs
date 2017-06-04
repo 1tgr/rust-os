@@ -9,7 +9,7 @@ impl Process {
     }
 
     pub fn spawn(filename: &str, inherit: &[Handle]) -> Result<Self> {
-        Ok(Process(OSHandle::from_raw(syscall::spawn(filename, inherit)?)))
+        Ok(Process(OSHandle::from_raw(syscall::spawn_process(filename, inherit)?)))
     }
 
     pub fn handle(&self) -> &OSHandle {

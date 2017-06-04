@@ -212,6 +212,17 @@ impl<'a> SyscallArgs for &'a str {
     }
 }
 
+impl<T> SyscallArgs for extern fn(T) {
+    fn as_args(self, args: &mut PackedArgs) {
+        (self as usize).as_args(args)
+    }
+
+    fn from_args(args: &mut PackedArgs) -> Result<Self> {
+        let ptr = SyscallArgs::from_args(args)?;
+        Ok(unsafe { mem::transmute::<usize, Self>(ptr) })
+    }
+}
+
 impl<T: SyscallArgs> SyscallArgs for (T,) {
     fn as_args(self, args: &mut PackedArgs) {
         self.0.as_args(args)
