@@ -25,6 +25,29 @@ fn read_line() -> Result<String> {
     String::from_utf8(v).map_err(|_| ErrNum::Utf8Error)
 }
 
+fn run() -> Result<()> {
+    let inherit = unsafe { [ stdin, stdout ] };
+    loop {
+        print!("> ");
+
+        let line = read_line()?;
+        if line == "exit" {
+            return Ok(());
+        }
+
+        if line.len() > 0 {
+            let run_line = move || -> Result<()> {
+                Process::spawn(&line, &inherit)?.wait_for_exit()?;
+                Ok(())
+            };
+
+            if let Some(num) = run_line().err() {
+                println!("{:?}", num);
+            }
+        }
+    }
+}
+
 #[cfg_attr(target_arch = "x86_64", link_args = "-T ../../libsyscall/arch/amd64/link.ld")]
 extern {
 }
@@ -32,20 +55,5 @@ extern {
 #[start]
 #[no_mangle]
 pub fn start(_: isize, _: *const *const u8) -> isize {
-    let inherit = unsafe { [ stdin, stdout ] };
-    loop {
-        print!("> ");
-
-        match read_line() {
-            Ok(line) => {
-                if line == "exit" {
-                    return 0;
-                } else if line.len() > 0 {
-                    Process::spawn(&line, &inherit).unwrap().wait_for_exit().unwrap();
-                }
-            },
-
-            Err(code) => { return -(code as isize) }
-        }
-    }
+    run().map(|()| 0).unwrap_or_else(|num| -(num as isize))
 }
