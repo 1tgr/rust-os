@@ -1,9 +1,7 @@
 use cairo::cairo::Cairo;
-use graphics::{FrameBuffer,Rect};
-use intrusive_collections::{KeyAdapter,LinkedListLink,RBTreeLink};
-use os::{Process,Result,SharedMem};
-use std::cell::RefCell;
-use std::rc::Rc;
+use graphics::{self,Event,FrameBuffer,Rect};
+use os::{File,Mutex,Process,Result,SharedMem};
+use std::sync::Arc;
 use syscall::Handle;
 
 struct WindowState {
@@ -19,32 +17,22 @@ pub enum WindowId {
 }
 
 pub struct Window {
-    by_zorder: LinkedListLink,
-    by_id: RBTreeLink,
     id: WindowId,
-    state: RefCell<WindowState>,
-}
-
-intrusive_adapter!(pub WindowZOrderAdapter = Rc<Window>: Window { by_zorder: LinkedListLink });
-intrusive_adapter!(pub WindowIdAdapter = Rc<Window>: Window { by_id: RBTreeLink });
-
-impl<'a> KeyAdapter<'a> for WindowIdAdapter {
-    type Key = WindowId;
-    fn get_key(&self, x: &'a Window) -> WindowId { x.id() }
+    server2client: Arc<Mutex<File>>,
+    state: Mutex<WindowState>,
 }
 
 impl Window {
-    pub fn new(owner: &Process, id: usize, pos: Rect, shared_mem_handle: usize) -> Result<Self> {
+    pub fn new(owner: &Process, id: usize, pos: Rect, shared_mem_handle: usize, server2client: Arc<Mutex<File>>) -> Result<Self> {
         let shared_mem = SharedMem::from_raw(owner.open_handle(shared_mem_handle)?, false);
         Ok(Window {
-            by_zorder: LinkedListLink::new(),
-            by_id: RBTreeLink::new(),
             id: WindowId::Id(owner.handle().get(), id),
-            state: RefCell::new(WindowState {
+            server2client,
+            state: Mutex::new(WindowState {
                 x: pos.x,
                 y: pos.y,
                 buffer: FrameBuffer::new(pos.width, pos.height, shared_mem)?,
-            })
+            })?
         })
     }
 
@@ -53,7 +41,7 @@ impl Window {
     }
 
     pub fn move_to(&self, pos: Rect) -> Result<()> {
-        let mut state = self.state.borrow_mut();
+        let mut state = self.state.lock().unwrap();
         state.x = pos.x;
         state.y = pos.y;
         state.buffer.resize(pos.width, pos.height)?;
@@ -61,10 +49,23 @@ impl Window {
     }
 
     pub fn paint_on(&self, cr: &Cairo) {
-        let mut state = self.state.borrow_mut();
+        let mut state = self.state.lock().unwrap();
         let (x, y) = (state.x, state.y);
         let surface = state.buffer.create_surface();
         cr.set_source_surface(&surface, x, y);
         cr.paint();
+    }
+
+    pub fn send_keypress(&self, c: char) -> Result<()> {
+        match self.id {
+            WindowId::Id(_, id) => {
+                let mut server2client = self.server2client.lock().unwrap();
+                graphics::send_message(&mut *server2client, Event::KeyPress { window_id: id, code: c })?;
+            },
+
+            _ => { }
+        }
+
+        Ok(())
     }
 }

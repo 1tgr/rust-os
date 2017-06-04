@@ -1,22 +1,24 @@
+#![feature(collections)]
 #![feature(link_args)]
 #![feature(start)]
 #![feature(unique)]
 
 extern crate cairo;
+extern crate collections;
 extern crate graphics;
 extern crate os;
 extern crate syscall;
 
-use cairo::CairoObj;
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
+use cairo::CairoObj;
+use collections::btree_map::BTreeMap;
 use graphics::{Client,Event,Window};
-use os::Result;
-use std::cell::RefCell;
+use os::{Mutex,Result};
 
 fn run() -> Result<()> {
-    let client = RefCell::new(Client::new());
-    let mut windows = Vec::new();
+    let client = Mutex::new(Client::new())?;
+    let mut windows = BTreeMap::new();
     for i in 0 .. 5 {
         let mut window = Window::new(&client, i as f64 * 100.0, i as f64 * 100.0, 150.0, 120.0)?;
 
@@ -34,24 +36,35 @@ fn run() -> Result<()> {
         }
 
         window.invalidate()?;
-        windows.push(window);
+        windows.insert(window.id(), window);
     }
 
-    let checkpoint_id = client.borrow_mut().checkpoint()?;
+    let checkpoint_id = {
+        let mut client = client.lock().unwrap();
+        client.checkpoint()?
+    };
 
-    loop {
-        let e = client.borrow_mut().wait_for_event()?;
+    while !windows.is_empty() {
+        let e = {
+            let mut client = client.lock().unwrap();
+            client.wait_for_event()?
+        };
+
         println!("[Client] {:?}", e);
         match e {
-            Event::Checkpoint { id } => {
-                if id == checkpoint_id {
-                    println!("System ready");
-                }
+            Event::Checkpoint { id } if id == checkpoint_id => {
+                println!("System ready");
             },
 
-            _ => { },
+            Event::KeyPress { window_id, code } if code as u32 == 27 => {
+                windows.remove(&window_id);
+            },
+
+            _ => { }
         }
-    } 
+    }
+
+    Ok(())
 }
 
 #[cfg(target_arch="x86_64")]

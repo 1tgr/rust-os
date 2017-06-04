@@ -2,9 +2,6 @@
 #![feature(link_args)]
 #![feature(start)]
 
-#[macro_use]
-extern crate intrusive_collections;
-
 extern crate cairo;
 extern crate collections;
 extern crate graphics;
@@ -17,46 +14,86 @@ mod window;
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use collections::btree_map::BTreeMap;
 use collections::vec_deque::VecDeque;
 use graphics::{Command,Event,Rect};
-use intrusive_collections::{LinkedList,RBTree};
-use os::{File,Mutex,OSMem,Process,Result};
-use std::rc::Rc;
+use os::{File,Mutex,OSMem,Process,Result,Thread};
+use std::io::Read;
+use std::str;
+use std::sync::Arc;
 use syscall::libc_helpers;
-use window::{Window,WindowId,WindowZOrderAdapter,WindowIdAdapter};
+use window::{Window,WindowId};
 
 struct ServerState {
     lfb_mem: OSMem,
-    windows_by_zorder: LinkedList<WindowZOrderAdapter>,
-    windows_by_id: RBTree<WindowIdAdapter>,
+    windows_by_zorder: VecDeque<Arc<Window>>,
+    windows_by_id: BTreeMap<WindowId, Arc<Window>>,
+    focus_window: Option<Arc<Window>>,
+}
+
+fn ref_eq<T>(a: &T, b: &T) -> bool {
+    a as *const T == b as *const T
 }
 
 impl ServerState {
     fn add_window(&mut self, window: Window) {
-        let window = Rc::new(window);
-        self.windows_by_zorder.push_back(window.clone());
-        self.windows_by_id.insert(window);
+        let window = Arc::new(window);
+        self.windows_by_zorder.push_front(window.clone());
+        self.windows_by_id.insert(window.id(), window.clone());
+        self.focus_window = Some(window);
         self.paint_all();
     }
 
-    fn remove_window(&mut self, id: WindowId) {
-        {
-            let mut cursor = self.windows_by_zorder.front_mut();
-            while let Some(window) = cursor.get() {
-                if window.id() == id {
-                    cursor.remove();
-                }
+    fn remove_window_impl(
+        windows_by_zorder: &mut VecDeque<Arc<Window>>,
+        windows_by_id: &mut BTreeMap<WindowId, Arc<Window>>,
+        focus_window: &mut Option<Arc<Window>>,
+        id: WindowId
+    ) {
+        if let Some(ref window) = windows_by_id.remove(&id) {
+            let index_opt =
+                windows_by_zorder
+                    .iter()
+                    .position(|w| ref_eq::<Window>(&*w, &*window));
 
-                cursor.move_next();
+            if let Some(index) = index_opt {
+                windows_by_zorder.remove(index);
+            }
+
+            let action = {
+                match *focus_window {
+                    Some(ref old_focus_window) if ref_eq::<Window>(old_focus_window, window) => {
+                        let next_window_opt =
+                            index_opt
+                                .and_then(|index| windows_by_zorder.get(index))
+                                .or_else(|| windows_by_zorder.front())
+                                .map(|w| (*w).clone());
+
+                        Ok(next_window_opt)
+                    },
+
+                    _ => Err(()),
+                }
+            };
+
+            if let Ok(next_window_opt) = action {
+                *focus_window = next_window_opt;
             }
         }
+    }
 
-        self.windows_by_id.find_mut(&id).remove();
+    fn remove_window(&mut self, id: WindowId) {
+        ServerState::remove_window_impl(
+            &mut self.windows_by_zorder,
+            &mut self.windows_by_id,
+            &mut self.focus_window,
+            id);
+
         self.paint_all();
     }
 
     fn move_window(&mut self, id: WindowId, pos: Rect) -> Result<()> {
-        if let Some(window) = self.windows_by_id.find_mut(&id).get() {
+        if let Some(window) = self.windows_by_id.get_mut(&id) {
             window.move_to(pos)?;
         }
 
@@ -74,7 +111,8 @@ impl ServerState {
         cr.set_source_rgb(0.0, 0.0, 0.5);
         cr.paint();
 
-        for window in self.windows_by_zorder.iter() {
+        let mut i = self.windows_by_zorder.iter_mut();
+        while let Some(window) = i.next_back() {
             window.paint_on(&cr);
         }
     }
@@ -91,38 +129,48 @@ impl Server {
         Ok(Server {
             state: Mutex::new(ServerState {
                 lfb_mem: unsafe { OSMem::from_raw(lfb_ptr, stride * 600) },
-                windows_by_zorder: LinkedList::new(WindowZOrderAdapter::new()),
-                windows_by_id: RBTree::new(WindowIdAdapter::new()),
+                windows_by_zorder: VecDeque::new(),
+                windows_by_id: BTreeMap::new(),
+                focus_window: None,
             })?,
         })
     }
 
-    pub fn handle_command(&self, client_process: &Process, server2client: &mut File, command: Command) -> Result<()> {
+    pub fn handle_command(&self, client_process: &Process, server2client: &Arc<Mutex<File>>, command: Command) -> Result<()> {
         let handle = client_process.handle().get();
         println!("[Server] {:?}", command);
         match command {
             Command::Checkpoint { id } => {
-                graphics::send_message(server2client, Event::Checkpoint { id })?;
+                graphics::send_message(&mut *server2client.lock().unwrap(), Event::Checkpoint { id })?;
             },
 
             Command::CreateWindow { id, pos, shared_mem_handle } => {
-                let window = Window::new(client_process, id, pos, shared_mem_handle)?;
-                self.state.lock()?.add_window(window);
+                let window = Window::new(client_process, id, pos, shared_mem_handle, server2client.clone())?;
+                self.state.lock().unwrap().add_window(window);
             },
 
             Command::DestroyWindow { id } => {
                 let id = WindowId::Id(handle, id);
-                self.state.lock()?.remove_window(id);
+                self.state.lock().unwrap().remove_window(id);
             },
 
             Command::InvalidateWindow { id: _id } => {
-                self.state.lock()?.paint_all();
+                self.state.lock().unwrap().paint_all();
             },
 
             Command::MoveWindow { id, pos } => {
                 let id = WindowId::Id(handle, id);
-                self.state.lock()?.move_window(id, pos)?;
+                self.state.lock().unwrap().move_window(id, pos)?;
             }
+        }
+
+        Ok(())
+    }
+
+    pub fn send_keypress(&self, c: char) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        if let Some(ref mut window) = state.focus_window {
+            window.send_keypress(c)?;
         }
 
         Ok(())
@@ -133,7 +181,7 @@ struct Connection<'a> {
     server: &'a Server,
     process: Process,
     client2server: File,
-    server2client: File,
+    server2client: Arc<Mutex<File>>,
 }
 
 impl<'a> Connection<'a> {
@@ -148,22 +196,48 @@ impl<'a> Connection<'a> {
             server2client.handle().get(),
         ];
 
-        let process = Process::spawn(filename, &inherit)?;
-        Ok(Connection { server, process, client2server, server2client })
+        Ok(Connection {
+            server,
+            process: Process::spawn(filename, &inherit)?,
+            client2server,
+            server2client: Arc::new(Mutex::new(server2client)?)
+        })
     }
 
     pub fn run(mut self) -> Result<()> {
         let mut buf = VecDeque::new();
         loop {
             let c = graphics::read_message(&mut buf, &mut self.client2server)?;
-            self.server.handle_command(&self.process, &mut self.server2client, c)?;
+            self.server.handle_command(&self.process, &self.server2client, c)?;
         }
     }
 }
 
 fn run() -> Result<()> {
-    let server = Server::new()?;
-    Connection::new(&server, "graphics_client")?.run()
+    let server = Arc::new(Server::new()?);
+
+    {
+        let server = server.clone();
+
+        let run = move || -> Result<()> {
+            let mut stdin = File::open("stdin")?;
+            let mut buf = [0; 4];
+            loop {
+                let len = stdin.read(&mut buf)?;
+                if let Ok(s) = str::from_utf8(&buf[..len]) {
+                    if let Some(c) = s.chars().next() {
+                        server.send_keypress(c)?;
+                    }
+                }
+            }
+        };
+
+        Thread::spawn(move || {
+            run().map(|()| 0).unwrap_or_else(|num| -(num as i32))
+        })?;
+    }
+
+    Connection::new(&*server, "graphics_client")?.run()
 }
 
 #[cfg(target_arch="x86_64")]
