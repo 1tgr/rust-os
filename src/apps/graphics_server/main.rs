@@ -66,7 +66,7 @@ impl ServerState {
 
     fn create_surface(&mut self) -> CairoSurface {
         let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-        CairoSurface::from_raw(&mut self.lfb_mem, CAIRO_FORMAT_ARGB32, 800, 600, stride)
+        CairoSurface::from_slice(&mut self.lfb_mem, CAIRO_FORMAT_ARGB32, 800, 600, stride)
     }
 
     fn paint_all(&mut self) {

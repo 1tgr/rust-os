@@ -42,6 +42,6 @@ impl FrameBuffer {
         let width = self.width_i();
         let height = self.height_i();
         let stride = self.stride();
-        CairoSurface::from_raw(&mut *self.shared_mem, cairo::bindings::CAIRO_FORMAT_ARGB32, width, height, stride)
+        CairoSurface::from_slice(&mut *self.shared_mem, cairo::bindings::CAIRO_FORMAT_ARGB32, width, height, stride)
     }
 }

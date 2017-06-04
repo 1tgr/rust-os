@@ -20,7 +20,7 @@ unsafe fn main() -> isize {
     let lfb_ptr = syscall::init_video_mode(800, 600, 32).unwrap();
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
     let mut lfb = OSMem::from_raw(lfb_ptr, stride * 600);
-    let surface = CairoSurface::from_raw(&mut lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride);
+    let surface = CairoSurface::from_slice(&mut lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride);
 
     let cr = Cairo::new(surface);
     let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0));
