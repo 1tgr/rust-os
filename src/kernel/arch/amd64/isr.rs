@@ -7,6 +7,7 @@ use prelude::*;
 use process;
 use ptr::{self,Align};
 use singleton::{DropSingleton,Singleton};
+use thread;
 
 extern {
     static GDT: u8;
@@ -170,7 +171,12 @@ pub extern fn exception(num: u8, regs: &Regs) {
         return;
     }
 
-    log!("exception {}: error=0x{:x}  cr2={:p}", num, regs.error, cr2);
+    {
+        let process_opt = thread::try_current_process();
+        let process_name = &process_opt.as_ref().map_or("<no process>", |p| p.name());
+        log!("exception {} in {}: error=0x{:x}  cr2={:p}", num, process_name, regs.error, cr2);
+    }
+
     log!("ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}", regs.ss, regs.rsp, regs.cs, regs.rip, regs.rflags);
     log!("rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}", regs.rax, regs.rbx, regs.rcx, regs.rdx);
     log!("rbp={:-16x} rdi={:-16x} rsi={:-16x}", regs.rbp, regs.rdi, regs.rsi);
