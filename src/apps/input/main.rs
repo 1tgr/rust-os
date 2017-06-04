@@ -1,34 +1,12 @@
 #![feature(link_args)]
 #![feature(start)]
 
+extern crate os;
 extern crate syscall;
 
-use std::fmt::{self,Write};
+use os::Process;
 use syscall::{ErrNum,Result};
 use syscall::libc_helpers::{stdin,stdout};
-
-struct Writer;
-
-impl Write for Writer {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        match syscall::write(unsafe { stdout }, s.as_bytes()) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(std::fmt::Error)
-        }
-    }
-}
-
-macro_rules! print {
-    ($($arg:tt)*) => { {
-        let mut writer = Writer;
-        let _ = write!(&mut writer, $($arg)*);
-    } }
-}
-
-macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
 
 fn read_line() -> Result<String> {
     let mut v = Vec::new();
@@ -63,9 +41,7 @@ pub fn start(_: isize, _: *const *const u8) -> isize {
                 if line == "exit" {
                     return 0;
                 } else if line.len() > 0 {
-                    let handle = syscall::spawn(&line, &inherit).unwrap();
-                    let _ = syscall::wait_for_exit(handle);
-                    let _ = syscall::close(handle);
+                    Process::spawn(&line, &inherit).unwrap().wait_for_exit().unwrap();
                 }
             },
 

@@ -10,4 +10,5 @@ test = false
 
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
+os = { path = "../../libos" }
 syscall = { path = "../../libsyscall" }
