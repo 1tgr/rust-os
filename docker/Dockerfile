@@ -1,7 +1,9 @@
-FROM travisci/ci-garnet:packer-1490989530
+FROM ubuntu:14.04 
 RUN apt-get update -qq
 RUN apt-get install -qq -y \
+    curl \
     genisoimage \
+    git \
     libfdt-dev \
     libglib2.0-dev \
     libpixman-1-dev \
