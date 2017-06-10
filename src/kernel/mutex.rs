@@ -13,6 +13,9 @@ pub struct UntypedMutex {
     state: spin::Mutex<UntypedMutexState>,
 }
 
+unsafe impl Send for UntypedMutex { }
+unsafe impl Sync for UntypedMutex { }
+
 impl UntypedMutex {
     pub fn new() -> Self {
         UntypedMutex {

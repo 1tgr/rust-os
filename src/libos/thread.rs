@@ -30,7 +30,7 @@ impl Thread {
         Thread(handle)
     }
 
-    pub fn spawn<T: 'static + FnOnce() -> i32>(entry: T) -> Result<Self> {
+    pub fn spawn<T: 'static + FnOnce() -> i32 + Send>(entry: T) -> Result<Self> {
         spawn_inner(Box::new(Box::new(entry)))
     }
 

@@ -143,14 +143,12 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn spawn_thread(&self, entry: extern fn(usize), context: usize) -> Result<Handle> {
-        let entry = entry as *const u8;
-
-        let kernel_entry = || {
+        let kernel_entry = move || {
             let stack_slice = process::alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
             log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
             unsafe {
                 arch_thread::jmp_user_mode(
-                    entry,
+                    entry as *const u8,
                     stack_slice.as_mut_ptr().offset(stack_slice.len() as isize),
                     context)
             }

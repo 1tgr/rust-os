@@ -187,7 +187,7 @@ pub fn spawn_remote<T>(process: Arc<Process>, start: T) -> Deferred<i32> where T
     spawn_inner(process, Box::new(start))
 }
 
-pub fn spawn<T>(start: T) -> Deferred<i32> where T : FnOnce() -> i32 {
+pub fn spawn<T : 'static + FnOnce() -> i32 + Send>(start: T) -> Deferred<i32> {
     let process = lock_sched!().current.process.clone();
     spawn_remote(process, start)
 }
