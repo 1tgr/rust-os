@@ -89,7 +89,8 @@ pub struct MutexGuard<'a, T:'a>
     data: &'a mut T,
 }
 
-unsafe impl<T> Sync for Mutex<T> {}
+unsafe impl<T: Send> Send for Mutex<T> { }
+unsafe impl<T: Send> Sync for Mutex<T> { }
 
 /// A Mutex which may be used statically.
 ///
