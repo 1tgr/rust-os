@@ -34,7 +34,7 @@ fn read_async_inner(shared: Arc<FlatMapShared>, input: KObjRef<AsyncRead>, mut b
             queue.extend(remainder);
             return Promise::resolved(Ok(buf));
         }
-        else if buf.len() >= len {
+        else if buf.len() > 0 || len == 0 {
             return Promise::resolved(Ok(buf));
         }
     }
