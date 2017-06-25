@@ -15,15 +15,23 @@ use cairo::CairoObj;
 use collections::btree_map::BTreeMap;
 use graphics::{Client,Event,Window};
 use os::{Mutex,Result};
+use std::mem;
 
-fn run() -> Result<()> {
-    let client = Mutex::new(Client::new())?;
-    let mut windows = BTreeMap::new();
-    for i in 0 .. 5 {
-        let mut window = Window::new(&client, i as f64 * 100.0, i as f64 * 100.0, 150.0, 120.0)?;
+struct DemoWindow<'a> {
+    window: Window<'a>,
+    text: String,
+}
 
+impl<'a> DemoWindow<'a> {
+    fn new(window: Window<'a>) -> Result<Self> {
+        let mut demo_window = DemoWindow { window, text: "".into() };
+        demo_window.invalidate()?;
+        Ok(demo_window)
+    }
+
+    fn invalidate(&mut self) -> Result<()> {
         {
-            let surface = window.create_surface();
+            let surface = self.window.create_surface();
             let cr = Cairo::new(surface);
             unsafe {
                 let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 100.0));
@@ -32,11 +40,37 @@ fn run() -> Result<()> {
                 cairo_rectangle(cr.as_ptr(), 0.0, 0.0, 150.0, 120.0);
                 cairo_set_source(cr.as_ptr(), pat.as_ptr());
                 cairo_fill(cr.as_ptr());
+
+                let mut text = Vec::<u8>::with_capacity(self.text.len() + 1);
+                text.extend(self.text.as_bytes());
+                text.push(0);
+
+                let text_ptr = (&text[..]).as_ptr() as *const i8;
+                let mut extents = mem::uninitialized();
+                cairo_text_extents(cr.as_ptr(), text_ptr, &mut extents);
+                cairo_set_source_rgb(cr.as_ptr(), 0.0, 0.0, 0.0);
+                cairo_move_to(cr.as_ptr(), 0.0, extents.height);
+                cairo_show_text(cr.as_ptr(), text_ptr);
             }
         }
 
-        window.invalidate()?;
-        windows.insert(window.id(), window);
+        self.window.invalidate()?;
+        Ok(())
+    }
+
+    fn handle_keypress(&mut self, code: char) -> Result<()> {
+        self.text.push(code);
+        self.invalidate()?;
+        Ok(())
+    }
+}
+
+fn run() -> Result<()> {
+    let client = Mutex::new(Client::new())?;
+    let mut windows = BTreeMap::new();
+    for i in 0 .. 5 {
+        let window = Window::new(&client, i as f64 * 100.0, i as f64 * 100.0, 150.0, 120.0)?;
+        windows.insert(window.id(), DemoWindow::new(window)?);
     }
 
     let checkpoint_id = {
@@ -56,9 +90,15 @@ fn run() -> Result<()> {
                 println!("System ready");
             },
 
-            Event::KeyPress { window_id, code } if code as u32 == 27 => {
+            Event::KeyPress { window_id, code } if code == '\u{1b}' => {
                 windows.remove(&window_id);
             },
+
+            Event::KeyPress { window_id, code } => {
+                if let Some(demo_window) = windows.get_mut(&window_id) {
+                    demo_window.handle_keypress(code)?;
+                }
+            }
 
             _ => { }
         }
