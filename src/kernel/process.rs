@@ -425,17 +425,22 @@ pub fn resolve_page_fault(ptr: *mut u8) -> bool {
     assert!(!identity.contains_ptr(ptr));
 
     let (slice, block) = try_or_false!(process.user_virt.tag_at(ptr).or_else(|| process.kernel_virt.tag_at(ptr)));
-    assert!(slice.as_mut_ptr() <= ptr && ptr < unsafe { slice.as_mut_ptr().offset(slice.len() as isize) });
+    assert!(slice.contains_ptr(ptr));
 
     let pager = try_or_false!(block.pager);
     let offset = ptr::bytes_between(slice.as_mut_ptr(), ptr);
     let (dirty, addr) = try_or_false!(pager.alloc(offset, || process.phys.alloc_page().ok()));
 
     unsafe {
-        try_or_false!(process.arch.map(ptr, addr, block.user, block.writable).ok());
-
         if dirty {
+            try_or_false!(process.arch.map(ptr, addr, block.user, true).ok());
             intrinsics::write_bytes(ptr, 0, phys_mem::PAGE_SIZE);
+
+            if !block.writable {
+                try_or_false!(process.arch.map(ptr, addr, block.user, false).ok());
+            }
+        } else {
+            try_or_false!(process.arch.map(ptr, addr, block.user, block.writable).ok());
         }
     }
 
