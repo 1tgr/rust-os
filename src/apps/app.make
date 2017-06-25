@@ -1,6 +1,6 @@
 include ../../config.txt
 
-RUSTUP_RUN = RUST_TARGET_PATH=../../libsyscall/arch rustup run $(CONFIG_RUST_TOOLCHAIN)
+RUSTUP_RUN = RUST_TARGET_PATH=../../libsyscall/arch
 
 .PHONY: all clean
 

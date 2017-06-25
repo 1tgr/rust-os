@@ -2,7 +2,7 @@
 set -xeuo pipefail
 IFS=$'\n\t'
 export PATH=$PATH:$HOME/.cargo/bin:$(pwd)/3rdparty/bin
-source src/config.txt
+CONFIG_RUST_TOOLCHAIN=$(cat src/rust-toolchain)
 curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $CONFIG_RUST_TOOLCHAIN
 which xargo || cargo install --vers 0.3.7 xargo
 rustup toolchain install $CONFIG_RUST_TOOLCHAIN
