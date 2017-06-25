@@ -422,9 +422,7 @@ pub fn resolve_page_fault(ptr: *mut u8) -> bool {
     let process = try_or_false!(thread::try_current_process());
     let ptr = Align::down(ptr, phys_mem::PAGE_SIZE);
     let identity = phys_mem::identity_range();
-    if identity.contains_ptr(ptr) {
-        return unsafe { process.arch.map(ptr, phys_mem::virt2phys(ptr), false, true).is_ok() };
-    }
+    assert!(!identity.contains_ptr(ptr));
 
     let (slice, block) = try_or_false!(process.user_virt.tag_at(ptr).or_else(|| process.kernel_virt.tag_at(ptr)));
     assert!(slice.as_mut_ptr() <= ptr && ptr < unsafe { slice.as_mut_ptr().offset(slice.len() as isize) });

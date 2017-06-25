@@ -9,7 +9,7 @@ use ptr::Align;
 use syscall::Result;
 
 bitflags! {
-    pub flags PageFlags: usize {
+    flags PageFlags: usize {
         const PAGE_PRESENT = 0x001,
         const PAGE_WRITABLE = 0x002,
         const PAGE_USER = 0x004,
@@ -23,7 +23,7 @@ bitflags! {
 }
 
 #[repr(C)]
-pub struct PageEntry<T> {
+struct PageEntry<T> {
     entry: usize,
     phantom: PhantomData<T>
 }
@@ -49,10 +49,6 @@ impl<T> PageEntry<T> {
 
     pub unsafe fn as_mut_ref(&self) -> &'static mut T {
         phys_mem::phys2virt(self.addr())
-    }
-
-    pub unsafe fn as_ref(&self) -> &'static T {
-        self.as_mut_ref()
     }
 
     pub fn ensure_present(&mut self, bitmap: &PhysicalBitmap) -> Result<()> {
@@ -83,10 +79,6 @@ impl<T> PageEntry<T> {
 
         assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
         self.entry = join(addr, flags);
-    }
-
-    pub fn unmap(&mut self) {
-        self.entry = 0;
     }
 
     pub fn present(&self) -> bool {
@@ -145,10 +137,10 @@ const KADDR_MMU_PD   : usize = KADDR_MMU_PT       + (MMU_RECURSIVE_SLOT<<30);
 const KADDR_MMU_PDPT : usize = KADDR_MMU_PD       + (MMU_RECURSIVE_SLOT<<21);
 const KADDR_MMU_PML4 : usize = KADDR_MMU_PDPT     + (MMU_RECURSIVE_SLOT<<12);
 
-pub type PT = [PageEntry<*mut u8>; 512];
-pub type PD = [PageEntry<PT>; 512];
-pub type PDPT = [PageEntry<PD>; 512];
-pub type PML4 = [PageEntry<PDPT>; 512];
+type PT = [PageEntry<*mut u8>; 512];
+type PD = [PageEntry<PT>; 512];
+type PDPT = [PageEntry<PD>; 512];
+type PML4 = [PageEntry<PDPT>; 512];
 
 fn pml4()                 -> &'static mut PML4 { unsafe { usize2ref(KADDR_MMU_PML4) } }
 fn pdpt<T>(ptr: *const T) -> &'static mut PDPT { unsafe { usize2ref(KADDR_MMU_PDPT + ((ptr as usize >> 27) & 0x00001FF000)) } }
@@ -160,10 +152,10 @@ fn pdpt_index<T>(ptr: *const T) -> usize { (ptr as usize >> 30) & 511 }
 fn pd_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 21) & 511 }
 fn pt_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 12) & 511 }
 
-pub fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
-pub fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
-pub fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
-pub fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
+fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
+fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
+fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
+fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
 
 pub fn print_mapping<T>(ptr: *const T) {
     let pml4_entry = pml4_entry(ptr);
@@ -196,26 +188,27 @@ pub struct AddressSpace {
 impl AddressSpace {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<AddressSpace> {
         let pml4_addr = bitmap.alloc_zeroed_page()?;
-        let kernel_base_ptr = unsafe { &KERNEL_BASE } as *const u8;
         let two_meg = 2 * 1024 * 1024;
-        let pml4_index = pml4_index(kernel_base_ptr);
-        let pdpt_index = pdpt_index(kernel_base_ptr);
-        let pd_index = pd_index(kernel_base_ptr);
 
         unsafe {
             let pml4: &mut PML4 = &mut phys_mem::phys2virt(pml4_addr);
             pml4[MMU_RECURSIVE_SLOT].map(pml4_addr, false, true);
 
-            let pml4_entry = &mut pml4[pml4_index];
-            pml4_entry.ensure_present(&bitmap)?;
+            let kernel_base_ptr = Align::down(&KERNEL_BASE as *const u8, phys_mem::PAGE_SIZE);
+            for addr in (0..bitmap.total_bytes()).step_by(two_meg) {
+                let ptr = kernel_base_ptr.offset(addr as isize);
+                let pml4_index = pml4_index(ptr);
+                let pdpt_index = pdpt_index(ptr);
+                let pd_index = pd_index(ptr);
 
-            let pdpt_entry = &mut pml4_entry.as_mut_ref()[pdpt_index];
-            pdpt_entry.ensure_present(&bitmap)?;
+                let pml4_entry = &mut pml4[pml4_index];
+                pml4_entry.ensure_present(&bitmap)?;
 
-            for i in 0..4 {
-                let pd_index = pd_index + i;
+                let pdpt_entry = &mut pml4_entry.as_mut_ref()[pdpt_index];
+                pdpt_entry.ensure_present(&bitmap)?;
+
                 let pd_entry = &mut pdpt_entry.as_mut_ref()[pd_index];
-                pd_entry.entry = join(i * two_meg, PAGE_PRESENT | PAGE_WRITABLE | PAGE_BIG);
+                pd_entry.entry = join(addr, PAGE_PRESENT | PAGE_WRITABLE | PAGE_BIG);
             }
         }
 
@@ -269,10 +262,6 @@ pub mod test {
     use ptr::Align;
     use super::*;
 
-    extern {
-        static kernel_end: u8;
-    }
-
     test! {
         fn check_pml4() {
             let entry = pml4_entry(0 as *const u8);
@@ -317,8 +306,14 @@ pub mod test {
         fn can_map_kernel() {
             let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
             let two_meg = 2 * 1024 * 1024;
-            let ptr1 = Align::up(unsafe { &kernel_end } as *const u8, 4 * two_meg);
-            let ptr1: *mut u16 = unsafe { mem::transmute(ptr1) };
+
+            let ptr1: *mut u16 =
+                unsafe {
+                    let kernel_base_ptr = &KERNEL_BASE as *const u8;
+                    let ptr1 = Align::up(kernel_base_ptr.offset(bitmap.total_bytes() as isize), two_meg);
+                    mem::transmute(ptr1)
+                };
+
             let addr = bitmap.alloc_page().unwrap();
             let address_space = AddressSpace::new(bitmap).unwrap();
             unsafe {

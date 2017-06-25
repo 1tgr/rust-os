@@ -19,6 +19,7 @@
 #![feature(link_args)]
 #![feature(nonzero)]
 #![feature(start)]
+#![feature(step_by)]
 
 #![no_std]
 
