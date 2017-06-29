@@ -1,6 +1,7 @@
 use collections::vec_deque::VecDeque;
 use ipc;
 use os::{File,OSHandle};
+use std::cell::RefCell;
 use std::sync::atomic::{AtomicUsize,Ordering};
 use syscall::Result;
 use types::{Command,Event};
@@ -11,29 +12,29 @@ pub fn alloc_id() -> usize {
 }
 
 pub struct Client {
-    buf: VecDeque<u8>,
-    client2server: File,
-    server2client: File,
+    client2server: RefCell<File>,
+    server2client: RefCell<(VecDeque<u8>, File)>,
 }
 
 impl Client {
     pub fn new() -> Self {
         Client {
-            buf: VecDeque::new(),
-            client2server: File::from_raw(OSHandle::from_raw(2)),
-            server2client: File::from_raw(OSHandle::from_raw(3)),
+            client2server: RefCell::new(File::from_raw(OSHandle::from_raw(2))),
+            server2client: RefCell::new((VecDeque::new(), File::from_raw(OSHandle::from_raw(3)))),
         }
     }
 
-    pub fn send_command(&mut self, command: Command) -> Result<()> {
-        ipc::send_message(&mut self.client2server, command)
+    pub fn send_command(&self, command: Command) -> Result<()> {
+        let mut client2server = self.client2server.borrow_mut();
+        ipc::send_message(&mut *client2server, command)
     }
 
-    pub fn wait_for_event(&mut self) -> Result<Event> {
-        ipc::read_message(&mut self.buf, &mut self.server2client)
+    pub fn wait_for_event(&self) -> Result<Event> {
+        let (ref mut buf, ref mut server2client) = *self.server2client.borrow_mut();
+        ipc::read_message(buf, server2client)
     }
 
-    pub fn checkpoint(&mut self) -> Result<usize> {
+    pub fn checkpoint(&self) -> Result<usize> {
         let id = alloc_id();
         self.send_command(Command::Checkpoint { id })?;
         Ok(id)

@@ -14,7 +14,7 @@ use cairo::cairo::Cairo;
 use cairo::CairoObj;
 use collections::btree_map::BTreeMap;
 use graphics::{Client,Event,Window};
-use os::{Mutex,Result};
+use os::Result;
 use std::mem;
 
 struct DemoWindow<'a> {
@@ -24,7 +24,7 @@ struct DemoWindow<'a> {
 
 impl<'a> DemoWindow<'a> {
     fn new(window: Window<'a>) -> Result<Self> {
-        let mut demo_window = DemoWindow { window, text: "".into() };
+        let mut demo_window = DemoWindow { window, text: "hello".into() };
         demo_window.invalidate()?;
         Ok(demo_window)
     }
@@ -59,31 +59,28 @@ impl<'a> DemoWindow<'a> {
     }
 
     fn handle_keypress(&mut self, code: char) -> Result<()> {
-        self.text.push(code);
+        match code {
+            '\x08' => { self.text.pop(); },
+            _ => { self.text.push(code); }
+        }
+
         self.invalidate()?;
         Ok(())
     }
 }
 
 fn run() -> Result<()> {
-    let client = Mutex::new(Client::new())?;
+    let client = Client::new();
     let mut windows = BTreeMap::new();
     for i in 0 .. 5 {
         let window = Window::new(&client, i as f64 * 100.0, i as f64 * 100.0, 150.0, 120.0)?;
         windows.insert(window.id(), DemoWindow::new(window)?);
     }
 
-    let checkpoint_id = {
-        let mut client = client.lock().unwrap();
-        client.checkpoint()?
-    };
+    let checkpoint_id = client.checkpoint()?;
 
     while !windows.is_empty() {
-        let e = {
-            let mut client = client.lock().unwrap();
-            client.wait_for_event()?
-        };
-
+        let e = client.wait_for_event()?;
         println!("[Client] {:?}", e);
         match e {
             Event::Checkpoint { id } if id == checkpoint_id => {
