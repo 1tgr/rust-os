@@ -158,7 +158,6 @@ thread_entry_asm:
     .align 16
 
 
-// TODO save XMM regs
 #define PUSH_REGS \
     push %rbx ;\
     push %rcx ;\
@@ -173,10 +172,13 @@ thread_entry_asm:
     push %r12 ;\
     push %r13 ;\
     push %r14 ;\
-    push %r15
+    push %r15 ;\
+    sub $512, %rsp ;\
+    fxsave (%rsp);
 
-// TODO restore XMM regs
 #define POP_REGS \
+    fxrstor (%rsp); \
+    add $512, %rsp; \
     pop %r15 ;\
     pop %r14 ;\
     pop %r13 ;\

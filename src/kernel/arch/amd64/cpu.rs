@@ -1,6 +1,6 @@
 #[repr(C)]
-#[derive(Debug)]
 pub struct Regs {
+    pub fxsafe: [u64; 64],
     pub r15: u64,
     pub r14: u64,
     pub r13: u64,
