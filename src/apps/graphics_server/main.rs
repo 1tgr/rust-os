@@ -16,7 +16,7 @@ use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
 use collections::btree_map::BTreeMap;
 use collections::vec_deque::VecDeque;
-use graphics::{Command,Event,Rect};
+use graphics::{Command,Event,Rect,WidgetTree};
 use os::{File,Mutex,OSMem,Process,Result,Thread};
 use std::io::Read;
 use std::str;
@@ -26,13 +26,8 @@ use window::{Window,WindowId};
 
 struct Server {
     lfb_mem: OSMem,
-    windows_by_zorder: VecDeque<Arc<Window>>,
+    windows: WidgetTree<Window>,
     windows_by_id: BTreeMap<WindowId, Arc<Window>>,
-    focus_window: Option<Arc<Window>>,
-}
-
-fn ref_eq<T>(a: &T, b: &T) -> bool {
-    a as *const T == b as *const T
 }
 
 impl Server {
@@ -41,91 +36,29 @@ impl Server {
         let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
         Ok(Server {
             lfb_mem: unsafe { OSMem::from_raw(lfb_ptr, stride * 600) },
-            windows_by_zorder: VecDeque::new(),
+            windows: WidgetTree::new(),
             windows_by_id: BTreeMap::new(),
-            focus_window: None
         })
     }
 
     fn add_window(&mut self, window: Window) {
         let window = Arc::new(window);
-        self.windows_by_zorder.push_front(window.clone());
         self.windows_by_id.insert(window.id(), window.clone());
-        self.focus_window = Some(window);
-        self.paint_all();
-    }
-
-    fn remove_window_impl(
-        windows_by_zorder: &mut VecDeque<Arc<Window>>,
-        windows_by_id: &mut BTreeMap<WindowId, Arc<Window>>,
-        focus_window: &mut Option<Arc<Window>>,
-        id: WindowId
-    ) {
-        if let Some(ref window) = windows_by_id.remove(&id) {
-            let index_opt =
-                windows_by_zorder
-                    .iter()
-                    .position(|w| ref_eq::<Window>(&*w, &*window));
-
-            if let Some(index) = index_opt {
-                windows_by_zorder.remove(index);
-            }
-
-            let action = {
-                match *focus_window {
-                    Some(ref old_focus_window) if ref_eq::<Window>(old_focus_window, window) => {
-                        let next_window_opt =
-                            index_opt
-                                .and_then(|index| windows_by_zorder.get(index))
-                                .or_else(|| windows_by_zorder.front())
-                                .map(|w| (*w).clone());
-
-                        Ok(next_window_opt)
-                    },
-
-                    _ => Err(()),
-                }
-            };
-
-            if let Ok(next_window_opt) = action {
-                *focus_window = next_window_opt;
-            }
-        }
+        self.windows.add(window);
     }
 
     fn remove_window(&mut self, id: WindowId) {
-        Server::remove_window_impl(
-            &mut self.windows_by_zorder,
-            &mut self.windows_by_id,
-            &mut self.focus_window,
-            id);
-
-        self.paint_all();
+        if let Some(window) = self.windows_by_id.remove(&id) {
+            self.windows.remove(&window);
+        }
     }
 
     fn move_window(&mut self, id: WindowId, pos: Rect) -> Result<()> {
         if let Some(window) = self.windows_by_id.get_mut(&id) {
-            window.move_to(pos)?;
+            self.windows.move_to(window, pos)?;
         }
 
-        self.paint_all();
         Ok(())
-    }
-
-    fn create_surface(&mut self) -> CairoSurface {
-        let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-        CairoSurface::from_slice(&mut self.lfb_mem, CAIRO_FORMAT_ARGB32, 800, 600, stride)
-    }
-
-    fn paint_all(&mut self) {
-        let cr = Cairo::new(self.create_surface());
-        cr.set_source_rgb(0.0, 0.0, 0.5);
-        cr.paint();
-
-        let mut i = self.windows_by_zorder.iter_mut();
-        while let Some(window) = i.next_back() {
-            window.paint_on(&cr);
-        }
     }
 
     pub fn handle_command(&mut self, client_process: &Process, server2client: &Arc<Mutex<File>>, command: Command) -> Result<()> {
@@ -147,7 +80,7 @@ impl Server {
             },
 
             Command::InvalidateWindow { id: _id } => {
-                self.paint_all();
+                self.windows.set_paint_needed();
             },
 
             Command::MoveWindow { id, pos } => {
@@ -156,11 +89,18 @@ impl Server {
             }
         }
 
+        if self.windows.get_paint_needed() {
+            let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
+            let surface = CairoSurface::from_slice(&mut self.lfb_mem, CAIRO_FORMAT_ARGB32, 800, 600, stride);
+            let cr = Cairo::new(surface);
+            self.windows.paint_on(&cr);
+        }
+
         Ok(())
     }
 
     pub fn send_keypress(&mut self, c: char) -> Result<()> {
-        if let Some(ref mut window) = self.focus_window {
+        if let Some(window) = self.windows.get_focus_mut() {
             window.send_keypress(c)?;
         }
 

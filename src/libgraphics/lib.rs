@@ -16,8 +16,10 @@ mod client;
 mod frame_buffer;
 mod ipc;
 mod types;
+mod widget;
 
 pub use client::*;
 pub use frame_buffer::*;
 pub use ipc::*;
 pub use types::*;
+pub use widget::*;

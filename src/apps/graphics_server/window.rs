@@ -1,5 +1,5 @@
 use cairo::cairo::Cairo;
-use graphics::{self,Event,FrameBuffer,Rect};
+use graphics::{self,Event,FrameBuffer,Rect,Widget};
 use os::{File,Mutex,Process,Result,SharedMem};
 use std::sync::Arc;
 use syscall::Handle;
@@ -40,22 +40,6 @@ impl Window {
         self.id
     }
 
-    pub fn move_to(&self, pos: Rect) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
-        state.x = pos.x;
-        state.y = pos.y;
-        state.buffer.resize(pos.width, pos.height)?;
-        Ok(())
-    }
-
-    pub fn paint_on(&self, cr: &Cairo) {
-        let mut state = self.state.lock().unwrap();
-        let (x, y) = (state.x, state.y);
-        let surface = state.buffer.create_surface();
-        cr.set_source_surface(&surface, x, y);
-        cr.paint();
-    }
-
     pub fn send_keypress(&self, c: char) -> Result<()> {
         match self.id {
             WindowId::Id(_, id) => {
@@ -66,6 +50,24 @@ impl Window {
             _ => { }
         }
 
+        Ok(())
+    }
+}
+
+impl Widget for Window {
+    fn paint_on(&self, cr: &Cairo) {
+        let mut state = self.state.lock().unwrap();
+        let (x, y) = (state.x, state.y);
+        let surface = state.buffer.create_surface();
+        cr.set_source_surface(&surface, x, y);
+        cr.paint();
+    }
+
+    fn move_to(&self, pos: Rect) -> Result<()> {
+        let mut state = self.state.lock().unwrap();
+        state.x = pos.x;
+        state.y = pos.y;
+        state.buffer.resize(pos.width, pos.height)?;
         Ok(())
     }
 }
