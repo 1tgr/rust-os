@@ -24,7 +24,7 @@ use std::sync::Arc;
 use syscall::libc_helpers;
 use window::{Window,WindowId};
 
-struct ServerState {
+struct Server {
     lfb_mem: OSMem,
     windows_by_zorder: VecDeque<Arc<Window>>,
     windows_by_id: BTreeMap<WindowId, Arc<Window>>,
@@ -35,7 +35,18 @@ fn ref_eq<T>(a: &T, b: &T) -> bool {
     a as *const T == b as *const T
 }
 
-impl ServerState {
+impl Server {
+    pub fn new() -> Result<Self> {
+        let lfb_ptr = syscall::init_video_mode(800, 600, 32)?;
+        let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
+        Ok(Server {
+            lfb_mem: unsafe { OSMem::from_raw(lfb_ptr, stride * 600) },
+            windows_by_zorder: VecDeque::new(),
+            windows_by_id: BTreeMap::new(),
+            focus_window: None
+        })
+    }
+
     fn add_window(&mut self, window: Window) {
         let window = Arc::new(window);
         self.windows_by_zorder.push_front(window.clone());
@@ -83,7 +94,7 @@ impl ServerState {
     }
 
     fn remove_window(&mut self, id: WindowId) {
-        ServerState::remove_window_impl(
+        Server::remove_window_impl(
             &mut self.windows_by_zorder,
             &mut self.windows_by_id,
             &mut self.focus_window,
@@ -116,27 +127,8 @@ impl ServerState {
             window.paint_on(&cr);
         }
     }
-}
 
-struct Server {
-    state: Mutex<ServerState>,
-}
-
-impl Server {
-    pub fn new() -> Result<Self> {
-        let lfb_ptr = syscall::init_video_mode(800, 600, 32)?;
-        let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-        Ok(Server {
-            state: Mutex::new(ServerState {
-                lfb_mem: unsafe { OSMem::from_raw(lfb_ptr, stride * 600) },
-                windows_by_zorder: VecDeque::new(),
-                windows_by_id: BTreeMap::new(),
-                focus_window: None,
-            })?,
-        })
-    }
-
-    pub fn handle_command(&self, client_process: &Process, server2client: &Arc<Mutex<File>>, command: Command) -> Result<()> {
+    pub fn handle_command(&mut self, client_process: &Process, server2client: &Arc<Mutex<File>>, command: Command) -> Result<()> {
         let handle = client_process.handle().get();
         println!("[Server] {:?}", command);
         match command {
@@ -146,30 +138,29 @@ impl Server {
 
             Command::CreateWindow { id, pos, shared_mem_handle } => {
                 let window = Window::new(client_process, id, pos, shared_mem_handle, server2client.clone())?;
-                self.state.lock().unwrap().add_window(window);
+                self.add_window(window);
             },
 
             Command::DestroyWindow { id } => {
                 let id = WindowId::Id(handle, id);
-                self.state.lock().unwrap().remove_window(id);
+                self.remove_window(id);
             },
 
             Command::InvalidateWindow { id: _id } => {
-                self.state.lock().unwrap().paint_all();
+                self.paint_all();
             },
 
             Command::MoveWindow { id, pos } => {
                 let id = WindowId::Id(handle, id);
-                self.state.lock().unwrap().move_window(id, pos)?;
+                self.move_window(id, pos)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn send_keypress(&self, c: char) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
-        if let Some(ref mut window) = state.focus_window {
+    pub fn send_keypress(&mut self, c: char) -> Result<()> {
+        if let Some(ref mut window) = self.focus_window {
             window.send_keypress(c)?;
         }
 
@@ -178,14 +169,14 @@ impl Server {
 }
 
 struct Connection<'a> {
-    server: &'a Server,
+    server: &'a Mutex<Server>,
     process: Process,
     client2server: File,
     server2client: Arc<Mutex<File>>,
 }
 
 impl<'a> Connection<'a> {
-    pub fn new(server: &'a Server, filename: &str) -> Result<Self> {
+    pub fn new(server: &'a Mutex<Server>, filename: &str) -> Result<Self> {
         let (stdin, stdout) = unsafe { (libc_helpers::stdin, libc_helpers::stdout) };
         let client2server = File::create_pipe()?;
         let server2client = File::create_pipe()?;
@@ -208,13 +199,13 @@ impl<'a> Connection<'a> {
         let mut buf = VecDeque::new();
         loop {
             let c = graphics::read_message(&mut buf, &mut self.client2server)?;
-            self.server.handle_command(&self.process, &self.server2client, c)?;
+            self.server.lock().unwrap().handle_command(&self.process, &self.server2client, c)?;
         }
     }
 }
 
 fn run() -> Result<()> {
-    let server = Arc::new(Server::new()?);
+    let server = Arc::new(Mutex::new(Server::new()?)?);
 
     {
         let server = server.clone();
@@ -226,7 +217,7 @@ fn run() -> Result<()> {
                 let len = stdin.read(&mut buf)?;
                 if let Ok(s) = str::from_utf8(&buf[..len]) {
                     if let Some(c) = s.chars().next() {
-                        server.send_keypress(c)?;
+                        server.lock().unwrap().send_keypress(c)?;
                     }
                 }
             }
