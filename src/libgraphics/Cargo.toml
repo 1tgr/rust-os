@@ -3,14 +3,26 @@ name = "graphics"
 version = "0.0.0"
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 
+[features]
+default = []
+test = ["testlite"]
+
 [lib]
 path = "lib.rs"
 test = false
 
+[[bin]]
+name = "test_graphics"
+path = "main.rs"
+test = true
+required-features = ["test"]
+
 [dependencies]
+alloc_system = { path = "../liballoc_system" }
 cairo = { path = "../libcairo" }
-corepack = { version = ">= 0.2.1", default-features = false, features = ["collections"] }
+corepack = { version = ">=0.2.1, <0.3.0", default-features = false, features = ["collections"] }
 os = { path = "../libos" }
-serde = { version = "1.0", default-features = false, features = ["collections"] }
-serde_derive = "1.0"
+serde = { version = "=1.0.8", default-features = false, features = ["collections"] }
+serde_derive = "=1.0.8"
 syscall = { path = "../libsyscall" }
+testlite = { path = "../libtestlite", optional = true }

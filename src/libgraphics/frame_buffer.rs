@@ -45,3 +45,19 @@ impl FrameBuffer {
         CairoSurface::from_slice(&mut *self.shared_mem, cairo::bindings::CAIRO_FORMAT_ARGB32, width, height, stride)
     }
 }
+
+#[cfg(feature = "test")]
+pub mod test {
+    use super::*;
+
+    test! {
+        fn empty_buffer_works() {
+            fn run() -> Result<()> {
+                FrameBuffer::new(0.0, 0.0, SharedMem::new(false)?)?;
+                Ok(())
+            }
+
+            run().unwrap();
+        }
+    }
+}

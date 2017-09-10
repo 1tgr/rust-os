@@ -34,3 +34,9 @@ pub fn send_message<T: Serialize>(file: &mut Write, message: T) -> Result<()> {
     file.write_all(&buf)?;
     Ok(())
 }
+
+#[cfg(feature = "test")]
+pub mod test {
+    test! {
+    }
+}

@@ -1,0 +1,8 @@
+[package]
+name = "testlite"
+version = "0.0.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+
+[lib]
+path = "lib.rs"
+test = false

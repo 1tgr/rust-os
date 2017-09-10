@@ -90,3 +90,9 @@ impl<T: Widget> WidgetTree<T> {
         self.focus.as_mut()
     }
 }
+
+#[cfg(feature = "test")]
+pub mod test {
+    test! {
+    }
+}

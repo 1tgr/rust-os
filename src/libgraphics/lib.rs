@@ -1,5 +1,3 @@
-#![crate_name = "graphics"]
-
 #![feature(collections)]
 #![feature(const_fn)]
 
@@ -12,6 +10,10 @@ extern crate os;
 extern crate serde;
 extern crate syscall;
 
+#[cfg(feature = "test")]
+#[macro_use]
+extern crate testlite;
+
 mod client;
 mod frame_buffer;
 mod ipc;
@@ -23,3 +25,11 @@ pub use frame_buffer::*;
 pub use ipc::*;
 pub use types::*;
 pub use widget::*;
+
+#[cfg(feature = "test")]
+pub const TEST_FIXTURES: &'static [testlite::Fixture] = &[
+    client::test::TESTS,
+    frame_buffer::test::TESTS,
+    ipc::test::TESTS,
+    widget::test::TESTS,
+];

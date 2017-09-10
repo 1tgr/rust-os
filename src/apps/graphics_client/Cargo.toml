@@ -13,5 +13,5 @@ alloc_system = { path = "../../liballoc_system" }
 cairo = { path = "../../libcairo" }
 graphics = { path = "../../libgraphics" }
 os = { path = "../../libos" }
-serde = { version = "1.0", default-features = false, features = ["collections"]}
+serde = { version = "=1.0.8", default-features = false, features = ["collections"] }
 syscall = { path = "../../libsyscall" }

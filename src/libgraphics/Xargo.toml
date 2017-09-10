@@ -1,0 +1,3 @@
+[dependencies]
+collections = {}
+std = { path = "../libstd", stage = 1 }

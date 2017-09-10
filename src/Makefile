@@ -5,6 +5,7 @@ DIRS_SRC += apps/graphics_client
 DIRS_SRC += apps/graphics_server
 DIRS_SRC += apps/hello
 DIRS_SRC += apps/input
+DIRS_SRC += libgraphics
 
 DIRS += $(DIRS_SRC)
 DIRS += boot

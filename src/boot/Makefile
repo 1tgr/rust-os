@@ -15,6 +15,7 @@ INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_client
 INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_server
 INITRD += ../apps/target/$(CONFIG_TARGET)/release/hello
 INITRD += ../apps/target/$(CONFIG_TARGET)/release/input
+INITRD += ../libgraphics/target/$(CONFIG_TARGET)/release/test_graphics
 
 ifeq ($(shell uname),Darwin)
 TARFLAGS += -s ',.*/,,g'

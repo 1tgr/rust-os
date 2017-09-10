@@ -1,0 +1,28 @@
+[root]
+name = "std"
+version = "0.0.0"
+dependencies = [
+ "libc 0.0.0",
+ "os 0.0.0",
+ "syscall 0.0.0",
+]
+
+[[package]]
+name = "libc"
+version = "0.0.0"
+
+[[package]]
+name = "os"
+version = "0.0.0"
+dependencies = [
+ "libc 0.0.0",
+ "syscall 0.0.0",
+]
+
+[[package]]
+name = "syscall"
+version = "0.0.0"
+dependencies = [
+ "libc 0.0.0",
+]
+

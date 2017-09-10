@@ -1,0 +1,5 @@
+[target.amd64.cairo]
+rustc-link-search = ["../cairo/lib", "../liblibc/arch/amd64"]
+
+[target.amd64.libc]
+rustc-link-search = ["../newlib/x86_64-elf/lib"]

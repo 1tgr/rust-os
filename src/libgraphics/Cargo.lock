@@ -1,10 +1,15 @@
 [root]
-name = "input"
+name = "graphics"
 version = "0.0.0"
 dependencies = [
  "alloc_system 0.0.0",
+ "cairo 0.0.0",
+ "corepack 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "os 0.0.0",
+ "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "syscall 0.0.0",
+ "testlite 0.0.0",
 ]
 
 [[package]]
@@ -27,67 +32,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "cairo_demo"
-version = "0.0.0"
-dependencies = [
- "alloc_system 0.0.0",
- "cairo 0.0.0",
- "libc 0.0.0",
- "os 0.0.0",
- "syscall 0.0.0",
-]
-
-[[package]]
 name = "corepack"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "graphics"
-version = "0.0.0"
-dependencies = [
- "alloc_system 0.0.0",
- "cairo 0.0.0",
- "corepack 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "os 0.0.0",
- "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "syscall 0.0.0",
-]
-
-[[package]]
-name = "graphics_client"
-version = "0.0.0"
-dependencies = [
- "alloc_system 0.0.0",
- "cairo 0.0.0",
- "graphics 0.0.0",
- "os 0.0.0",
- "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "syscall 0.0.0",
-]
-
-[[package]]
-name = "graphics_server"
-version = "0.0.0"
-dependencies = [
- "alloc_system 0.0.0",
- "cairo 0.0.0",
- "graphics 0.0.0",
- "os 0.0.0",
- "serde 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "syscall 0.0.0",
-]
-
-[[package]]
-name = "hello"
-version = "0.0.0"
-dependencies = [
- "alloc_system 0.0.0",
 ]
 
 [[package]]
@@ -155,6 +105,10 @@ version = "0.0.0"
 dependencies = [
  "libc 0.0.0",
 ]
+
+[[package]]
+name = "testlite"
+version = "0.0.0"
 
 [[package]]
 name = "unicode-xid"
