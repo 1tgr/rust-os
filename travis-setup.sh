@@ -10,4 +10,4 @@ rustup component add --toolchain=$CONFIG_RUST_TOOLCHAIN rust-src
 make -s -C 3rdparty tools
 x86_64-elf-ld --version
 qemu-system-x86_64 --version
-pip3 install -r requirements.txt
+pip3 install --user -r requirements.txt
