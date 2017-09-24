@@ -68,7 +68,7 @@ impl<T> WidgetTree<T> {
         self.paint_needed = true;
     }
 
-    pub fn get_focus(&mut self) -> Option<&Arc<T>> {
+    pub fn get_focus(&self) -> Option<&Arc<T>> {
         self.focus.as_ref()
     }
 
@@ -118,16 +118,53 @@ pub mod test {
         }
     }
 
+    fn assert_focus_is<T>(tree: &WidgetTree<T>, widget: Option<&Arc<T>>) {
+        assert!(tree.get_focus().eq_with(&widget, |a, b| {
+            ref_eq::<T>(a.as_ref(), b.as_ref())
+        }));
+    }
+
     test! {
         fn add_changes_focus() {
-            let mut tree = WidgetTree::new();
-            assert_eq!(None, tree.get_focus());
-
             let one = Arc::new(1);
+            let two = Arc::new(2);
+            let mut tree = WidgetTree::new();
+            assert_focus_is(&tree, None);
             tree.add(one.clone());
-            assert!(Some(one).eq_with(&tree.get_focus().cloned(), |a, b| {
-                ref_eq::<i32>(a.as_ref(), b.as_ref())
-            }));
+            assert_focus_is(&tree, Some(&one));
+            tree.add(two.clone());
+            assert_focus_is(&tree, Some(&two));
+        }
+
+        fn remove_one_does_not_change_focus() {
+            let one = Arc::new(1);
+            let two = Arc::new(2);
+            let mut tree = WidgetTree::new();
+            tree.add(one.clone());
+            tree.add(two.clone());
+            tree.remove(&one);
+            assert_focus_is(&tree, Some(&two));
+        }
+
+        fn remove_two_changes_focus() {
+            let one = Arc::new(1);
+            let two = Arc::new(2);
+            let mut tree = WidgetTree::new();
+            tree.add(one.clone());
+            tree.add(two.clone());
+            tree.remove(&two);
+            assert_focus_is(&tree, Some(&one));
+        }
+
+        fn remove_both_changes_focus() {
+            let one = Arc::new(1);
+            let two = Arc::new(2);
+            let mut tree = WidgetTree::new();
+            tree.add(one.clone());
+            tree.add(two.clone());
+            tree.remove(&two);
+            tree.remove(&one);
+            assert_focus_is(&tree, None);
         }
     }
 }
