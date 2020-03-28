@@ -1,8 +1,8 @@
+use crate::types::Rect;
+use alloc::collections::vec_deque::VecDeque;
+use alloc::rc::Rc;
 use cairo::cairo::Cairo;
-use collections::vec_deque::VecDeque;
-use std::sync::Arc;
 use syscall::Result;
-use types::Rect;
 
 pub trait Widget {
     fn paint_on(&self, cr: &Cairo);
@@ -11,8 +11,8 @@ pub trait Widget {
 
 pub struct WidgetTree<T> {
     paint_needed: bool,
-    by_zorder: VecDeque<Arc<T>>,
-    focus: Option<Arc<T>>,
+    by_zorder: VecDeque<Rc<T>>,
+    focus: Option<Rc<T>>,
 }
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
@@ -24,37 +24,36 @@ impl<T> WidgetTree<T> {
         WidgetTree {
             paint_needed: true,
             by_zorder: VecDeque::new(),
-            focus: None
+            focus: None,
         }
     }
 
-    pub fn add(&mut self, widget: Arc<T>) {
+    pub fn add(&mut self, widget: Rc<T>) {
         self.by_zorder.push_front(widget.clone());
         self.focus = Some(widget);
         self.paint_needed = true;
     }
 
-    pub fn remove(&mut self, widget: &Arc<T>) {
-        let index_opt =
-            self.by_zorder
-                .iter()
-                .position(|w| ref_eq::<T>(w.as_ref(), widget.as_ref()));
+    pub fn remove(&mut self, widget: &Rc<T>) {
+        let index_opt = self
+            .by_zorder
+            .iter()
+            .position(|w| ref_eq::<T>(w.as_ref(), widget.as_ref()));
 
         if let Some(index) = index_opt {
             self.by_zorder.remove(index);
         }
 
-        let has_focus =
-            self.focus
-                .as_ref()
-                .map_or(false, |old_focus| ref_eq::<T>(&*old_focus, &*widget));
+        let has_focus = self
+            .focus
+            .as_ref()
+            .map_or(false, |old_focus| ref_eq::<T>(&*old_focus, &*widget));
 
         if has_focus {
-            self.focus =
-                index_opt
-                    .and_then(|index| self.by_zorder.get(index))
-                    .or_else(|| self.by_zorder.front())
-                    .map(|w| (*w).clone());
+            self.focus = index_opt
+                .and_then(|index| self.by_zorder.get(index))
+                .or_else(|| self.by_zorder.front())
+                .map(|w| (*w).clone());
         }
 
         self.paint_needed = true;
@@ -68,17 +67,17 @@ impl<T> WidgetTree<T> {
         self.paint_needed = true;
     }
 
-    pub fn get_focus(&self) -> Option<&Arc<T>> {
+    pub fn get_focus(&self) -> Option<&Rc<T>> {
         self.focus.as_ref()
     }
 
-    pub fn get_focus_mut(&mut self) -> Option<&mut Arc<T>> {
+    pub fn get_focus_mut(&mut self) -> Option<&mut Rc<T>> {
         self.focus.as_mut()
     }
 }
 
 impl<T: Widget> WidgetTree<T> {
-    pub fn move_to(&mut self, widget: &Arc<T>, pos: Rect) -> Result<()> {
+    pub fn move_to(&mut self, widget: &Rc<T>, pos: Rect) -> Result<()> {
         widget.move_to(pos)?;
         self.paint_needed = true;
         Ok(())
@@ -113,21 +112,21 @@ pub mod test {
             match (self.as_ref(), other.as_ref()) {
                 (Some(ref a), Some(ref b)) => f(a, b),
                 (None, None) => true,
-                _ => false
+                _ => false,
             }
         }
     }
 
-    fn assert_focus_is<T>(tree: &WidgetTree<T>, widget: Option<&Arc<T>>) {
-        assert!(tree.get_focus().eq_with(&widget, |a, b| {
-            ref_eq::<T>(a.as_ref(), b.as_ref())
-        }));
+    fn assert_focus_is<T>(tree: &WidgetTree<T>, widget: Option<&Rc<T>>) {
+        assert!(tree
+            .get_focus()
+            .eq_with(&widget, |a, b| { ref_eq::<T>(a.as_ref(), b.as_ref()) }));
     }
 
     test! {
         fn add_changes_focus() {
-            let one = Arc::new(1);
-            let two = Arc::new(2);
+            let one = Rc::new(1);
+            let two = Rc::new(2);
             let mut tree = WidgetTree::new();
             assert_focus_is(&tree, None);
             tree.add(one.clone());
@@ -137,8 +136,8 @@ pub mod test {
         }
 
         fn remove_one_does_not_change_focus() {
-            let one = Arc::new(1);
-            let two = Arc::new(2);
+            let one = Rc::new(1);
+            let two = Rc::new(2);
             let mut tree = WidgetTree::new();
             tree.add(one.clone());
             tree.add(two.clone());
@@ -147,8 +146,8 @@ pub mod test {
         }
 
         fn remove_two_changes_focus() {
-            let one = Arc::new(1);
-            let two = Arc::new(2);
+            let one = Rc::new(1);
+            let two = Rc::new(2);
             let mut tree = WidgetTree::new();
             tree.add(one.clone());
             tree.add(two.clone());
@@ -157,8 +156,8 @@ pub mod test {
         }
 
         fn remove_both_changes_focus() {
-            let one = Arc::new(1);
-            let two = Arc::new(2);
+            let one = Rc::new(1);
+            let two = Rc::new(2);
             let mut tree = WidgetTree::new();
             tree.add(one.clone());
             tree.add(two.clone());

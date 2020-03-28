@@ -2,6 +2,13 @@
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 name = "input"
 version = "0.0.0"
+edition = "2018"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [[bin]]
 name = "input"
@@ -10,5 +17,4 @@ test = false
 
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
-os = { path = "../../libos" }
-syscall = { path = "../../libsyscall" }
+rt = { path = "../../librt" }

@@ -1,9 +1,9 @@
-use bindings::*;
-use CairoObj;
-use collections::string::ToString;
+use crate::bindings::*;
+use crate::surface::CairoSurface;
+use crate::CairoObj;
+use alloc::string::ToString;
 use core::ops::Deref;
-use core::ptr::Unique;
-use surface::CairoSurface;
+use core::ptr::NonNull;
 
 pub struct Cairo(CairoObj<cairo_t>);
 
@@ -44,14 +44,13 @@ impl Cairo {
 
     pub fn show_text(&self, text: &str) -> &Self {
         let mut buf;
-        let text =
-            if text.len() == 0 || !text.ends_with('\0') {
-                buf = text.to_string();
-                buf.push_str("\0");
-                buf.as_str()
-            } else {
-                text
-            };
+        let text = if text.len() == 0 || !text.ends_with('\0') {
+            buf = text.to_string();
+            buf.push_str("\0");
+            buf.as_str()
+        } else {
+            text
+        };
 
         unsafe { cairo_show_text(self.0.as_ptr(), text.as_bytes().as_ptr() as *const i8) };
         self
@@ -59,9 +58,9 @@ impl Cairo {
 }
 
 impl Deref for Cairo {
-    type Target = Unique<cairo_t>;
+    type Target = NonNull<cairo_t>;
 
-    fn deref(&self) -> &Unique<cairo_t> {
+    fn deref(&self) -> &NonNull<cairo_t> {
         &self.0
     }
 }

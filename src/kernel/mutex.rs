@@ -1,8 +1,8 @@
-use collections::vec_deque::VecDeque;
-use kobj::KObj;
-use spin;
-use syscall::{ErrNum,Result};
-use thread::{self,BlockedThread};
+use crate::kobj::KObj;
+use crate::spin;
+use crate::thread::{self, BlockedThread};
+use alloc::collections::vec_deque::VecDeque;
+use syscall::{ErrNum, Result};
 
 struct UntypedMutexState {
     waiters: VecDeque<BlockedThread>,
@@ -13,8 +13,8 @@ pub struct UntypedMutex {
     state: spin::Mutex<UntypedMutexState>,
 }
 
-unsafe impl Send for UntypedMutex { }
-unsafe impl Sync for UntypedMutex { }
+unsafe impl Send for UntypedMutex {}
+unsafe impl Sync for UntypedMutex {}
 
 impl UntypedMutex {
     pub fn new() -> Self {
@@ -22,7 +22,7 @@ impl UntypedMutex {
             state: spin::Mutex::new(UntypedMutexState {
                 waiters: VecDeque::new(),
                 locked: false,
-            })
+            }),
         }
     }
 
@@ -39,7 +39,7 @@ impl UntypedMutex {
         Ok(())
     }
 
-    pub unsafe fn unlock_unsafe(&self)  -> Result<()> {
+    pub unsafe fn unlock_unsafe(&self) -> Result<()> {
         let mut state = lock!(self.state);
         if !state.locked {
             return Err(ErrNum::NotSupported);
@@ -55,7 +55,9 @@ impl UntypedMutex {
     }
 
     pub fn lock(&self) -> Result<UntypedMutexGuard> {
-        unsafe { self.lock_unsafe()?; }
+        unsafe {
+            self.lock_unsafe()?;
+        }
         Ok(UntypedMutexGuard::new(self))
     }
 }
@@ -85,11 +87,11 @@ impl<'a> Drop for UntypedMutexGuard<'a> {
 
 #[cfg(feature = "test")]
 pub mod test {
-    use alloc::arc::Arc;
-    use collections::vec::Vec;
-    use core::fmt::Write;
-    use logging;
     use super::*;
+    use crate::logging;
+    use alloc::sync::Arc;
+    use alloc::vec::Vec;
+    use core::fmt::Write;
 
     test! {
         fn can_lock_single_thread() {

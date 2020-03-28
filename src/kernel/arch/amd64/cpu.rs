@@ -22,7 +22,7 @@ pub struct Regs {
     pub cs: u64,
     pub rflags: u64,
     pub rsp: u64,
-    pub ss: u64
+    pub ss: u64,
 }
 
 #[repr(C, packed)]
@@ -42,7 +42,7 @@ pub struct Tss {
     pub ist7: u64,
     pub reserved3: u64,
     pub iopm_len: u16,
-    pub reserved4: u16
+    pub reserved4: u16,
 }
 
 #[repr(C, packed)]
@@ -55,7 +55,7 @@ pub struct DescriptorExtra {
     pub limit_high_and_flags: u8,
     pub base_high: u8,
     pub base_extra: u32,
-    pub reserved: u32
+    pub reserved: u32,
 }
 
 #[repr(C, packed)]
@@ -67,20 +67,20 @@ pub struct InterruptDescriptor {
     pub type_attr: u8,
     pub offset_high: u16,
     pub offset_extra: u32,
-    pub reserved2: u32
+    pub reserved2: u32,
 }
 
 #[repr(C, packed)]
 pub struct Dtr {
     pub limit: u16,
-    pub base: u64
+    pub base: u64,
 }
 
 pub const IA32_STAR: u32 = 0xC0000081;
 pub const IA32_LSTAR: u32 = 0xC0000082;
 pub const IA32_SFMASK: u32 = 0xC0000084;
 
-extern {
+extern "C" {
     pub fn lidt(ptr: &Dtr); // I don't know why I can't get lidt to work via inline asm
 }
 
@@ -148,9 +148,9 @@ pub unsafe fn outb(port: u16, val: u8) {
 }
 
 pub unsafe fn inb(port: u16) -> u8 {
-	let ret;
-	asm!("inb %dx, %al" : "={al}" (ret) : "{dx}" (port) : : "volatile");
-	ret
+    let ret;
+    asm!("inb %dx, %al" : "={al}" (ret) : "{dx}" (port) : : "volatile");
+    ret
 }
 
 pub unsafe fn outw(port: u16, val: u16) {
@@ -158,15 +158,15 @@ pub unsafe fn outw(port: u16, val: u16) {
 }
 
 pub unsafe fn inw(port: u16) -> u16 {
-	let ret;
-	asm!("inw %dx, %ax" : "={ax}" (ret) : "{dx}" (port) : : "volatile");
-	ret
+    let ret;
+    asm!("inw %dx, %ax" : "={ax}" (ret) : "{dx}" (port) : : "volatile");
+    ret
 }
 
 pub unsafe fn inl(port: u16) -> u32 {
-	let ret;
-	asm!("inl %dx, %eax" : "={eax}" (ret) : "{dx}" (port) : : "volatile");
-	ret
+    let ret;
+    asm!("inl %dx, %eax" : "={eax}" (ret) : "{dx}" (port) : : "volatile");
+    ret
 }
 
 pub unsafe fn outl(port: u16, val: u32) {

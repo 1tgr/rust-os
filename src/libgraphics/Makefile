@@ -1,6 +1,6 @@
 include ../config.txt
 
-RUSTUP_RUN = RUST_TARGET_PATH=../libsyscall/arch
+RUSTUP_RUN = RUST_TARGET_PATH=${CURDIR}/../libsyscall/arch RUSTFLAGS=-Dwarnings
 
 .PHONY: all clean
 

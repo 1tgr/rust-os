@@ -1,19 +1,21 @@
 #![feature(link_args)]
+#![feature(rustc_private)]
 #![feature(start)]
-#![feature(unique)]
 
+extern crate alloc_system;
 extern crate cairo;
 extern crate libc;
 extern crate os;
+extern crate rt;
 extern crate syscall;
 
-use cairo::{CairoFunc,CairoObj};
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use cairo::{CairoFunc, CairoObj};
 use os::OSMem;
 use std::f64::consts;
-use std::mem;
+use std::mem::MaybeUninit;
 use std::ptr;
 
 unsafe fn main() -> isize {
@@ -53,29 +55,39 @@ unsafe fn main() -> isize {
         })
     };
 
-    let image = CairoObj::wrap(cairo_image_surface_create_from_png_stream(Some(reader.func()), reader.closure()));
-    cairo_set_source_surface(cr.as_ptr(), image.as_ptr(),
+    let image = CairoObj::wrap(cairo_image_surface_create_from_png_stream(
+        Some(reader.func()),
+        reader.closure(),
+    ));
+    cairo_set_source_surface(
+        cr.as_ptr(),
+        image.as_ptr(),
         (128 - cairo_image_surface_get_width(image.as_ptr()) / 2) as f64,
-        (128 - cairo_image_surface_get_height(image.as_ptr()) / 2) as f64);
+        (128 - cairo_image_surface_get_height(image.as_ptr()) / 2) as f64,
+    );
 
     cairo_paint(cr.as_ptr());
 
     let message = b"Hello, world\0".as_ptr() as *const i8;
-    let mut extents = mem::uninitialized();
-    cairo_text_extents(cr.as_ptr(), message, &mut extents);
+    let mut extents = MaybeUninit::uninit();
+    cairo_text_extents(cr.as_ptr(), message, extents.as_mut_ptr());
+
+    let extents = extents.assume_init();
     cairo_set_source_rgb(cr.as_ptr(), 0.0, 0.0, 0.0);
-    cairo_move_to(cr.as_ptr(),
+    cairo_move_to(
+        cr.as_ptr(),
         128.0 - extents.x_advance / 2.0,
-        128.0 + ((cairo_image_surface_get_height(image.as_ptr()) / 2) as f64) + extents.height);
+        128.0 + ((cairo_image_surface_get_height(image.as_ptr()) / 2) as f64) + extents.height,
+    );
 
     cairo_show_text(cr.as_ptr(), message);
     0
 }
 
-#[cfg(target_arch="x86_64")]
+#[cfg(target_arch = "x86_64")]
+#[allow(unused_attributes)]
 #[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
-extern {
-}
+extern "C" {}
 
 #[start]
 #[no_mangle]

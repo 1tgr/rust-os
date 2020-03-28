@@ -13,11 +13,11 @@
 //! This primitive is meant to be used to run one-time initialization. An
 //! example use case would be for initializing an FFI library.
 
+use crate::spin::{StaticMutex, STATIC_MUTEX_INIT};
 use core::isize;
 use core::mem::drop;
 use core::ops::FnOnce;
-use core::sync::atomic::{AtomicIsize, Ordering, ATOMIC_ISIZE_INIT};
-use spin::{StaticMutex, STATIC_MUTEX_INIT};
+use core::sync::atomic::{AtomicIsize, Ordering};
 
 /// A synchronization primitive which can be used to run a one-time global
 /// initialization. Useful for one-time initialization for FFI or related
@@ -44,8 +44,8 @@ pub struct Once {
 /// Initialization value for static `Once` values.
 pub const ONCE_INIT: Once = Once {
     mutex: STATIC_MUTEX_INIT,
-    cnt: ATOMIC_ISIZE_INIT,
-    lock_cnt: ATOMIC_ISIZE_INIT,
+    cnt: AtomicIsize::new(0),
+    lock_cnt: AtomicIsize::new(0),
 };
 
 impl Once {
@@ -62,10 +62,13 @@ impl Once {
     /// be reliably observed by other tasks at this point (there is a
     /// happens-before relation between the closure and code executing after the
     /// return).
-    pub fn call_once<F>(&'static self, f: F) where F: FnOnce() {
+    pub fn call_once<F>(&'static self, f: F)
+    where
+        F: FnOnce(),
+    {
         // Optimize common path: load is much cheaper than fetch_add.
         if self.cnt.load(Ordering::SeqCst) < 0 {
-            return
+            return;
         }
 
         // Implementation-wise, this would seem like a fairly trivial primitive.
@@ -100,7 +103,7 @@ impl Once {
             // Make sure we never overflow, we'll never have isize::MIN
             // simultaneous calls to `call_once` to make this value go back to 0
             self.cnt.store(isize::MIN, Ordering::SeqCst);
-            return
+            return;
         }
 
         // If the count is negative, then someone else finished the job,
@@ -125,9 +128,9 @@ impl Once {
 mod tests {
     use prelude::v1::*;
 
-    use thread;
-    use super::{ONCE_INIT, Once};
+    use super::{Once, ONCE_INIT};
     use sync::mpsc::channel;
+    use thread;
 
     #[test]
     fn smoke_once() {
@@ -147,8 +150,10 @@ mod tests {
         let (tx, rx) = channel();
         for _ in 0..10 {
             let tx = tx.clone();
-            thread::spawn(move|| {
-                for _ in 0..4 { thread::yield_now() }
+            thread::spawn(move || {
+                for _ in 0..4 {
+                    thread::yield_now()
+                }
                 unsafe {
                     O.call_once(|| {
                         assert!(!run);

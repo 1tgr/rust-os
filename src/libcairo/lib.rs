@@ -1,10 +1,8 @@
 #![crate_name = "cairo"]
-
-#![feature(collections)]
-#![feature(unique)]
+#![feature(rustc_private)]
 #![no_std]
 
-extern crate collections;
+extern crate alloc;
 extern crate libc;
 
 #[link(name = "c")]
@@ -14,17 +12,16 @@ extern crate libc;
 #[link(name = "z")]
 #[link(name = "gcc")]
 #[link(name = "m")]
-extern {
-}
+extern "C" {}
 
-pub mod cairo;
 pub mod bindings;
+pub mod cairo;
 pub mod surface;
 
-use bindings::*;
+use crate::bindings::*;
 use core::marker::PhantomData;
 use core::ops::Deref;
-use core::ptr::Unique;
+use core::ptr::NonNull;
 use libc::c_int;
 
 pub fn stride_for_width(format: cairo_format_t, width: u16) -> usize {
@@ -66,25 +63,25 @@ impl CairoDrop for cairo_surface_t {
     }
 }
 
-pub struct CairoObj<T: CairoDrop>(Unique<T>);
+pub struct CairoObj<T: CairoDrop>(NonNull<T>);
 
 impl<T: CairoDrop> CairoObj<T> {
     pub fn wrap(ptr: *mut T) -> CairoObj<T> {
         assert!(ptr as usize != 0);
-        CairoObj(unsafe { Unique::new(ptr) })
+        CairoObj(unsafe { NonNull::new_unchecked(ptr) })
     }
 }
 
 impl<T: CairoDrop> Clone for CairoObj<T> {
     fn clone(&self) -> Self {
-        CairoObj(unsafe { Unique::new(CairoDrop::reference_cairo(self.0.as_ptr())) })
+        CairoObj(unsafe { NonNull::new_unchecked(CairoDrop::reference_cairo(self.0.as_ptr())) })
     }
 }
 
 impl<T: CairoDrop> Deref for CairoObj<T> {
-    type Target = Unique<T>;
+    type Target = NonNull<T>;
 
-    fn deref(&self) -> &Unique<T> {
+    fn deref(&self) -> &NonNull<T> {
         &self.0
     }
 }
@@ -107,7 +104,7 @@ impl<F: FnMut(T1, T2) -> T3, T1, T2, T3> CairoFunc<F, T1, T2, T3> {
         closure.0(arg1, arg2)
     }
 
-    pub fn func(&self) -> (extern "C" fn(*mut libc::c_void, T1, T2) -> T3) {
+    pub fn func(&self) -> extern "C" fn(*mut libc::c_void, T1, T2) -> T3 {
         Self::call
     }
 

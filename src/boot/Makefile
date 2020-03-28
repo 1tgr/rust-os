@@ -10,11 +10,11 @@ ISO_LAYOUT += initrd.tar.gz
 ISO_LAYOUT += boot/grub/menu.lst=menu.lst
 ISO_LAYOUT += boot/grub/stage2_eltorito=stage2_eltorito_temp
 
-INITRD += ../apps/target/$(CONFIG_TARGET)/release/cairo_demo
-INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_client
-INITRD += ../apps/target/$(CONFIG_TARGET)/release/graphics_server
-INITRD += ../apps/target/$(CONFIG_TARGET)/release/hello
-INITRD += ../apps/target/$(CONFIG_TARGET)/release/input
+INITRD += ../apps/cairo_demo/target/$(CONFIG_TARGET)/release/cairo_demo
+INITRD += ../apps/graphics_client/target/$(CONFIG_TARGET)/release/graphics_client
+INITRD += ../apps/graphics_server/target/$(CONFIG_TARGET)/release/graphics_server
+INITRD += ../apps/hello/target/$(CONFIG_TARGET)/release/hello
+INITRD += ../apps/input/target/$(CONFIG_TARGET)/release/input
 INITRD += ../libgraphics/target/$(CONFIG_TARGET)/release/test_graphics
 
 ifeq ($(shell uname),Darwin)

@@ -1,30 +1,48 @@
+use super::{ErrNum, Result};
 use core::mem;
 use core::slice;
-use core::str::{self,StrExt};
-use super::{ErrNum,Result};
+use core::str;
 
 pub struct TupleDeque6<T> {
     tuple: (T, T, T, T, T, T),
-    len: u8
+    len: u8,
 }
 
 impl<T: Default> TupleDeque6<T> {
     pub fn new() -> Self {
         TupleDeque6 {
             tuple: <_>::default(),
-            len: 0
+            len: 0,
         }
     }
 
     pub fn pop_front(&mut self) -> Option<T> {
         match self.len {
-            6 => { self.len = 5; Some(mem::replace(&mut self.tuple.0, T::default())) },
-            5 => { self.len = 4; Some(mem::replace(&mut self.tuple.1, T::default())) },
-            4 => { self.len = 3; Some(mem::replace(&mut self.tuple.2, T::default())) },
-            3 => { self.len = 2; Some(mem::replace(&mut self.tuple.3, T::default())) },
-            2 => { self.len = 1; Some(mem::replace(&mut self.tuple.4, T::default())) },
-            1 => { self.len = 0; Some(mem::replace(&mut self.tuple.5, T::default())) },
-            _ => None
+            6 => {
+                self.len = 5;
+                Some(mem::replace(&mut self.tuple.0, T::default()))
+            }
+            5 => {
+                self.len = 4;
+                Some(mem::replace(&mut self.tuple.1, T::default()))
+            }
+            4 => {
+                self.len = 3;
+                Some(mem::replace(&mut self.tuple.2, T::default()))
+            }
+            3 => {
+                self.len = 2;
+                Some(mem::replace(&mut self.tuple.3, T::default()))
+            }
+            2 => {
+                self.len = 1;
+                Some(mem::replace(&mut self.tuple.4, T::default()))
+            }
+            1 => {
+                self.len = 0;
+                Some(mem::replace(&mut self.tuple.5, T::default()))
+            }
+            _ => None,
         }
     }
 }
@@ -32,21 +50,36 @@ impl<T: Default> TupleDeque6<T> {
 impl<T> TupleDeque6<T> {
     #[allow(dead_code)]
     pub fn from_tuple(tuple: (T, T, T, T, T, T)) -> Self {
-        TupleDeque6 {
-            tuple: tuple,
-            len: 6
-        }
+        TupleDeque6 { tuple, len: 6 }
     }
 
     pub fn push_back(&mut self, item: T) {
         match self.len {
-            0 => { self.tuple.0 = item; self.len = 1; },
-            1 => { self.tuple.1 = item; self.len = 2; },
-            2 => { self.tuple.2 = item; self.len = 3; },
-            3 => { self.tuple.3 = item; self.len = 4; },
-            4 => { self.tuple.4 = item; self.len = 5; },
-            5 => { self.tuple.5 = item; self.len = 6; },
-            _ => { panic!("tuple is full") }
+            0 => {
+                self.tuple.0 = item;
+                self.len = 1;
+            }
+            1 => {
+                self.tuple.1 = item;
+                self.len = 2;
+            }
+            2 => {
+                self.tuple.2 = item;
+                self.len = 3;
+            }
+            3 => {
+                self.tuple.3 = item;
+                self.len = 4;
+            }
+            4 => {
+                self.tuple.4 = item;
+                self.len = 5;
+            }
+            5 => {
+                self.tuple.5 = item;
+                self.len = 6;
+            }
+            _ => panic!("tuple is full"),
         }
     }
 
@@ -57,7 +90,7 @@ impl<T> TupleDeque6<T> {
 
 pub type PackedArgs = TupleDeque6<usize>;
 
-pub trait SyscallArgs : Sized {
+pub trait SyscallArgs: Sized {
     fn as_args(self, args: &mut PackedArgs);
     fn from_args(args: &mut PackedArgs) -> Result<Self>;
 }
@@ -68,8 +101,7 @@ pub trait SyscallResult {
 }
 
 impl SyscallArgs for () {
-    fn as_args(self, _args: &mut PackedArgs) {
-    }
+    fn as_args(self, _args: &mut PackedArgs) {}
 
     fn from_args(_args: &mut PackedArgs) -> Result<Self> {
         Ok(())
@@ -207,12 +239,12 @@ impl<'a> SyscallArgs for &'a str {
         let bytes = SyscallArgs::from_args(args)?;
         match str::from_utf8(bytes) {
             Ok(s) => Ok(s),
-            Err(_) => Err(ErrNum::Utf8Error)
+            Err(_) => Err(ErrNum::Utf8Error),
         }
     }
 }
 
-impl<T> SyscallArgs for extern fn(T) {
+impl<T> SyscallArgs for extern "C" fn(T) {
     fn as_args(self, args: &mut PackedArgs) {
         (self as usize).as_args(args)
     }
@@ -265,7 +297,7 @@ impl<T: SyscallResult> SyscallResult for Result<T> {
     fn as_result(self) -> isize {
         match self {
             Ok(x) => x.as_result(),
-            Err(num) => -(num as isize)
+            Err(num) => -(num as isize),
         }
     }
 
@@ -283,13 +315,16 @@ impl SyscallResult for () {
         0
     }
 
-    fn from_result(_value: isize) {
-    }
+    fn from_result(_value: isize) {}
 }
 
 impl SyscallResult for bool {
     fn as_result(self) -> isize {
-        if self { 1 } else { 0 }
+        if self {
+            1
+        } else {
+            0
+        }
     }
 
     fn from_result(value: isize) -> Self {

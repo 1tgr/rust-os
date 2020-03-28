@@ -1,10 +1,10 @@
-use collections::vec_deque::VecDeque;
-use ipc;
-use os::{File,OSHandle};
-use std::cell::RefCell;
-use std::sync::atomic::{AtomicUsize,Ordering};
+use crate::ipc;
+use crate::types::{Command, Event};
+use alloc::collections::vec_deque::VecDeque;
+use core::cell::RefCell;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use os::{File, OSHandle};
 use syscall::Result;
-use types::{Command,Event};
 
 pub fn alloc_id() -> usize {
     static NEXT_ID: AtomicUsize = AtomicUsize::new(1);

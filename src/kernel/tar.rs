@@ -1,6 +1,6 @@
+use crate::ptr::Align;
 use core::mem;
 use core::str;
-use ptr::Align;
 
 #[repr(C)]
 struct Header {
@@ -33,7 +33,7 @@ impl Header {
 fn nul_terminate(s: &[u8]) -> &[u8] {
     match s.iter().position(|b| *b == 0) {
         Some(index) => &s[0..index],
-        None => s
+        None => s,
     }
 }
 
@@ -41,7 +41,7 @@ pub fn locate<'a>(data: &'a [u8], filename: &str) -> Option<&'a [u8]> {
     let mut offset = 0;
     while offset < data.len() {
         let header = unsafe {
-            let header_slice = &data[offset .. offset + mem::size_of::<Header>()];
+            let header_slice = &data[offset..offset + mem::size_of::<Header>()];
             &*(header_slice.as_ptr() as *const Header)
         };
 
@@ -55,7 +55,7 @@ pub fn locate<'a>(data: &'a [u8], filename: &str) -> Option<&'a [u8]> {
         let size = header.parse_size();
         if let Ok(header_filename) = str::from_utf8(header_filename) {
             if header_filename == filename {
-                return Some(&data[offset .. offset + size]);
+                return Some(&data[offset..offset + size]);
             }
         }
 

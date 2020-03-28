@@ -10,11 +10,14 @@ DIRS_SRC += libgraphics
 DIRS += $(DIRS_SRC)
 DIRS += boot
 
-.PHONY: all $(DIRS)
+.PHONY: all test $(DIRS)
 
-all: $(DIRS)
+all: test
 
 $(DIRS):
 	make -C $@
 
 boot: $(DIRS_SRC)
+
+test: $(DIRS)
+	python3 test.py qemu-system-x86_64 -no-kvm -display vnc=:1 -no-reboot -kernel kernel/kernel -initrd boot/initrd.tar

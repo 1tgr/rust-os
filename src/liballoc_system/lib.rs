@@ -8,88 +8,61 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![cfg_attr(stage0, feature(custom_attribute))]
-#![crate_name = "alloc_system"]
-#![crate_type = "rlib"]
+#![feature(alloc_error_handler)]
 #![no_std]
-#![cfg_attr(not(stage0), allocator)]
-#![unstable(feature = "alloc_system",
-            reason = "this library is unlikely to be stabilized in its current \
-                      form or name",
-            issue = "27783")]
-#![feature(allocator)]
-#![feature(staged_api)]
 
 extern crate libc;
 
 // The minimum alignment guaranteed by the architecture. This value is used to
 // add fast paths for low alignment values. In practice, the alignment is a
 // constant at the call site and the branch will be optimized out.
-const MIN_ALIGN: usize = 8;
+const MIN_ALIGN: size_t = 8;
 
+use core::alloc::{GlobalAlloc, Layout};
 use core::cmp;
 use core::ptr;
+use libc::{c_void, size_t};
 
-extern {
-    fn memalign(align: libc::size_t, size: libc::size_t) -> *mut libc::c_void;
+extern "C" {
+    fn memalign(align: size_t, size: size_t) -> *mut c_void;
 }
 
-unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
-    if align <= MIN_ALIGN {
-        libc::malloc(size as libc::size_t) as *mut u8
-    } else {
-        memalign(align as libc::size_t, size as libc::size_t) as *mut u8
-    }
-}
+struct LibcAllocator;
 
-unsafe fn deallocate(ptr: *mut u8) {
-    libc::free(ptr as *mut libc::c_void)
-}
+#[global_allocator]
+static ALLOCATOR: LibcAllocator = LibcAllocator;
 
-#[no_mangle]
-pub extern fn __rust_allocate(size: usize, align: usize) -> *mut u8 {
-    unsafe { allocate(size, align) }
-}
-
-#[no_mangle]
-pub extern fn __rust_allocate_zeroed(size: usize, align: usize) -> *mut u8 {
-    unsafe {
-        let ptr = allocate(size, align);
-        ptr::write_bytes(ptr, 0, size);
-        ptr
-    }
-}
-
-#[no_mangle]
-#[allow(unused_variables)]
-pub extern fn __rust_deallocate(ptr: *mut u8, old_size: usize, align: usize) {
-    unsafe { deallocate(ptr) }
-}
-
-#[no_mangle]
-pub extern fn __rust_reallocate(ptr: *mut u8, old_size: usize, size: usize,
-                                align: usize) -> *mut u8 {
-    unsafe {
+unsafe impl GlobalAlloc for LibcAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let size = layout.size() as size_t;
+        let align = layout.align() as size_t;
         if align <= MIN_ALIGN {
-            libc::realloc(ptr as *mut libc::c_void, size as libc::size_t) as *mut u8
+            libc::malloc(size) as *mut u8
         } else {
-            let new_ptr = allocate(size, align);
-            ptr::copy(ptr, new_ptr, cmp::min(size, old_size));
-            deallocate(ptr);
+            memalign(align, size) as *mut u8
+        }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+        libc::free(ptr as *mut c_void)
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let size = layout.size() as size_t;
+        let align = layout.align() as size_t;
+        let new_size = new_size as size_t;
+        if align <= MIN_ALIGN {
+            libc::realloc(ptr as *mut c_void, new_size) as *mut u8
+        } else {
+            let new_ptr = memalign(new_size, align) as *mut u8;
+            ptr::copy(ptr, new_ptr, cmp::min(new_size, size) as usize);
+            libc::free(ptr as *mut c_void);
             new_ptr
         }
     }
 }
 
-#[no_mangle]
-#[allow(unused_variables)]
-pub extern fn __rust_reallocate_inplace(ptr: *mut u8, old_size: usize,
-                                        size: usize, align: usize) -> usize {
-    old_size
-}
-
-#[no_mangle]
-#[allow(unused_variables)]
-pub extern fn __rust_usable_size(size: usize, align: usize) -> usize {
-    size
+#[alloc_error_handler]
+fn alloc_error_handler(layout: Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
 }

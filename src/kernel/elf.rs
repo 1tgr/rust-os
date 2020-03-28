@@ -2132,10 +2132,14 @@ pub struct Struct_Unnamed1 {
     pub e_shstrndx: Elf32_Half,
 }
 impl ::core::clone::Clone for Struct_Unnamed1 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed1 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Ehdr = Struct_Unnamed1;
 #[repr(C)]
@@ -2157,10 +2161,14 @@ pub struct Struct_Unnamed2 {
     pub e_shstrndx: Elf64_Half,
 }
 impl ::core::clone::Clone for Struct_Unnamed2 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed2 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Ehdr = Struct_Unnamed2;
 #[repr(C)]
@@ -2178,10 +2186,14 @@ pub struct Struct_Unnamed3 {
     pub sh_entsize: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed3 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed3 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Shdr = Struct_Unnamed3;
 #[repr(C)]
@@ -2199,10 +2211,14 @@ pub struct Struct_Unnamed4 {
     pub sh_entsize: Elf64_Xword,
 }
 impl ::core::clone::Clone for Struct_Unnamed4 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed4 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Shdr = Struct_Unnamed4;
 #[repr(C)]
@@ -2216,10 +2232,14 @@ pub struct Struct_Unnamed5 {
     pub st_shndx: Elf32_Section,
 }
 impl ::core::clone::Clone for Struct_Unnamed5 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed5 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Sym = Struct_Unnamed5;
 #[repr(C)]
@@ -2233,10 +2253,14 @@ pub struct Struct_Unnamed6 {
     pub st_size: Elf64_Xword,
 }
 impl ::core::clone::Clone for Struct_Unnamed6 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed6 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Sym = Struct_Unnamed6;
 #[repr(C)]
@@ -2246,10 +2270,14 @@ pub struct Struct_Unnamed7 {
     pub si_flags: Elf32_Half,
 }
 impl ::core::clone::Clone for Struct_Unnamed7 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed7 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Syminfo = Struct_Unnamed7;
 #[repr(C)]
@@ -2259,10 +2287,14 @@ pub struct Struct_Unnamed8 {
     pub si_flags: Elf64_Half,
 }
 impl ::core::clone::Clone for Struct_Unnamed8 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed8 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Syminfo = Struct_Unnamed8;
 #[repr(C)]
@@ -2272,10 +2304,14 @@ pub struct Struct_Unnamed9 {
     pub r_info: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed9 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed9 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Rel = Struct_Unnamed9;
 #[repr(C)]
@@ -2285,10 +2321,14 @@ pub struct Struct_Unnamed10 {
     pub r_info: Elf64_Xword,
 }
 impl ::core::clone::Clone for Struct_Unnamed10 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed10 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Rel = Struct_Unnamed10;
 #[repr(C)]
@@ -2299,10 +2339,14 @@ pub struct Struct_Unnamed11 {
     pub r_addend: Elf32_Sword,
 }
 impl ::core::clone::Clone for Struct_Unnamed11 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed11 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Rela = Struct_Unnamed11;
 #[repr(C)]
@@ -2313,10 +2357,14 @@ pub struct Struct_Unnamed12 {
     pub r_addend: Elf64_Sxword,
 }
 impl ::core::clone::Clone for Struct_Unnamed12 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed12 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Rela = Struct_Unnamed12;
 #[repr(C)]
@@ -2332,10 +2380,14 @@ pub struct Struct_Unnamed13 {
     pub p_align: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed13 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed13 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Phdr = Struct_Unnamed13;
 #[repr(C)]
@@ -2351,10 +2403,14 @@ pub struct Struct_Unnamed14 {
     pub p_align: Elf64_Xword,
 }
 impl ::core::clone::Clone for Struct_Unnamed14 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed14 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Phdr = Struct_Unnamed14;
 #[repr(C)]
@@ -2364,10 +2420,14 @@ pub struct Struct_Unnamed15 {
     pub d_un: Union_Unnamed16,
 }
 impl ::core::clone::Clone for Struct_Unnamed15 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed15 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -2385,10 +2445,14 @@ impl Union_Unnamed16 {
     }
 }
 impl ::core::clone::Clone for Union_Unnamed16 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Union_Unnamed16 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Dyn = Struct_Unnamed15;
 #[repr(C)]
@@ -2398,10 +2462,14 @@ pub struct Struct_Unnamed17 {
     pub d_un: Union_Unnamed18,
 }
 impl ::core::clone::Clone for Struct_Unnamed17 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed17 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -2419,10 +2487,14 @@ impl Union_Unnamed18 {
     }
 }
 impl ::core::clone::Clone for Union_Unnamed18 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Union_Unnamed18 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Dyn = Struct_Unnamed17;
 #[repr(C)]
@@ -2437,10 +2509,14 @@ pub struct Struct_Unnamed19 {
     pub vd_next: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed19 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed19 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Verdef = Struct_Unnamed19;
 #[repr(C)]
@@ -2455,10 +2531,14 @@ pub struct Struct_Unnamed20 {
     pub vd_next: Elf64_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed20 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed20 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Verdef = Struct_Unnamed20;
 #[repr(C)]
@@ -2468,10 +2548,14 @@ pub struct Struct_Unnamed21 {
     pub vda_next: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed21 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed21 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Verdaux = Struct_Unnamed21;
 #[repr(C)]
@@ -2481,10 +2565,14 @@ pub struct Struct_Unnamed22 {
     pub vda_next: Elf64_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed22 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed22 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Verdaux = Struct_Unnamed22;
 #[repr(C)]
@@ -2497,10 +2585,14 @@ pub struct Struct_Unnamed23 {
     pub vn_next: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed23 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed23 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Verneed = Struct_Unnamed23;
 #[repr(C)]
@@ -2513,10 +2605,14 @@ pub struct Struct_Unnamed24 {
     pub vn_next: Elf64_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed24 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed24 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Verneed = Struct_Unnamed24;
 #[repr(C)]
@@ -2529,10 +2625,14 @@ pub struct Struct_Unnamed25 {
     pub vna_next: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed25 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed25 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Vernaux = Struct_Unnamed25;
 #[repr(C)]
@@ -2545,10 +2645,14 @@ pub struct Struct_Unnamed26 {
     pub vna_next: Elf64_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed26 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed26 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Vernaux = Struct_Unnamed26;
 #[repr(C)]
@@ -2558,10 +2662,14 @@ pub struct Struct_Unnamed27 {
     pub a_un: Union_Unnamed28,
 }
 impl ::core::clone::Clone for Struct_Unnamed27 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed27 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -2575,10 +2683,14 @@ impl Union_Unnamed28 {
     }
 }
 impl ::core::clone::Clone for Union_Unnamed28 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Union_Unnamed28 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_auxv_t = Struct_Unnamed27;
 #[repr(C)]
@@ -2588,10 +2700,14 @@ pub struct Struct_Unnamed29 {
     pub a_un: Union_Unnamed30,
 }
 impl ::core::clone::Clone for Struct_Unnamed29 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed29 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -2605,10 +2721,14 @@ impl Union_Unnamed30 {
     }
 }
 impl ::core::clone::Clone for Union_Unnamed30 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Union_Unnamed30 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_auxv_t = Struct_Unnamed29;
 #[repr(C)]
@@ -2619,10 +2739,14 @@ pub struct Struct_Unnamed31 {
     pub n_type: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed31 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed31 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Nhdr = Struct_Unnamed31;
 #[repr(C)]
@@ -2633,10 +2757,14 @@ pub struct Struct_Unnamed32 {
     pub n_type: Elf64_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed32 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed32 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Nhdr = Struct_Unnamed32;
 #[repr(C)]
@@ -2649,10 +2777,14 @@ pub struct Struct_Unnamed33 {
     pub m_stride: Elf32_Half,
 }
 impl ::core::clone::Clone for Struct_Unnamed33 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed33 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Move = Struct_Unnamed33;
 #[repr(C)]
@@ -2665,10 +2797,14 @@ pub struct Struct_Unnamed34 {
     pub m_stride: Elf64_Half,
 }
 impl ::core::clone::Clone for Struct_Unnamed34 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed34 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Move = Struct_Unnamed34;
 #[repr(C)]
@@ -2687,10 +2823,14 @@ impl Union_Unnamed35 {
     }
 }
 impl ::core::clone::Clone for Union_Unnamed35 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Union_Unnamed35 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -2699,10 +2839,14 @@ pub struct Struct_Unnamed36 {
     pub gt_unused: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed36 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed36 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -2711,10 +2855,14 @@ pub struct Struct_Unnamed37 {
     pub gt_bytes: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed37 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed37 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_gptab = Union_Unnamed35;
 #[repr(C)]
@@ -2725,10 +2873,14 @@ pub struct Struct_Unnamed38 {
     pub ri_gp_value: Elf32_Sword,
 }
 impl ::core::clone::Clone for Struct_Unnamed38 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed38 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_RegInfo = Struct_Unnamed38;
 #[repr(C)]
@@ -2740,10 +2892,14 @@ pub struct Struct_Unnamed39 {
     pub info: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed39 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed39 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf_Options = Struct_Unnamed39;
 #[repr(C)]
@@ -2753,10 +2909,14 @@ pub struct Struct_Unnamed40 {
     pub hwp_flags2: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed40 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed40 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf_Options_Hw = Struct_Unnamed40;
 #[repr(C)]
@@ -2769,10 +2929,14 @@ pub struct Struct_Unnamed41 {
     pub l_flags: Elf32_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed41 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed41 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf32_Lib = Struct_Unnamed41;
 #[repr(C)]
@@ -2785,10 +2949,14 @@ pub struct Struct_Unnamed42 {
     pub l_flags: Elf64_Word,
 }
 impl ::core::clone::Clone for Struct_Unnamed42 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl ::core::default::Default for Struct_Unnamed42 {
-    fn default() -> Self { unsafe { ::core::mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { ::core::mem::zeroed() }
+    }
 }
 pub type Elf64_Lib = Struct_Unnamed42;
 pub type Elf32_Conflict = Elf32_Addr;

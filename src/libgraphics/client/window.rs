@@ -1,8 +1,8 @@
+use crate::client::{self, Client};
+use crate::frame_buffer::FrameBuffer;
+use crate::types::{Command, Rect};
 use cairo::surface::CairoSurface;
-use client::{self,Client};
-use frame_buffer::FrameBuffer;
-use os::{Result,SharedMem};
-use types::{Command,Rect};
+use os::{Result, SharedMem};
 
 pub struct Window<'a> {
     client: &'a Client,
@@ -18,17 +18,18 @@ impl<'a> Window<'a> {
         let shared_mem = SharedMem::new(true)?;
         client.send_command(Command::CreateWindow {
             id,
-            pos: Rect {
-                x: x,
-                y: y,
-                width: width,
-                height: height,
-            },
-            shared_mem_handle: shared_mem.handle().get()
+            pos: Rect { x, y, width, height },
+            shared_mem_handle: shared_mem.handle().get(),
         })?;
 
         let buffer = FrameBuffer::new(width, height, shared_mem)?;
-        Ok(Window { client, id, x, y, buffer, })
+        Ok(Window {
+            client,
+            id,
+            x,
+            y,
+            buffer,
+        })
     }
 
     pub fn id(&self) -> usize {

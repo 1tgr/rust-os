@@ -1,15 +1,15 @@
-use arch::cpu::{self,DescriptorExtra,Dtr,InterruptDescriptor,Regs,Tss};
-use arch::debug;
-use arch::mmu;
+use crate::arch::cpu::{self, DescriptorExtra, Dtr, InterruptDescriptor, Regs, Tss};
+use crate::arch::debug;
+use crate::arch::mmu;
+use crate::once::{self, Once};
+use crate::prelude::*;
+use crate::process;
+use crate::ptr::{self, Align};
+use crate::singleton::{DropSingleton, Singleton};
+use crate::thread;
 use core::mem;
-use once::{self,Once};
-use prelude::*;
-use process;
-use ptr::{self,Align};
-use singleton::{DropSingleton,Singleton};
-use thread;
 
-extern {
+extern "C" {
     static GDT: u8;
     static mut GDT_TSS: DescriptorExtra;
     static mut TSS: Tss;
@@ -21,8 +21,8 @@ extern {
 }
 
 lazy_static! {
-    static ref IRQ_HANDLERS: Vec<Singleton<Box<Fn() + 'static>>> = {
-        let mut v: Vec<Singleton<Box<Fn() + 'static>>> = Vec::new();
+    static ref IRQ_HANDLERS: Vec<Singleton<Box<dyn Fn() + 'static>>> = {
+        let mut v: Vec<Singleton<Box<dyn Fn() + 'static>>> = Vec::new();
         for _ in 0..16 {
             v.push(Singleton::new());
         }
@@ -38,9 +38,9 @@ const PIC1_DATA: u16 = PIC1 + 1;
 const PIC2_COMMAND: u16 = PIC2;
 const PIC2_DATA: u16 = PIC2 + 1;
 
-pub type DropIrqHandler = DropSingleton<Box<Fn()>>;
+pub type DropIrqHandler = DropSingleton<Box<dyn Fn()>>;
 
-pub fn register_irq_handler<T: Fn() + 'static>(irq: usize, handler: T) -> DropIrqHandler  {
+pub fn register_irq_handler<T: Fn() + 'static>(irq: usize, handler: T) -> DropIrqHandler {
     if let Some(singleton) = IRQ_HANDLERS.get(irq) {
         singleton.register(Box::new(handler))
     } else {
@@ -49,21 +49,22 @@ pub fn register_irq_handler<T: Fn() + 'static>(irq: usize, handler: T) -> DropIr
 }
 
 macro_rules! assert_size {
-	($value:expr, $expected_end:expr) => ({
+    ($value:expr, $expected_end:expr) => {{
         let value = $value;
         let expected_end = $expected_end;
         let expected_len = ptr::bytes_between(value as *const _ as *const u8, expected_end as *const _ as *const u8);
         assert_eq!(mem::size_of_val(value), expected_len);
-    })
+    }};
 }
 
 macro_rules! assert_len {
-	($slice:expr, $expected_end:expr) => ({
+    ($slice:expr, $expected_end:expr) => {{
         let slice = $slice;
         let expected_end = $expected_end;
-        let expected_len = ptr::bytes_between(slice.as_ptr() as *const u8, expected_end as *const u8) / mem::size_of_val(&*slice.as_ptr());
+        let expected_len = ptr::bytes_between(slice.as_ptr() as *const u8, expected_end as *const u8)
+            / mem::size_of_val(&*slice.as_ptr());
         assert_eq!(expected_len, slice.len());
-    })
+    }};
 }
 
 pub fn init_once() {
@@ -106,32 +107,32 @@ pub fn init_once() {
 
         let idtr = Dtr {
             limit: mem::size_of_val(&IDT) as u16,
-            base: IDT.as_ptr() as u64
+            base: IDT.as_ptr() as u64,
         };
 
         cpu::lidt(&idtr);
 
-        const ICW1_ICW4: u8 = 0x01;         /* ICW4 (not) needed */
-        const ICW1_INIT: u8 = 0x10;         /* Initialization - required! */
-        const ICW4_8086: u8 = 0x01;         /* 8086/88 (MCS-80/85) mode */
+        const ICW1_ICW4: u8 = 0x01; /* ICW4 (not) needed */
+        const ICW1_INIT: u8 = 0x10; /* Initialization - required! */
+        const ICW4_8086: u8 = 0x01; /* 8086/88 (MCS-80/85) mode */
 
         const OFFSET1: u8 = 32;
         const OFFSET2: u8 = 40;
 
-        let a1 = cpu::inb(PIC1_DATA);                        // save masks
+        let a1 = cpu::inb(PIC1_DATA); // save masks
         let a2 = cpu::inb(PIC2_DATA);
 
-        cpu::outb(PIC1_COMMAND, ICW1_INIT+ICW1_ICW4);  // starts the initialization sequence (in cascade mode)
-        cpu::outb(PIC2_COMMAND, ICW1_INIT+ICW1_ICW4);
-        cpu::outb(PIC1_DATA, OFFSET1);                 // ICW2: Master PIC vector offset
-        cpu::outb(PIC2_DATA, OFFSET2);                 // ICW2: Slave PIC vector offset
-        cpu::outb(PIC1_DATA, 4);                       // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
-        cpu::outb(PIC2_DATA, 2);                       // ICW3: tell Slave PIC its cascade identity (0000 0010)
+        cpu::outb(PIC1_COMMAND, ICW1_INIT + ICW1_ICW4); // starts the initialization sequence (in cascade mode)
+        cpu::outb(PIC2_COMMAND, ICW1_INIT + ICW1_ICW4);
+        cpu::outb(PIC1_DATA, OFFSET1); // ICW2: Master PIC vector offset
+        cpu::outb(PIC2_DATA, OFFSET2); // ICW2: Slave PIC vector offset
+        cpu::outb(PIC1_DATA, 4); // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+        cpu::outb(PIC2_DATA, 2); // ICW3: tell Slave PIC its cascade identity (0000 0010)
 
         cpu::outb(PIC1_DATA, ICW4_8086);
         cpu::outb(PIC2_DATA, ICW4_8086);
 
-        cpu::outb(PIC1_DATA, a1);   // restore saved masks.
+        cpu::outb(PIC1_DATA, a1); // restore saved masks.
         cpu::outb(PIC2_DATA, a2);
 
         cpu::sti();
@@ -144,7 +145,7 @@ pub unsafe fn set_kernel_stack(ptr: *mut u8) {
 }
 
 #[no_mangle]
-pub extern fn irq(num: usize, _: &Regs) {
+pub extern "C" fn irq(num: usize, _: &Regs) {
     unsafe {
         const PIC_EOI: u8 = 0x20; // End-of-interrupt command code
 
@@ -165,7 +166,7 @@ pub extern fn irq(num: usize, _: &Regs) {
 }
 
 #[no_mangle]
-pub extern fn exception(num: u8, regs: &Regs) {
+pub extern "C" fn exception(num: u8, regs: &Regs) {
     let cr2: *mut u8 = cpu::read_cr2();
     if num == 14 && (regs.error & 1) == 0 && process::resolve_page_fault(cr2) {
         return;
@@ -174,22 +175,59 @@ pub extern fn exception(num: u8, regs: &Regs) {
     {
         let process_opt = thread::try_current_process();
         let process_name = &process_opt.as_ref().map_or("<no process>", |p| p.name());
-        log!("exception {} in {}: error=0x{:x}  cr2={:p}", num, process_name, regs.error, cr2);
+        log!(
+            "exception {} in {}: error=0x{:x}  cr2={:p}",
+            num,
+            process_name,
+            regs.error,
+            cr2
+        );
     }
 
-    log!("ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}", regs.ss, regs.rsp, regs.cs, regs.rip, regs.rflags);
-    log!("rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}", regs.rax, regs.rbx, regs.rcx, regs.rdx);
+    log!(
+        "ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}",
+        regs.ss,
+        regs.rsp,
+        regs.cs,
+        regs.rip,
+        regs.rflags
+    );
+    log!(
+        "rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}",
+        regs.rax,
+        regs.rbx,
+        regs.rcx,
+        regs.rdx
+    );
     log!("rbp={:-16x} rdi={:-16x} rsi={:-16x}", regs.rbp, regs.rdi, regs.rsi);
-    log!(" r8={:-16x}  r9={:-16x} r10={:-16x} r11={:-16x}", regs.r8, regs.r9, regs.r10, regs.r11);
-    log!("r12={:-16x} r12={:-16x} r14={:-16x} r15={:-16x}", regs.r12, regs.r13, regs.r14, regs.r15);
+    log!(
+        " r8={:-16x}  r9={:-16x} r10={:-16x} r11={:-16x}",
+        regs.r8,
+        regs.r9,
+        regs.r10,
+        regs.r11
+    );
+    log!(
+        "r12={:-16x} r12={:-16x} r14={:-16x} r15={:-16x}",
+        regs.r12,
+        regs.r13,
+        regs.r14,
+        regs.r15
+    );
     log!("");
 
     if num == 14 {
-        log!("page fault: {} {} address {:p} in {} mode",
-             if (regs.error & 1) != 0 { "protection violation" } else { "page not present" },
-             if (regs.error & 2) != 0 { "writing" } else { "reading" },
-             cr2,
-             if (regs.error & 4) != 0 { "user" } else { "kernel" });
+        log!(
+            "page fault: {} {} address {:p} in {} mode",
+            if (regs.error & 1) != 0 {
+                "protection violation"
+            } else {
+                "page not present"
+            },
+            if (regs.error & 2) != 0 { "writing" } else { "reading" },
+            cr2,
+            if (regs.error & 4) != 0 { "user" } else { "kernel" }
+        );
 
         log!("cr3 = {:x}", cpu::read_cr3());
         mmu::print_mapping(cr2);
@@ -197,11 +235,11 @@ pub extern fn exception(num: u8, regs: &Regs) {
     }
 
     unsafe { debug::print_stack_trace(regs.rsp as *const usize) };
-    loop { }
+    loop {}
 }
 
 #[no_mangle]
-pub extern fn interrupt(num: u8, regs: &Regs) {
+pub extern "C" fn interrupt(num: u8, regs: &Regs) {
     if num < 32 {
         exception(num, regs)
     } else {
@@ -211,7 +249,7 @@ pub extern fn interrupt(num: u8, regs: &Regs) {
 
 #[cfg(feature = "test")]
 pub mod test {
-    use arch::cpu;
+    use crate::arch::cpu;
 
     test! {
         fn can_interrupt() {

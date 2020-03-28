@@ -2,6 +2,13 @@
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 name = "graphics_client"
 version = "0.0.0"
+edition = "2018"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [[bin]]
 name = "graphics_client"
@@ -12,6 +19,5 @@ test = false
 alloc_system = { path = "../../liballoc_system" }
 cairo = { path = "../../libcairo" }
 graphics = { path = "../../libgraphics" }
-os = { path = "../../libos" }
-serde = { version = "=1.0.8", default-features = false, features = ["collections"] }
-syscall = { path = "../../libsyscall" }
+rt = { path = "../../librt" }
+serde = { version = "1", default-features = false, features = ["alloc"] }

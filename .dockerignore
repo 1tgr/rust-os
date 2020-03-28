@@ -1,0 +1,14 @@
+.dockerignore
+.git
+.gitignore
+.travis.yml
+3rdparty
+!3rdparty/Makefile
+cache
+Dockerfile
+LICENSE
+README.md
+src
+!src/rust-toolchain
+test.py
+travis.sh

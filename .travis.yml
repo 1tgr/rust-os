@@ -14,12 +14,11 @@ cache:
     directories:
         - 3rdparty
 
-dist: trusty
+os: linux
+dist: bionic
 
 git:
     submodules: false
 
 language: c
 script: ./travis.sh
-sudo: false
-

@@ -4,10 +4,10 @@ version = "0.0.0"
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 build = "build.rs"
 links = "cairo"
+edition = "2018"
 
 [lib]
 path = "lib.rs"
 test = false
 
 [dependencies]
-libc = { path = "../liblibc" }

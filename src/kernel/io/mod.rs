@@ -5,10 +5,10 @@ pub mod pipe;
 
 mod nodes;
 
+use crate::deferred::Deferred;
+use crate::io::nodes::PromiseNode;
+use crate::prelude::*;
 use core::result;
-use deferred::Deferred;
-use io::nodes::PromiseNode;
-use prelude::*;
 use syscall::Result;
 
 pub use self::flat_map::FlatMap;
@@ -25,7 +25,7 @@ pub trait Write {
 }
 
 /// A computation that might eventually resolve to a value of type `T`.
-pub struct Promise<T>(Box<PromiseNode<T>>);
+pub struct Promise<T>(Box<dyn PromiseNode<T>>);
 
 impl<T: 'static> Promise<T> {
     /// Creates a promise from a kernel `Deferred` object. The promise is resolved once the deferred is resolved.

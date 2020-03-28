@@ -1,17 +1,17 @@
+use crate::prelude::*;
 use core::mem;
-use core::sync::atomic::{AtomicPtr,Ordering};
-use prelude::*;
+use core::sync::atomic::{AtomicPtr, Ordering};
 
 pub struct Singleton<T> {
-    cell: AtomicPtr<T>
+    cell: AtomicPtr<T>,
 }
 
-unsafe impl<T> Sync for Singleton<T> { }
+unsafe impl<T> Sync for Singleton<T> {}
 
 impl<T> Singleton<T> {
     pub const fn new() -> Singleton<T> {
         Singleton {
-            cell: AtomicPtr::new(0 as *mut T)
+            cell: AtomicPtr::new(0 as *mut T),
         }
     }
 
@@ -36,7 +36,7 @@ impl<T> Singleton<T> {
 
 pub struct DropSingleton<T: 'static> {
     cell: &'static AtomicPtr<T>,
-    old: *mut T
+    old: *mut T,
 }
 
 impl<T> Drop for DropSingleton<T> {

@@ -1,15 +1,15 @@
+use crate::multiboot::{multiboot_info_t, multiboot_memory_map_t, multiboot_module_t, multiboot_uint32_t};
+use crate::ptr::{self, Align, PointerInSlice};
+use crate::spin::Mutex;
 use bit_vec::BitVec;
 use core::cmp;
 use core::intrinsics;
 use core::mem;
 use core::slice;
-use libc::{c_int,c_void};
-use multiboot::{multiboot_info_t,multiboot_memory_map_t,multiboot_module_t,multiboot_uint32_t};
-use spin::Mutex;
-use ptr::{self,Align,PointerInSlice};
-use syscall::{ErrNum,Result};
+use libc::{c_int, c_void};
+use syscall::{ErrNum, Result};
 
-extern {
+extern "C" {
     static mut KERNEL_BASE: u8;
     static kernel_start: u8;
     static kernel_end: u8;
@@ -19,7 +19,7 @@ extern {
 }
 
 #[no_mangle]
-pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
+pub unsafe extern "C" fn sbrk(incr: c_int) -> *mut c_void {
     static mut BRK: usize = 0;
     let begin = (&mut heap_start as *mut u8).offset(BRK as isize);
     assert!((begin as *const u8) < (&heap_end as *const u8), "out of heap space");
@@ -30,7 +30,7 @@ pub unsafe extern fn sbrk(incr: c_int) -> *mut c_void {
 pub const PAGE_SIZE: usize = 4096;
 
 pub struct PhysicalBitmap {
-    free: Mutex<BitVec>
+    free: Mutex<BitVec>,
 }
 
 impl PhysicalBitmap {
@@ -49,7 +49,10 @@ impl PhysicalBitmap {
         bitmap.reserve_ptr(unsafe { &kernel_start }, kernel_len as usize);
         bitmap.reserve_addr(lower_bytes, cmp::max(0, 1024 * 1024 - lower_bytes));
         bitmap.reserve_addr(unsafe { mboot_ptr } as usize, mem::size_of::<multiboot_info_t>());
-        bitmap.reserve_addr(info.mods_addr as usize, info.mods_count as usize * mem::size_of::<multiboot_module_t>());
+        bitmap.reserve_addr(
+            info.mods_addr as usize,
+            info.mods_count as usize * mem::size_of::<multiboot_module_t>(),
+        );
 
         {
             let mut mmap_offset = 0;
@@ -63,9 +66,8 @@ impl PhysicalBitmap {
             }
         }
 
-        let mods: &[multiboot_module_t] = unsafe { slice::from_raw_parts(
-            phys2virt(info.mods_addr as usize),
-            info.mods_count as usize) };
+        let mods: &[multiboot_module_t] =
+            unsafe { slice::from_raw_parts(phys2virt(info.mods_addr as usize), info.mods_count as usize) };
 
         for module in mods {
             let addr = module.mod_start;
@@ -114,7 +116,7 @@ impl PhysicalBitmap {
                 Ok(i * PAGE_SIZE)
             }
 
-            None => Err(ErrNum::OutOfMemory)
+            None => Err(ErrNum::OutOfMemory),
         }
     }
 
@@ -149,11 +151,13 @@ pub fn identity_range() -> &'static [u8] {
 fn check_identity(addr: usize, ptr: *const u8) {
     let identity = identity_range();
     if !identity.contains_ptr(ptr) {
-        panic!("physical {:x}/virtual {:p} can't be contained in the identity mapping {:p}..{:p}",
+        panic!(
+            "physical {:x}/virtual {:p} can't be contained in the identity mapping {:p}..{:p}",
             addr,
             ptr,
             identity.as_ptr(),
-            unsafe { identity.as_ptr().offset(identity.len() as isize) });
+            unsafe { identity.as_ptr().offset(identity.len() as isize) }
+        );
     }
 }
 

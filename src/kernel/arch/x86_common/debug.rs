@@ -1,7 +1,7 @@
-use libc::c_char;
 use super::serial;
+use libc::c_char;
 
-extern {
+extern "C" {
     static kernel_start: u8;
     static kernel_end: u8;
 }

@@ -110,7 +110,7 @@ $(CAIRO)/Makefile: $(CAIRO)/ $(SRC)/newlib/x86_64-elf/lib/libc.a $(SRC)/cairo/li
 	PKG_CONFIG_PATH=$(SRC)/cairo/lib/pkgconfig \
 	./configure --silent --prefix=$(SRC)/cairo --host=x86_64-elf --enable-ps=no --enable-ft=no --enable-pdf=no --enable-svg=no --enable-script=no --enable-interpreter=no --enable-pthread=no
 
-$(QEMU)/Makefile: $(QEMU)
+$(QEMU)/Makefile: $(QEMU)/
 	cd $(QEMU) && \
 	./configure --target-list=x86_64-softmmu --prefix=$(ROOT)/3rdparty
 

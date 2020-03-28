@@ -1,4 +1,4 @@
-use super::{OSHandle,Result};
+use super::{OSHandle, Result};
 use syscall;
 
 pub struct File(OSHandle);

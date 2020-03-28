@@ -11,15 +11,15 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
-use arch::cpu;
+use crate::arch::cpu;
+use crate::spin::{StaticMutex, STATIC_MUTEX_INIT};
 use libc::c_char;
-use spin::{StaticMutex,STATIC_MUTEX_INIT};
 
 static MUTEX: StaticMutex = STATIC_MUTEX_INIT;
 
 unsafe fn putb(b: u8) {
     // Wait for the serial port's fifo to not be empty
-    while (cpu::inb(0x3F8+5) & 0x20) == 0 {
+    while (cpu::inb(0x3F8 + 5) & 0x20) == 0 {
         // Do nothing
     }
 
@@ -32,9 +32,9 @@ unsafe fn putb(b: u8) {
 
 pub fn puts(s: &str) {
     let _x = lock!(MUTEX);
-	for b in s.bytes() {
-		unsafe { putb(b) };
-	}
+    for b in s.bytes() {
+        unsafe { putb(b) };
+    }
 }
 
 pub unsafe fn put_cstr(s: *const c_char) {

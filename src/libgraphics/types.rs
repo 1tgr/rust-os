@@ -29,17 +29,12 @@ pub enum Command {
     MoveWindow {
         id: usize,
         pos: Rect,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Event {
-    Checkpoint {
-        id: usize,
-    },
+    Checkpoint { id: usize },
 
-    KeyPress {
-        window_id: usize,
-        code: char,
-    }
+    KeyPress { window_id: usize, code: char },
 }

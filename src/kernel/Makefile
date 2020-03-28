@@ -1,7 +1,7 @@
 include ../config.txt
 
 OBJS = arch/$(CONFIG_TARGET)/start.o arch/$(CONFIG_TARGET)/setjmp.o
-RUSTUP_RUN = RUST_TARGET_PATH=../libsyscall/arch
+RUSTUP_RUN = RUST_TARGET_PATH=${CURDIR}/../libsyscall/arch RUSTFLAGS=-Dwarnings
 CC = gcc
 TARGET = x86_64-elf
 OBJDUMP = $(TARGET)-objdump

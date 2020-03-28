@@ -1,24 +1,24 @@
-use alloc::boxed::{Box,FnBox};
-use super::{OSHandle,Result};
+use super::{OSHandle, Result};
+use alloc::boxed::Box;
+use core::mem;
 use syscall;
 
-extern fn thread_entry(context: usize) {
-    let b: Box<Box<FnBox() -> i32>> = unsafe { Box::from_raw(context as *mut _) };
+extern "C" fn thread_entry(context: usize) {
+    let b: Box<Box<dyn FnOnce() -> i32>> = unsafe { Box::from_raw(context as *mut _) };
     let code = b();
     Thread::exit(code)
 }
 
-fn spawn_inner(b: Box<Box<FnBox() -> i32>>) -> Result<Thread> {
+fn spawn_inner(b: Box<Box<dyn FnOnce() -> i32>>) -> Result<Thread> {
     let context_ptr = Box::into_raw(b);
 
-    let handle =
-        match syscall::spawn_thread(thread_entry, context_ptr as usize) {
-            Ok(handle) => handle,
-            Err(code) => {
-                unsafe { Box::from_raw(context_ptr) };
-                return Err(code)
-            }
-        };
+    let handle = match syscall::spawn_thread(thread_entry, context_ptr as usize) {
+        Ok(handle) => handle,
+        Err(code) => {
+            mem::drop(unsafe { Box::from_raw(context_ptr) });
+            return Err(code);
+        }
+    };
 
     Ok(Thread(OSHandle::from_raw(handle)))
 }

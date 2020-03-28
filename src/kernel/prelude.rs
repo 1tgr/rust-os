@@ -9,5 +9,5 @@
  * its use, and the author takes no liability.
  */
 pub use alloc::boxed::Box;
-pub use collections::string::{String, ToString};
-pub use collections::vec::Vec;
+pub use alloc::string::{String, ToString};
+pub use alloc::vec::Vec;

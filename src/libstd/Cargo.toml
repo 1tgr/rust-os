@@ -2,6 +2,13 @@
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 name = "std"
 version = "0.0.0"
+edition = "2018"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
 
 [lib]
 path = "lib.rs"

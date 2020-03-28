@@ -1,11 +1,7 @@
-use arch::cpu;
+use crate::arch::cpu;
 
 fn address((bus, slot): (u8, u8), func: u8, offset: u8) -> u32 {
-    0x80000000
-    | (bus as u32) << 16
-    | (slot as u32) << 11
-    | (func as u32) << 8
-    | (offset as u32) & 0xfc
+    0x80000000 | (bus as u32) << 16 | (slot as u32) << 11 | (func as u32) << 8 | (offset as u32) & 0xfc
 }
 
 pub unsafe fn inw(bus_slot: (u8, u8), func: u8, offset: u8) -> u16 {

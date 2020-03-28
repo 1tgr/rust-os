@@ -1,10 +1,11 @@
+#![allow(missing_docs)]
 #![stable(feature = "rust-os", since = "1.0.0")]
 
-use fmt;
-use io::{self,Read,Write};
+use crate::fmt;
+use crate::io::{self,Read,Write};
 use os::File;
 use syscall;
-use syscall::libc_helpers;
+use syscall::libc_helpers::{StdoutWriter,StderrWriter};
 
 #[stable(feature = "rust-os", since = "1.0.0")]
 impl Read for File {
@@ -26,5 +27,10 @@ impl Write for File {
 
 #[stable(feature = "rust-os", since = "1.0.0")]
 pub fn print(args: fmt::Arguments) {
-     fmt::Write::write_fmt(&mut libc_helpers::StdoutWriter, args).unwrap()
+     fmt::Write::write_fmt(&mut StdoutWriter, args).unwrap()
  }
+
+#[stable(feature = "rust-os", since = "1.0.0")]
+pub fn eprint(args: fmt::Arguments) {
+    fmt::Write::write_fmt(&mut StderrWriter, args).unwrap()
+}

@@ -1,20 +1,20 @@
-use alloc::arc::Arc;
-use arch::thread as arch_thread;
-use arch::vga_bochs;
-use console::Console;
+use crate::arch::thread as arch_thread;
+use crate::arch::vga_bochs;
+use crate::console::Console;
+use crate::io::Pipe;
+use crate::kobj::KObj;
+use crate::mutex::UntypedMutex;
+use crate::phys_mem;
+use crate::prelude::*;
+use crate::process::{self, SharedMemBlock};
+use crate::singleton::{DropSingleton, Singleton};
+use crate::thread;
+use alloc::sync::Arc;
 use core::fmt;
-use io::Pipe;
-use kobj::KObj;
-use mutex::UntypedMutex;
-use phys_mem;
-use prelude::*;
-use process::{self,SharedMemBlock};
-use singleton::{DropSingleton,Singleton};
-use syscall::{self,ErrNum,Handle,HandleSyscall,PackedArgs,Result};
-use thread;
+use syscall::{self, ErrNum, Handle, HandleSyscall, PackedArgs, Result};
 
 pub struct SyscallHandler {
-    console: Arc<Console>
+    console: Arc<Console>,
 }
 
 static HANDLER: Singleton<SyscallHandler> = Singleton::new();
@@ -35,18 +35,14 @@ pub fn dispatch(num: usize, args: PackedArgs) -> isize {
 
 impl SyscallHandler {
     pub fn new(console: Arc<Console>) -> Self {
-        SyscallHandler {
-            console: console
-        }
+        SyscallHandler { console }
     }
 }
 
 impl HandleSyscall for SyscallHandler {
-    fn log_entry(&self, _msg: fmt::Arguments) {
-    }
+    fn log_entry(&self, _msg: fmt::Arguments) {}
 
-    fn log_exit(&self, _msg: fmt::Arguments) {
-    }
+    fn log_exit(&self, _msg: fmt::Arguments) {}
 
     fn exit_thread(&self, code: i32) -> Result<()> {
         thread::exit(code)
@@ -65,7 +61,7 @@ impl HandleSyscall for SyscallHandler {
     fn alloc_pages(&self, len: usize) -> Result<*mut u8> {
         match process::alloc(len, true, true) {
             Ok(slice) => Ok(slice.as_mut_ptr()),
-            Err(_) => Err(ErrNum::OutOfMemory)
+            Err(_) => Err(ErrNum::OutOfMemory),
         }
     }
 
@@ -74,19 +70,18 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn open(&self, filename: &str) -> Result<Handle> {
-        let file: Arc<KObj> =
-            match filename {
-                "stdin" => self.console.clone(),
-                "stdout" => self.console.clone(),
-                _ => { return Err(ErrNum::FileNotFound) }
-            };
+        let file: Arc<dyn KObj> = match filename {
+            "stdin" => self.console.clone(),
+            "stdout" => self.console.clone(),
+            _ => return Err(ErrNum::FileNotFound),
+        };
 
         Ok(process::make_handle(file))
     }
 
     fn close(&self, handle: Handle) -> Result<()> {
         if !process::close_handle(handle) {
-            return Err(ErrNum::InvalidHandle)
+            return Err(ErrNum::InvalidHandle);
         }
 
         Ok(())
@@ -142,15 +137,20 @@ impl HandleSyscall for SyscallHandler {
         unsafe { mutex.unlock_unsafe() }
     }
 
-    fn spawn_thread(&self, entry: extern fn(usize), context: usize) -> Result<Handle> {
+    fn spawn_thread(&self, entry: extern "C" fn(usize), context: usize) -> Result<Handle> {
         let kernel_entry = move || {
-            let stack_slice = process::alloc(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
-            log!("stack_slice = 0x{:x} bytes @ {:p}", stack_slice.len(), stack_slice.as_ptr());
+            let stack_slice = process::alloc::<u8>(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+            log!(
+                "stack_slice = 0x{:x} bytes @ {:p}",
+                stack_slice.len(),
+                stack_slice.as_ptr()
+            );
             unsafe {
                 arch_thread::jmp_user_mode(
                     entry as *const u8,
                     stack_slice.as_mut_ptr().offset(stack_slice.len() as isize),
-                    context)
+                    context,
+                )
             }
             // TODO: free stack
         };

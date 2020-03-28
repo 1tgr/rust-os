@@ -8,7 +8,7 @@ macro_rules! test {
         )*
 
         #[doc(hidden)]
-        pub const TESTS: ::test::Fixture = (module_path!(), &[
+        pub const TESTS: crate::test::Fixture = (module_path!(), &[
             $(
                 (stringify!($name), $name),
             )*

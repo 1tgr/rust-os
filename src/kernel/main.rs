@@ -8,41 +8,41 @@
  * This code has been put into the public domain, there are no restrictions on
  * its use, and the author takes no liability.
  */
-#![feature(alloc)]
-#![feature(asm)]	//< As a kernel, we need inline assembly
-#![feature(collections)]
+#![feature(asm)] //< As a kernel, we need inline assembly
 #![feature(const_fn)]
 #![feature(core_intrinsics)]
-#![feature(fnbox)]
-#![feature(heap_api)]
-#![feature(lang_items)]	//< unwind needs to define lang items
+#![feature(lang_items)] //< unwind needs to define lang items
 #![feature(link_args)]
-#![feature(nonzero)]
+#![feature(panic_info_message)]
 #![feature(start)]
-#![feature(step_by)]
-
 #![no_std]
 
 /// Macros, need to be loaded before everything else due to how rust parses
-#[macro_use] extern crate collections;
-#[macro_use] extern crate bitflags;
-#[macro_use] extern crate lazy_static;
-
-#[macro_use] mod macros;
-#[macro_use] mod spin;
-#[macro_use] mod test;
-
+#[macro_use]
 extern crate alloc;
+#[macro_use]
+extern crate bitflags;
+#[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
+mod macros;
+#[macro_use]
+mod spin;
+#[macro_use]
+mod test;
+
+extern crate alloc_system;
 extern crate bit_vec;
 extern crate libc;
 extern crate syscall;
 
 // Achitecture-specific modules
-#[cfg(target_arch="x86_64")]
-#[path="arch/amd64/mod.rs"]
+#[cfg(target_arch = "x86_64")]
+#[path = "arch/amd64/mod.rs"]
 pub mod arch;
-#[cfg(target_arch="x86")]
-#[path="arch/x86/mod.rs"]
+#[cfg(target_arch = "x86")]
+#[path = "arch/x86/mod.rs"]
 pub mod arch;
 
 pub mod libc_helpers;
@@ -72,22 +72,19 @@ mod demo;
 
 #[cfg(feature = "test")]
 fn run_tests() {
-    use test::Fixture;
+    use crate::test::Fixture;
 
     const TEST_FIXTURES: &'static [Fixture] = &[
         ptr::test::TESTS,
-
         arch::isr::test::TESTS,
         arch::mmu::test::TESTS,
         io::pipe::test::TESTS,
         phys_mem::test::TESTS,
         virt_mem::test::TESTS,
-
         thread::test::TESTS,
-
         mutex::test::TESTS,
         process::test::TESTS,
-        demo::TESTS
+        demo::TESTS,
     ];
 
     log!("begin kmain");
@@ -104,8 +101,7 @@ fn run_tests() {
 }
 
 #[cfg(not(feature = "test"))]
-fn run_tests() {
-}
+fn run_tests() {}
 
 // Kernel entrypoint
 #[no_mangle]
@@ -118,6 +114,8 @@ pub unsafe fn kmain() -> ! {
     }
 }
 
-#[lang="start"]
+#[lang = "start"]
 #[start]
-fn main(_: isize, _: *const *const u8) -> isize { 0 }
+fn main(_: isize, _: *const *const u8) -> isize {
+    0
+}

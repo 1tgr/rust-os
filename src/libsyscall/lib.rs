@@ -1,10 +1,6 @@
 #![crate_name = "syscall"]
-
 #![feature(asm)]
-#![feature(core_str_ext)]
 #![feature(lang_items)]
-#![cfg_attr(not(feature = "kernel"), feature(start))]
-#![cfg_attr(not(feature = "kernel"), feature(link_args))]
 #![no_std]
 
 #[cfg(not(feature = "kernel"))]
@@ -24,15 +20,20 @@ pub enum ErrNum {
 pub type Handle = usize;
 pub type Result<T> = core::result::Result<T, ErrNum>;
 
-#[macro_use] mod macros;
+#[macro_use]
+mod macros;
 
 mod marshal;
 mod table;
 
-#[cfg(feature = "kernel")] mod kernel;
-#[cfg(feature = "kernel")] pub use kernel::*;
+#[cfg(feature = "kernel")]
+mod kernel;
+#[cfg(feature = "kernel")]
+pub use kernel::*;
 
-#[cfg(not(feature = "kernel"))] mod user;
-#[cfg(not(feature = "kernel"))] pub use user::*;
+#[cfg(not(feature = "kernel"))]
+mod user;
+#[cfg(not(feature = "kernel"))]
+pub use crate::user::*;
 
-pub use table::*;
+pub use crate::table::*;

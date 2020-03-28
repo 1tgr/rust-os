@@ -1,16 +1,16 @@
-use alloc::arc::Arc;
-use arch::mmu::AddressSpace;
-use phys_mem::PhysicalBitmap;
+use crate::arch::mmu::AddressSpace;
+use crate::phys_mem::PhysicalBitmap;
+use alloc::sync::Arc;
 use syscall::Result;
 
 pub struct ArchProcess {
-    address_space: AddressSpace
+    address_space: AddressSpace,
 }
 
 impl ArchProcess {
     pub fn new(bitmap: Arc<PhysicalBitmap>) -> Result<ArchProcess> {
         Ok(ArchProcess {
-            address_space: AddressSpace::new(bitmap)?
+            address_space: AddressSpace::new(bitmap)?,
         })
     }
 

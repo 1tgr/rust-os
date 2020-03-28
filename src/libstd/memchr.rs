@@ -36,8 +36,6 @@ pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
     // libc memchr
     #[cfg(not(target_os = "windows"))]
     fn memchr_specific(needle: u8, haystack: &[u8]) -> Option<usize> {
-        use libc;
-
         let p = unsafe {
             libc::memchr(
                 haystack.as_ptr() as *const libc::c_void,
@@ -62,8 +60,8 @@ pub fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
 
 #[allow(dead_code)]
 mod fallback {
-    use cmp;
-    use mem;
+    use core::cmp;
+    use core::mem;
 
     const LO_U64: u64 = 0x0101010101010101;
     const HI_U64: u64 = 0x8080808080808080;

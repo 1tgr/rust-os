@@ -1,12 +1,16 @@
 #![feature(link_args)]
 #![feature(start)]
 
+extern crate alloc;
+extern crate alloc_system;
+extern crate core;
 extern crate graphics;
+extern crate rt;
 
-#[cfg(target_arch="x86_64")]
+#[cfg(target_arch = "x86_64")]
+#[allow(unused_attributes)]
 #[link_args = "-T ../libsyscall/arch/amd64/link.ld"]
-extern {
-}
+extern "C" {}
 
 #[start]
 #[no_mangle]

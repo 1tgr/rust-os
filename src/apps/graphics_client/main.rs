@@ -1,21 +1,24 @@
-#![feature(collections)]
 #![feature(link_args)]
+#![feature(rustc_private)]
 #![feature(start)]
-#![feature(unique)]
 
+extern crate alloc;
+extern crate alloc_system;
 extern crate cairo;
-extern crate collections;
+extern crate core;
 extern crate graphics;
 extern crate os;
+extern crate rt;
 extern crate syscall;
 
+use alloc::collections::btree_map::BTreeMap;
+use alloc::string::String;
 use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::CairoObj;
-use collections::btree_map::BTreeMap;
-use graphics::{Client,Event,Window};
+use core::mem::MaybeUninit;
+use graphics::{Client, Event, Window};
 use os::Result;
-use std::mem;
 
 struct DemoWindow<'a> {
     window: Window<'a>,
@@ -24,7 +27,10 @@ struct DemoWindow<'a> {
 
 impl<'a> DemoWindow<'a> {
     fn new(window: Window<'a>) -> Result<Self> {
-        let mut demo_window = DemoWindow { window, text: "hello".into() };
+        let mut demo_window = DemoWindow {
+            window,
+            text: "hello".into(),
+        };
         demo_window.invalidate()?;
         Ok(demo_window)
     }
@@ -46,8 +52,10 @@ impl<'a> DemoWindow<'a> {
                 text.push(0);
 
                 let text_ptr = (&text[..]).as_ptr() as *const i8;
-                let mut extents = mem::uninitialized();
-                cairo_text_extents(cr.as_ptr(), text_ptr, &mut extents);
+                let mut extents = MaybeUninit::uninit();
+                cairo_text_extents(cr.as_ptr(), text_ptr, extents.as_mut_ptr());
+
+                let extents = extents.assume_init();
                 cairo_set_source_rgb(cr.as_ptr(), 0.0, 0.0, 0.0);
                 cairo_move_to(cr.as_ptr(), 0.0, extents.height);
                 cairo_show_text(cr.as_ptr(), text_ptr);
@@ -60,8 +68,12 @@ impl<'a> DemoWindow<'a> {
 
     fn handle_keypress(&mut self, code: char) -> Result<()> {
         match code {
-            '\x08' => { self.text.pop(); },
-            _ => { self.text.push(code); }
+            '\x08' => {
+                self.text.pop();
+            }
+            _ => {
+                self.text.push(code);
+            }
         }
 
         self.invalidate()?;
@@ -72,7 +84,7 @@ impl<'a> DemoWindow<'a> {
 fn run() -> Result<()> {
     let client = Client::new();
     let mut windows = BTreeMap::new();
-    for i in 0 .. 5 {
+    for i in 0..5 {
         let window = Window::new(&client, i as f64 * 100.0, i as f64 * 100.0, 150.0, 120.0)?;
         windows.insert(window.id(), DemoWindow::new(window)?);
     }
@@ -85,11 +97,11 @@ fn run() -> Result<()> {
         match e {
             Event::Checkpoint { id } if id == checkpoint_id => {
                 println!("System ready");
-            },
+            }
 
             Event::KeyPress { window_id, code } if code == '\u{1b}' => {
                 windows.remove(&window_id);
-            },
+            }
 
             Event::KeyPress { window_id, code } => {
                 if let Some(demo_window) = windows.get_mut(&window_id) {
@@ -97,17 +109,17 @@ fn run() -> Result<()> {
                 }
             }
 
-            _ => { }
+            _ => {}
         }
     }
 
     Ok(())
 }
 
-#[cfg(target_arch="x86_64")]
+#[cfg(target_arch = "x86_64")]
+#[allow(unused_attributes)]
 #[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
-extern {
-}
+extern "C" {}
 
 #[start]
 #[no_mangle]

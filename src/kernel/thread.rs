@@ -1,28 +1,28 @@
-use alloc::arc::Arc;
-use alloc::boxed::FnBox;
-use alloc::heap;
-use arch::cpu;
-use arch::isr;
-use arch::thread;
-use collections::vec_deque::VecDeque;
+use crate::arch::cpu;
+use crate::arch::isr;
+use crate::arch::thread;
+use crate::deferred::Deferred;
+use crate::prelude::*;
+use crate::process::Process;
+use crate::ptr::Align;
+use crate::singleton::Singleton;
+use crate::spin::Mutex;
+use alloc::alloc::{self as alloc_mod, Layout};
+use alloc::collections::vec_deque::VecDeque;
+use alloc::sync::Arc;
+use bitflags::_core::mem::MaybeUninit;
 use core::mem;
 use core::slice;
-use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
-use deferred::Deferred;
-use libc::{self,jmp_buf};
-use spin::Mutex;
-use prelude::*;
-use process::Process;
-use ptr::Align;
-use singleton::Singleton;
+use core::sync::atomic::{AtomicUsize, Ordering};
+use libc::{self, jmp_buf};
 
 static SCHEDULER: Singleton<Mutex<SchedulerState>> = Singleton::new();
 
 fn setjmp() -> Option<jmp_buf> {
+    let mut jmp_buf = MaybeUninit::uninit();
     unsafe {
-        let mut jmp_buf = mem::uninitialized();
-        if libc::setjmp(&mut jmp_buf) == 0 {
-            Some(jmp_buf)
+        if libc::setjmp(jmp_buf.as_mut_ptr()) == 0 {
+            Some(jmp_buf.assume_init())
         } else {
             None
         }
@@ -31,7 +31,7 @@ fn setjmp() -> Option<jmp_buf> {
 
 struct HWToken {
     process: Arc<Process>,
-    stack_ptr: *mut u8
+    stack_ptr: *mut u8,
 }
 
 impl HWToken {
@@ -45,24 +45,24 @@ struct Thread {
     _id: usize,
     stack: &'static mut [u8],
     process: Arc<Process>,
-    exited: Deferred<i32>
+    exited: Deferred<i32>,
 }
 
 impl Thread {
     pub fn new(process: Arc<Process>, stack: &'static mut [u8]) -> Thread {
-        static NEXT_THREAD_ID: AtomicUsize = ATOMIC_USIZE_INIT;
+        static NEXT_THREAD_ID: AtomicUsize = AtomicUsize::new(0);
         Thread {
             _id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
-            stack: stack,
-            process: process,
-            exited: Deferred::new()
+            stack,
+            process,
+            exited: Deferred::new(),
         }
     }
 
     pub fn hw_token(&mut self) -> HWToken {
         HWToken {
             process: self.process.clone(),
-            stack_ptr: Align::down(unsafe { self.stack.as_mut_ptr().offset(self.stack.len() as isize) }, 16)
+            stack_ptr: Align::down(unsafe { self.stack.as_mut_ptr().offset(self.stack.len() as isize) }, 16),
         }
     }
 }
@@ -72,7 +72,7 @@ pub struct BlockedThread(jmp_buf, Thread);
 struct SchedulerState {
     current: Thread,
     threads: VecDeque<BlockedThread>,
-    garbage_stacks: Vec<&'static mut [u8]>
+    garbage_stacks: Vec<&'static mut [u8]>,
 }
 
 impl Drop for SchedulerState {
@@ -80,7 +80,7 @@ impl Drop for SchedulerState {
         let garbage_stacks = mem::replace(&mut self.garbage_stacks, Vec::new());
 
         for stack in garbage_stacks {
-            unsafe { heap::deallocate(stack.as_mut_ptr(), stack.len(), 16) };
+            unsafe { alloc_mod::dealloc(stack.as_mut_ptr(), Layout::from_size_align_unchecked(stack.len(), 16)) };
         }
     }
 }
@@ -91,7 +91,7 @@ pub fn with_scheduler<F: FnOnce()>(f: F) {
     let state = SchedulerState {
         current: Thread::new(idle_process.clone(), &mut []),
         threads: VecDeque::new(),
-        garbage_stacks: Vec::new()
+        garbage_stacks: Vec::new(),
     };
 
     let _d = SCHEDULER.register(Mutex::new(state));
@@ -104,7 +104,9 @@ fn current_sched() -> &'static Mutex<SchedulerState> {
 }
 
 macro_rules! lock_sched {
-    () => (lock!(current_sched()))
+    () => {
+        lock!(current_sched())
+    };
 }
 
 pub fn try_current_process() -> Option<Arc<Process>> {
@@ -130,7 +132,10 @@ pub fn block<Park: FnOnce(BlockedThread)>(park: Park) -> bool {
 
                 move |old_jmp_buf| {
                     park(BlockedThread(old_jmp_buf, old_current));
-                    assert!(cpu::interrupts_enabled(), "current thread is holding a spinlock and it's about to be blocked");
+                    assert!(
+                        cpu::interrupts_enabled(),
+                        "current thread is holding a spinlock and it's about to be blocked"
+                    );
                     unsafe {
                         new_token.switch();
                         libc::longjmp(&new_jmp_buf, 1)
@@ -140,11 +145,14 @@ pub fn block<Park: FnOnce(BlockedThread)>(park: Park) -> bool {
 
             match setjmp() {
                 Some(old_jmp_buf) => switch(old_jmp_buf),
-                None => { mem::forget(switch); true }
+                None => {
+                    mem::forget(switch);
+                    true
+                }
             }
-        },
+        }
 
-        None => false
+        None => false,
     }
 }
 
@@ -171,10 +179,10 @@ pub fn exit(code: i32) -> ! {
     panic!("exit: no more threads")
 }
 
-fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) -> Deferred<i32> {
+fn spawn_inner<'a>(process: Arc<Process>, start: Box<dyn FnOnce() + 'a>) -> Deferred<i32> {
     let stack_len = 4096;
-    let stack_base_ptr = unsafe { heap::allocate(stack_len, 16) };
-    let b: Box<FnBox() + 'a> = Box::new(start);
+    let stack_base_ptr = unsafe { alloc_mod::alloc_zeroed(Layout::from_size_align_unchecked(stack_len, 16)) };
+    let b: Box<dyn FnOnce() + 'a> = Box::new(start);
     let jmp_buf = thread::new_jmp_buf(b, unsafe { stack_base_ptr.offset(stack_len as isize) });
     let thread = Thread::new(process, unsafe { slice::from_raw_parts_mut(stack_base_ptr, stack_len) });
     let exited = thread.exited.clone();
@@ -182,19 +190,21 @@ fn spawn_inner<'a>(process: Arc<Process>, start: Box<FnBox() + 'a>) -> Deferred<
     exited
 }
 
-pub fn spawn_remote<T>(process: Arc<Process>, start: T) -> Deferred<i32> where T : FnOnce() -> i32 {
-    let start = || { exit(start()) };
+pub fn spawn_remote<'a, T>(process: Arc<Process>, start: T) -> Deferred<i32>
+where
+    T: FnOnce() -> i32 + 'a,
+{
+    let start = || exit(start());
     spawn_inner(process, Box::new(start))
 }
 
-pub fn spawn<T : 'static + FnOnce() -> i32 + Send>(start: T) -> Deferred<i32> {
+pub fn spawn<'a, T: FnOnce() -> i32 + Send + 'a>(start: T) -> Deferred<i32> {
     let process = lock_sched!().current.process.clone();
     spawn_remote(process, start)
 }
 
 #[cfg(feature = "test")]
 pub mod test {
-    use prelude::*;
     use super::*;
 
     test! {

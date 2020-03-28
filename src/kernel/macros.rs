@@ -1,6 +1,6 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * macros.rs
  * - Macros used by the kernel
@@ -17,9 +17,8 @@ macro_rules! log{
 	( $($arg:tt)* ) => ({
 		// Import the Writer trait (required by write!)
 		use core::fmt::Write;
-        let mut writer = ::logging::Writer::get(module_path!());
+        let mut writer = crate::logging::Writer::get(module_path!());
 		let _ = write!(&mut writer, $($arg)*);
         let _ = writer.write_str("\n");
 	})
 }
-

@@ -1,12 +1,15 @@
 #![feature(link_args)]
+#![feature(rustc_private)]
 #![feature(start)]
 
+extern crate alloc_system;
 extern crate os;
+extern crate rt;
 extern crate syscall;
 
 use os::Process;
-use syscall::{ErrNum,Result};
-use syscall::libc_helpers::{stdin,stdout};
+use syscall::libc_helpers::{stdin, stdout};
+use syscall::{ErrNum, Result};
 
 fn read_line() -> Result<String> {
     let mut v = Vec::new();
@@ -26,7 +29,7 @@ fn read_line() -> Result<String> {
 }
 
 fn run() -> Result<()> {
-    let inherit = unsafe { [ stdin, stdout ] };
+    let inherit = unsafe { [stdin, stdout] };
     loop {
         print!("> ");
 
@@ -48,9 +51,10 @@ fn run() -> Result<()> {
     }
 }
 
-#[cfg_attr(target_arch = "x86_64", link_args = "-T ../../libsyscall/arch/amd64/link.ld")]
-extern {
-}
+#[cfg(target_arch = "x86_64")]
+#[allow(unused_attributes)]
+#[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
+extern "C" {}
 
 #[start]
 #[no_mangle]

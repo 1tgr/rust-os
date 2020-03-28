@@ -1,8 +1,8 @@
-use arch;
+use crate::arch;
 use core::cell::UnsafeCell;
 use core::marker::Sync;
-use core::ops::{Drop, Deref, DerefMut};
-use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use core::ops::{Deref, DerefMut, Drop};
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// This type provides MUTual EXclusion based on spinning.
 ///
@@ -73,8 +73,7 @@ use core::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 /// let answer = { *spin_mutex.lock() };
 /// assert_eq!(answer, numthreads);
 /// ```
-pub struct Mutex<T>
-{
+pub struct Mutex<T> {
     lock: AtomicUsize,
     data: UnsafeCell<T>,
 }
@@ -82,15 +81,14 @@ pub struct Mutex<T>
 /// A guard to which the protected data can be accessed
 ///
 /// When the guard falls out of scope it will release the lock.
-pub struct MutexGuard<'a, T:'a>
-{
+pub struct MutexGuard<'a, T: 'a> {
     lock: &'a AtomicUsize,
     token: usize,
     data: &'a mut T,
 }
 
-unsafe impl<T: Send> Send for Mutex<T> { }
-unsafe impl<T: Send> Sync for Mutex<T> { }
+unsafe impl<T: Send> Send for Mutex<T> {}
+unsafe impl<T: Send> Sync for Mutex<T> {}
 
 /// A Mutex which may be used statically.
 ///
@@ -109,28 +107,23 @@ pub type StaticMutex = Mutex<()>;
 
 /// A initializer for StaticMutex, containing no data.
 pub const STATIC_MUTEX_INIT: StaticMutex = Mutex {
-    lock: ATOMIC_USIZE_INIT,
+    lock: AtomicUsize::new(0),
     data: UnsafeCell::new(()),
 };
 
-impl<T> Mutex<T>
-{
+impl<T> Mutex<T> {
     /// Creates a new spinlock wrapping the supplied data.
-    pub fn new(user_data: T) -> Mutex<T>
-    {
-        Mutex
-        {
-            lock: ATOMIC_USIZE_INIT,
+    pub fn new(user_data: T) -> Mutex<T> {
+        Mutex {
+            lock: AtomicUsize::new(0),
             data: UnsafeCell::new(user_data),
         }
     }
 
-    fn obtain_lock(&self, file_line: *const (&'static str, u32)) -> usize
-    {
+    fn obtain_lock(&self, file_line: *const (&'static str, u32)) -> usize {
         let token = arch::disable_interrupts();
         let null = 0;
-        while self.lock.compare_and_swap(null, file_line as usize, Ordering::SeqCst) != null
-        {
+        while self.lock.compare_and_swap(null, file_line as usize, Ordering::SeqCst) != null {
             // Do nothing
         }
         token
@@ -151,13 +144,11 @@ impl<T> Mutex<T>
     /// }
     ///
     /// ```
-    pub fn lock(&self, file_line: &'static (&'static str, u32)) -> MutexGuard<T>
-    {
+    pub fn lock(&self, file_line: &'static (&'static str, u32)) -> MutexGuard<T> {
         let token = self.obtain_lock(file_line);
-        MutexGuard
-        {
+        MutexGuard {
             lock: &self.lock,
-            token: token,
+            token,
             data: unsafe { &mut *self.data.get() },
         }
     }
@@ -177,22 +168,22 @@ impl<T> Mutex<T>
     }
 }
 
-impl<'a, T> Deref for MutexGuard<'a, T>
-{
+impl<'a, T> Deref for MutexGuard<'a, T> {
     type Target = T;
-    fn deref<'b>(&'b self) -> &'b T { &*self.data }
+    fn deref<'b>(&'b self) -> &'b T {
+        &*self.data
+    }
 }
 
-impl<'a, T> DerefMut for MutexGuard<'a, T>
-{
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self.data }
+impl<'a, T> DerefMut for MutexGuard<'a, T> {
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T {
+        &mut *self.data
+    }
 }
 
-impl<'a, T> Drop for MutexGuard<'a, T>
-{
+impl<'a, T> Drop for MutexGuard<'a, T> {
     /// The dropping of the MutexGuard will release the lock it was created from.
-    fn drop(&mut self)
-    {
+    fn drop(&mut self) {
         self.lock.store(0, Ordering::SeqCst);
         arch::restore_interrupts(self.token);
     }
@@ -200,8 +191,8 @@ impl<'a, T> Drop for MutexGuard<'a, T>
 
 #[macro_export]
 macro_rules! lock {
-    ($mutex:expr) => ({
+    ($mutex:expr) => {{
         static FILE_LINE: (&'static str, u32) = (file!(), line!());
         $mutex.lock(&FILE_LINE)
-    })
+    }};
 }

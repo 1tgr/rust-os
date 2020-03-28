@@ -1,0 +1,13 @@
+version: "3.2"
+
+services:
+  test:
+    image: 1tgr/rust-os
+    build: .
+    command: make -C src test
+    environment:
+      CARGO_HOME: /build/cache/.cargo
+      XARGO_HOME: /build/cache/.xargo
+    volumes:
+    - ./cache:/build/cache
+    - ./src:/build/src

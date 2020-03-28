@@ -1,19 +1,19 @@
-use arch::cpu;
+use crate::arch::cpu;
+use crate::io;
+use crate::kobj::KObj;
+use crate::logging::Writer;
+use crate::phys_mem;
+use crate::spin::Mutex;
 use core::fmt::Write;
 use core::intrinsics;
 use core::str;
-use io;
-use kobj::KObj;
-use logging::Writer;
-use phys_mem;
-use spin::Mutex;
 use syscall::Result;
 
 struct VgaState {
     base_ptr: *mut u16,
     ptr: *mut u16,
     row: isize,
-    col: isize
+    col: isize,
 }
 
 impl VgaState {
@@ -21,10 +21,10 @@ impl VgaState {
         let base_ptr = unsafe { phys_mem::phys2virt::<u16>(0xb8000) as *mut u16 };
 
         let state = VgaState {
-            base_ptr: base_ptr,
+            base_ptr,
             ptr: base_ptr,
             row: 0,
-            col: 0
+            col: 0,
         };
 
         let mut ptr = base_ptr;
@@ -78,7 +78,9 @@ impl VgaState {
         match b {
             10 => self.newline(),
             _ => {
-                unsafe { *self.ptr = 0x1700 | (b as u16); }
+                unsafe {
+                    *self.ptr = 0x1700 | (b as u16);
+                }
 
                 self.col += 1;
 
@@ -120,7 +122,7 @@ impl io::Write for Vga {
 }
 
 impl KObj for Vga {
-    fn write(&self) -> Option<&io::Write> {
+    fn write(&self) -> Option<&dyn io::Write> {
         Some(self)
     }
 }

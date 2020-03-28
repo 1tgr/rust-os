@@ -1,10 +1,11 @@
-#![feature(collections)]
-#![feature(const_fn)]
+#![feature(rustc_private)]
 
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 
+extern crate alloc;
 extern crate cairo;
-extern crate collections;
+extern crate core;
 extern crate corepack;
 extern crate os;
 extern crate serde;
@@ -20,11 +21,11 @@ mod ipc;
 mod types;
 mod widget;
 
-pub use client::*;
-pub use frame_buffer::*;
-pub use ipc::*;
-pub use types::*;
-pub use widget::*;
+pub use crate::client::*;
+pub use crate::frame_buffer::*;
+pub use crate::ipc::*;
+pub use crate::types::*;
+pub use crate::widget::*;
 
 #[cfg(feature = "test")]
 pub const TEST_FIXTURES: &'static [testlite::Fixture] = &[

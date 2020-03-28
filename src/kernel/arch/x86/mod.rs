@@ -1,6 +1,6 @@
 /*
  * Rust BareBones OS
- * - By John Hodge (Mutabah/thePowersGang) 
+ * - By John Hodge (Mutabah/thePowersGang)
  *
  * arch/x86/mod.rs
  * - Top-level file for x86 architecture
@@ -15,12 +15,8 @@
 pub mod debug;
 
 #[no_mangle]
-pub fn x86_prep_page_table(buf: &mut [u32; 1024])
-{
-	for i in 0u32 .. 1024
-	{
-		buf[i as usize] = i * 0x1000 + 3;
-	}
+pub fn x86_prep_page_table(buf: &mut [u32; 1024]) {
+    for i in 0u32..1024 {
+        buf[i as usize] = i * 0x1000 + 3;
+    }
 }
-
-

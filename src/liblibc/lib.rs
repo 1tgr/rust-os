@@ -11,11 +11,13 @@
 #![crate_name = "libc"]
 #![crate_type = "rlib"]
 #![no_std]
-#![doc(html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
-       html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
-       html_root_url = "https://doc.rust-lang.org/nightly/",
-       html_playground_url = "https://play.rust-lang.org/",
-       issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/")]
+#![doc(
+    html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
+    html_favicon_url = "https://doc.rust-lang.org/favicon.ico",
+    html_root_url = "https://doc.rust-lang.org/nightly/",
+    html_playground_url = "https://play.rust-lang.org/",
+    issue_tracker_base_url = "https://github.com/rust-lang/rust/issues/"
+)]
 #![cfg_attr(test, feature(test))]
 
 //! Bindings for the C standard library and other platform libraries
@@ -72,28 +74,30 @@
 
 #![allow(bad_style)]
 #![cfg_attr(target_os = "nacl", allow(unused_imports))]
-#[cfg(feature = "cargo-build")] extern crate std as core;
+#[cfg(feature = "cargo-build")]
+extern crate std as core;
 
-#[cfg(test)] extern crate std;
-#[cfg(test)] extern crate test;
+#[cfg(test)]
+extern crate std;
+#[cfg(test)]
+extern crate test;
 
 #[link(name = "c")]
-extern {
-}
+extern "C" {}
 
 // Explicit export lists for the intersection (provided here) mean that
 // you can write more-platform-agnostic code if you stick to just these
 // symbols.
 
-pub use funcs::c95::stdlib::*;
-pub use types::common::c95::*;
-pub use types::common::c99::*;
-pub use types::common::posix88::*;
-pub use types::os::arch::c95::*;
-pub use types::os::arch::c99::*;
-pub use types::os::arch::posix88::*;
-pub use types::os::arch::posix01::*;
-pub use types::os::arch::extra::*;
+pub use crate::funcs::c95::stdlib::*;
+pub use crate::types::common::c95::*;
+pub use crate::types::common::c99::*;
+pub use crate::types::common::posix88::*;
+pub use crate::types::os::arch::c95::*;
+pub use crate::types::os::arch::c99::*;
+pub use crate::types::os::arch::extra::*;
+pub use crate::types::os::arch::posix01::*;
+pub use crate::types::os::arch::posix88::*;
 
 // But we also reexport most everything
 // if you're interested in writing platform-specific code.
@@ -159,9 +163,8 @@ pub mod types {
     pub mod os {
         pub mod common {
             pub mod posix01 {
-                use types::common::c95::{c_void};
-                use types::os::arch::c95::{c_char, c_ulong, size_t,
-                                                 time_t, suseconds_t, c_long};
+                use crate::types::common::c95::c_void;
+                use crate::types::os::arch::c95::{c_char, c_long, c_ulong, size_t, suseconds_t, time_t};
 
                 #[cfg(not(target_os = "nacl"))]
                 pub type pthread_t = c_ulong;
@@ -170,10 +173,11 @@ pub mod types {
                 pub type rlim_t = u64;
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct glob_t {
+                #[derive(Copy, Clone)]
+                pub struct glob_t {
                     pub gl_pathc: size_t,
                     pub gl_pathv: *mut *mut c_char,
-                    pub gl_offs:  size_t,
+                    pub gl_offs: size_t,
 
                     pub __unused1: *mut c_void,
                     pub __unused2: *mut c_void,
@@ -183,13 +187,15 @@ pub mod types {
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct timeval {
+                #[derive(Copy, Clone)]
+                pub struct timeval {
                     pub tv_sec: time_t,
                     pub tv_usec: suseconds_t,
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct timespec {
+                #[derive(Copy, Clone)]
+                pub struct timespec {
                     pub tv_sec: time_t,
                     pub tv_nsec: c_long,
                 }
@@ -207,8 +213,8 @@ pub mod types {
             }
 
             pub mod bsd43 {
-                use types::os::common::posix01::timeval;
-                use types::os::arch::c95::c_long;
+                use crate::types::os::arch::c95::c_long;
+                use crate::types::os::common::posix01::timeval;
                 // This is also specified in POSIX 2001, but only has two fields. All implementors
                 // implement BSD 4.3 version.
                 #[repr(C)]
@@ -229,25 +235,27 @@ pub mod types {
                     pub ru_msgrcv: c_long,
                     pub ru_nsignals: c_long,
                     pub ru_nvcsw: c_long,
-                    pub ru_nivcsw: c_long
+                    pub ru_nivcsw: c_long,
                 }
             }
 
             pub mod bsd44 {
-                use types::common::c95::{c_void};
-                use types::os::arch::c95::{c_char, c_int, c_uint};
+                use crate::types::common::c95::c_void;
+                use crate::types::os::arch::c95::{c_char, c_int, c_uint};
 
                 pub type socklen_t = u32;
                 pub type sa_family_t = u16;
                 pub type in_port_t = u16;
                 pub type in_addr_t = u32;
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct sockaddr {
+                #[derive(Copy, Clone)]
+                pub struct sockaddr {
                     pub sa_family: sa_family_t,
                     pub sa_data: [u8; 14],
                 }
                 #[repr(C)]
-                #[derive(Copy)] pub struct sockaddr_storage {
+                #[derive(Copy)]
+                pub struct sockaddr_storage {
                     pub ss_family: sa_family_t,
                     pub __ss_align: isize,
                     #[cfg(target_pointer_width = "32")]
@@ -256,21 +264,26 @@ pub mod types {
                     pub __ss_pad2: [u8; 128 - 2 * 8],
                 }
                 impl ::core::clone::Clone for sockaddr_storage {
-                    fn clone(&self) -> sockaddr_storage { *self }
+                    fn clone(&self) -> sockaddr_storage {
+                        *self
+                    }
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct sockaddr_in {
+                #[derive(Copy, Clone)]
+                pub struct sockaddr_in {
                     pub sin_family: sa_family_t,
                     pub sin_port: in_port_t,
                     pub sin_addr: in_addr,
                     pub sin_zero: [u8; 8],
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct in_addr {
+                #[derive(Copy, Clone)]
+                pub struct in_addr {
                     pub s_addr: in_addr_t,
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct sockaddr_in6 {
+                #[derive(Copy, Clone)]
+                pub struct sockaddr_in6 {
                     pub sin6_family: sa_family_t,
                     pub sin6_port: in_port_t,
                     pub sin6_flowinfo: u32,
@@ -278,21 +291,25 @@ pub mod types {
                     pub sin6_scope_id: u32,
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct in6_addr {
-                    pub s6_addr: [u16; 8]
+                #[derive(Copy, Clone)]
+                pub struct in6_addr {
+                    pub s6_addr: [u16; 8],
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct ip_mreq {
+                #[derive(Copy, Clone)]
+                pub struct ip_mreq {
                     pub imr_multiaddr: in_addr,
                     pub imr_interface: in_addr,
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct ip6_mreq {
+                #[derive(Copy, Clone)]
+                pub struct ip6_mreq {
                     pub ipv6mr_multiaddr: in6_addr,
                     pub ipv6mr_interface: c_uint,
                 }
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct addrinfo {
+                #[derive(Copy, Clone)]
+                pub struct addrinfo {
                     pub ai_flags: c_int,
                     pub ai_family: c_int,
                     pub ai_socktype: c_int,
@@ -314,34 +331,39 @@ pub mod types {
                     pub ai_next: *mut addrinfo,
                 }
                 #[repr(C)]
-                #[derive(Copy)] pub struct sockaddr_un {
+                #[derive(Copy)]
+                pub struct sockaddr_un {
                     pub sun_family: sa_family_t,
-                    pub sun_path: [c_char; 108]
+                    pub sun_path: [c_char; 108],
                 }
                 impl ::core::clone::Clone for sockaddr_un {
-                    fn clone(&self) -> sockaddr_un { *self }
+                    fn clone(&self) -> sockaddr_un {
+                        *self
+                    }
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct ifaddrs {
+                #[derive(Copy, Clone)]
+                pub struct ifaddrs {
                     pub ifa_next: *mut ifaddrs,
                     pub ifa_name: *mut c_char,
                     pub ifa_flags: c_uint,
                     pub ifa_addr: *mut sockaddr,
                     pub ifa_netmask: *mut sockaddr,
                     pub ifa_ifu: *mut sockaddr, // FIXME This should be a union
-                    pub ifa_data: *mut c_void
+                    pub ifa_data: *mut c_void,
                 }
-
             }
         }
 
-        #[cfg(any(target_arch = "x86",
-                  target_arch = "arm",
-                  target_arch = "mips",
-                  target_arch = "mipsel",
-                  target_arch = "powerpc",
-                  target_arch = "le32"))]
+        #[cfg(any(
+            target_arch = "x86",
+            target_arch = "arm",
+            target_arch = "mips",
+            target_arch = "mipsel",
+            target_arch = "powerpc",
+            target_arch = "le32"
+        ))]
         pub mod arch {
             pub mod c95 {
                 pub type c_char = i8;
@@ -370,12 +392,13 @@ pub mod types {
                 pub type intmax_t = i64;
                 pub type uintmax_t = u64;
             }
-            #[cfg(any(target_arch = "mips",
-                      target_arch = "mipsel",
-                      target_arch = "powerpc",
-                      target_arch = "le32",
-                      all(any(target_arch = "arm", target_arch = "x86"),
-                          not(target_os = "android"))))]
+            #[cfg(any(
+                target_arch = "mips",
+                target_arch = "mipsel",
+                target_arch = "powerpc",
+                target_arch = "le32",
+                all(any(target_arch = "arm", target_arch = "x86"), not(target_os = "android"))
+            ))]
             pub mod posix88 {
                 pub type off_t = i32;
                 pub type dev_t = u64;
@@ -387,8 +410,7 @@ pub mod types {
                 pub type mode_t = u32;
                 pub type ssize_t = i32;
             }
-            #[cfg(all(any(target_arch = "arm", target_arch = "x86"),
-                      target_os = "android"))]
+            #[cfg(all(any(target_arch = "arm", target_arch = "x86"), target_os = "android"))]
             pub mod posix88 {
                 pub type off_t = i32;
                 pub type dev_t = u32;
@@ -402,22 +424,24 @@ pub mod types {
                 pub type mode_t = u16;
                 pub type ssize_t = i32;
             }
-            #[cfg(any(all(any(target_arch = "arm", target_arch = "x86"),
-                          not(target_os = "android")),
-                      target_arch = "le32",
-                      target_arch = "powerpc"))]
+            #[cfg(any(
+                all(any(target_arch = "arm", target_arch = "x86"), not(target_os = "android")),
+                target_arch = "le32",
+                target_arch = "powerpc"
+            ))]
             pub mod posix01 {
-                use types::os::arch::c95::{c_short, c_long, time_t};
+                use types::os::arch::c95::{c_long, c_short, time_t};
+                use types::os::arch::posix88::uid_t;
                 use types::os::arch::posix88::{dev_t, gid_t, ino_t};
                 use types::os::arch::posix88::{mode_t, off_t};
-                use types::os::arch::posix88::{uid_t};
 
                 pub type nlink_t = u32;
                 pub type blksize_t = i32;
                 pub type blkcnt_t = i32;
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct stat {
+                #[derive(Copy, Clone)]
+                pub struct stat {
                     pub st_dev: dev_t,
                     pub __pad1: c_short,
                     pub st_ino: ino_t,
@@ -441,30 +465,32 @@ pub mod types {
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct utimbuf {
+                #[derive(Copy, Clone)]
+                pub struct utimbuf {
                     pub actime: time_t,
                     pub modtime: time_t,
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct pthread_attr_t {
-                    pub __size: [u32; 9]
+                #[derive(Copy, Clone)]
+                pub struct pthread_attr_t {
+                    pub __size: [u32; 9],
                 }
             }
 
-            #[cfg(all(any(target_arch = "arm", target_arch = "x86"),
-                      target_os = "android"))]
+            #[cfg(all(any(target_arch = "arm", target_arch = "x86"), target_os = "android"))]
             pub mod posix01 {
-                use types::os::arch::c95::{c_uchar, c_uint, c_ulong, c_long, time_t};
+                use types::os::arch::c95::{c_long, c_uchar, c_uint, c_ulong, time_t};
                 use types::os::arch::c99::{c_longlong, c_ulonglong};
-                use types::os::arch::posix88::{uid_t, gid_t};
+                use types::os::arch::posix88::{gid_t, uid_t};
 
                 pub type nlink_t = u16;
                 pub type blksize_t = u32;
                 pub type blkcnt_t = u32;
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct stat {
+                #[derive(Copy, Clone)]
+                pub struct stat {
                     pub st_dev: c_ulonglong,
                     pub __pad0: [c_uchar; 4],
                     pub __st_ino: c_long,
@@ -487,31 +513,33 @@ pub mod types {
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct utimbuf {
+                #[derive(Copy, Clone)]
+                pub struct utimbuf {
                     pub actime: time_t,
                     pub modtime: time_t,
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct pthread_attr_t {
-                    pub __size: [u32; 9]
+                #[derive(Copy, Clone)]
+                pub struct pthread_attr_t {
+                    pub __size: [u32; 9],
                 }
             }
 
-            #[cfg(any(target_arch = "mips",
-                      target_arch = "mipsel"))]
+            #[cfg(any(target_arch = "mips", target_arch = "mipsel"))]
             pub mod posix01 {
                 use types::os::arch::c95::{c_long, c_ulong, time_t};
+                use types::os::arch::posix88::uid_t;
                 use types::os::arch::posix88::{gid_t, ino_t};
                 use types::os::arch::posix88::{mode_t, off_t};
-                use types::os::arch::posix88::{uid_t};
 
                 pub type nlink_t = u32;
                 pub type blksize_t = i32;
                 pub type blkcnt_t = i32;
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct stat {
+                #[derive(Copy, Clone)]
+                pub struct stat {
                     pub st_dev: c_ulong,
                     pub st_pad1: [c_long; 3],
                     pub st_ino: ino_t,
@@ -535,36 +563,37 @@ pub mod types {
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct utimbuf {
+                #[derive(Copy, Clone)]
+                pub struct utimbuf {
                     pub actime: time_t,
                     pub modtime: time_t,
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct pthread_attr_t {
-                    pub __size: [u32; 9]
+                #[derive(Copy, Clone)]
+                pub struct pthread_attr_t {
+                    pub __size: [u32; 9],
                 }
             }
             pub mod posix08 {}
             pub mod bsd44 {}
             pub mod extra {
-                use types::os::arch::c95::{c_ushort, c_int, c_uchar};
+                use types::os::arch::c95::{c_int, c_uchar, c_ushort};
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct sockaddr_ll {
+                #[derive(Copy, Clone)]
+                pub struct sockaddr_ll {
                     pub sll_family: c_ushort,
                     pub sll_protocol: c_ushort,
                     pub sll_ifindex: c_int,
                     pub sll_hatype: c_ushort,
                     pub sll_pkttype: c_uchar,
                     pub sll_halen: c_uchar,
-                    pub sll_addr: [c_uchar; 8]
+                    pub sll_addr: [c_uchar; 8],
                 }
             }
-
         }
 
-        #[cfg(any(target_arch = "x86_64",
-                  target_arch = "aarch64"))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
         pub mod arch {
             pub mod c95 {
                 #[cfg(not(target_arch = "aarch64"))]
@@ -607,9 +636,8 @@ pub mod types {
                     pub r14: i64,
                     pub r15: i64,
                     pub rsp: i64,
-                    pub rip: i64
+                    pub rip: i64,
                 }
-
             }
             pub mod c99 {
                 pub type c_longlong = i64;
@@ -632,17 +660,18 @@ pub mod types {
             }
             #[cfg(not(target_arch = "aarch64"))]
             pub mod posix01 {
-                use types::os::arch::c95::{c_int, c_long, time_t};
-                use types::os::arch::posix88::{dev_t, gid_t, ino_t};
-                use types::os::arch::posix88::{mode_t, off_t};
-                use types::os::arch::posix88::{uid_t};
+                use crate::types::os::arch::c95::{c_int, c_long, time_t};
+                use crate::types::os::arch::posix88::uid_t;
+                use crate::types::os::arch::posix88::{dev_t, gid_t, ino_t};
+                use crate::types::os::arch::posix88::{mode_t, off_t};
 
                 pub type nlink_t = u64;
                 pub type blksize_t = i64;
                 pub type blkcnt_t = i64;
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct stat {
+                #[derive(Copy, Clone)]
+                pub struct stat {
                     pub st_dev: dev_t,
                     pub st_ino: ino_t,
                     pub st_nlink: nlink_t,
@@ -664,29 +693,32 @@ pub mod types {
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct utimbuf {
+                #[derive(Copy, Clone)]
+                pub struct utimbuf {
                     pub actime: time_t,
                     pub modtime: time_t,
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct pthread_attr_t {
-                    pub __size: [u64; 7]
+                #[derive(Copy, Clone)]
+                pub struct pthread_attr_t {
+                    pub __size: [u64; 7],
                 }
             }
             #[cfg(target_arch = "aarch64")]
             pub mod posix01 {
                 use types::os::arch::c95::{c_int, c_long, time_t};
+                use types::os::arch::posix88::uid_t;
                 use types::os::arch::posix88::{dev_t, gid_t, ino_t};
                 use types::os::arch::posix88::{mode_t, off_t};
-                use types::os::arch::posix88::{uid_t};
 
                 pub type nlink_t = u32;
                 pub type blksize_t = i32;
                 pub type blkcnt_t = i64;
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct stat {
+                #[derive(Copy, Clone)]
+                pub struct stat {
                     pub st_dev: dev_t,
                     pub st_ino: ino_t,
                     pub st_mode: mode_t,
@@ -709,30 +741,31 @@ pub mod types {
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct utimbuf {
+                #[derive(Copy, Clone)]
+                pub struct utimbuf {
                     pub actime: time_t,
                     pub modtime: time_t,
                 }
 
                 #[repr(C)]
-                #[derive(Copy, Clone)] pub struct pthread_attr_t {
-                    pub __size: [u64; 8]
+                #[derive(Copy, Clone)]
+                pub struct pthread_attr_t {
+                    pub __size: [u64; 8],
                 }
             }
-            pub mod posix08 {
-            }
-            pub mod bsd44 {
-            }
+            pub mod posix08 {}
+            pub mod bsd44 {}
             pub mod extra {
-                use types::os::arch::c95::{c_ushort, c_int, c_uchar};
-                #[derive(Copy, Clone)] pub struct sockaddr_ll {
+                use crate::types::os::arch::c95::{c_int, c_uchar, c_ushort};
+                #[derive(Copy, Clone)]
+                pub struct sockaddr_ll {
                     pub sll_family: c_ushort,
                     pub sll_protocol: c_ushort,
                     pub sll_ifindex: c_int,
                     pub sll_hatype: c_ushort,
                     pub sll_pkttype: c_uchar,
                     pub sll_halen: c_uchar,
-                    pub sll_addr: [c_uchar; 8]
+                    pub sll_addr: [c_uchar; 8],
                 }
             }
         }
@@ -742,10 +775,10 @@ pub mod types {
 pub mod funcs {
     pub mod c95 {
         pub mod stdlib {
-            use types::common::c95::{c_void};
-            use types::os::arch::c95::{jmp_buf,size_t,c_int};
+            use crate::types::common::c95::c_void;
+            use crate::types::os::arch::c95::{c_int, jmp_buf, size_t};
 
-            extern {
+            extern "C" {
                 pub fn malloc(size: size_t) -> *mut c_void;
                 pub fn realloc(p: *mut c_void, size: size_t) -> *mut c_void;
                 pub fn free(p: *mut c_void);

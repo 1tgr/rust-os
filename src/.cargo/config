@@ -1,3 +1,6 @@
+[build]
+target = "../libsyscall/arch/amd64.json"
+
 [target.amd64.cairo]
 rustc-link-search = ["../cairo/lib", "../liblibc/arch/amd64"]
 

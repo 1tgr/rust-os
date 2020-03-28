@@ -23,10 +23,14 @@ pub struct Struct_multiboot_header {
     pub depth: multiboot_uint32_t,
 }
 impl Clone for Struct_multiboot_header {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_header {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -37,10 +41,14 @@ pub struct Struct_multiboot_aout_symbol_table {
     pub reserved: multiboot_uint32_t,
 }
 impl Clone for Struct_multiboot_aout_symbol_table {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_aout_symbol_table {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 pub type multiboot_aout_symbol_table_t = Struct_multiboot_aout_symbol_table;
 #[repr(C)]
@@ -52,13 +60,16 @@ pub struct Struct_multiboot_elf_section_header_table {
     pub shndx: multiboot_uint32_t,
 }
 impl Clone for Struct_multiboot_elf_section_header_table {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_elf_section_header_table {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
-pub type multiboot_elf_section_header_table_t =
-    Struct_multiboot_elf_section_header_table;
+pub type multiboot_elf_section_header_table_t = Struct_multiboot_elf_section_header_table;
 #[repr(C)]
 #[derive(Copy)]
 pub struct Struct_multiboot_info {
@@ -92,52 +103,48 @@ pub struct Struct_multiboot_info {
     pub _bindgen_data_1_: [u32; 2usize],
 }
 impl Struct_multiboot_info {
-    pub unsafe fn framebuffer_palette_addr(&mut self)
-     -> *mut multiboot_uint32_t {
+    pub unsafe fn framebuffer_palette_addr(&mut self) -> *mut multiboot_uint32_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(0))
     }
-    pub unsafe fn framebuffer_palette_num_colors(&mut self)
-     -> *mut multiboot_uint16_t {
+    pub unsafe fn framebuffer_palette_num_colors(&mut self) -> *mut multiboot_uint16_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(4))
     }
-    pub unsafe fn framebuffer_red_field_position(&mut self)
-     -> *mut multiboot_uint8_t {
+    pub unsafe fn framebuffer_red_field_position(&mut self) -> *mut multiboot_uint8_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(0))
     }
-    pub unsafe fn framebuffer_red_mask_size(&mut self)
-     -> *mut multiboot_uint8_t {
+    pub unsafe fn framebuffer_red_mask_size(&mut self) -> *mut multiboot_uint8_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(1))
     }
-    pub unsafe fn framebuffer_green_field_position(&mut self)
-     -> *mut multiboot_uint8_t {
+    pub unsafe fn framebuffer_green_field_position(&mut self) -> *mut multiboot_uint8_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(2))
     }
-    pub unsafe fn framebuffer_green_mask_size(&mut self)
-     -> *mut multiboot_uint8_t {
+    pub unsafe fn framebuffer_green_mask_size(&mut self) -> *mut multiboot_uint8_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(3))
     }
-    pub unsafe fn framebuffer_blue_field_position(&mut self)
-     -> *mut multiboot_uint8_t {
+    pub unsafe fn framebuffer_blue_field_position(&mut self) -> *mut multiboot_uint8_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(4))
     }
-    pub unsafe fn framebuffer_blue_mask_size(&mut self)
-     -> *mut multiboot_uint8_t {
+    pub unsafe fn framebuffer_blue_mask_size(&mut self) -> *mut multiboot_uint8_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_1_);
         mem::transmute(raw.offset(5))
     }
 }
 impl Clone for Struct_multiboot_info {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_info {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 #[repr(C)]
 #[derive(Copy)]
@@ -149,17 +156,20 @@ impl Union_Unnamed1 {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_);
         mem::transmute(raw.offset(0))
     }
-    pub unsafe fn elf_sec(&mut self)
-     -> *mut multiboot_elf_section_header_table_t {
+    pub unsafe fn elf_sec(&mut self) -> *mut multiboot_elf_section_header_table_t {
         let raw: *mut u8 = mem::transmute(&self._bindgen_data_);
         mem::transmute(raw.offset(0))
     }
 }
 impl Clone for Union_Unnamed1 {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Union_Unnamed1 {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 pub type multiboot_info_t = Struct_multiboot_info;
 #[repr(C)]
@@ -170,10 +180,14 @@ pub struct Struct_multiboot_color {
     pub blue: multiboot_uint8_t,
 }
 impl Clone for Struct_multiboot_color {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_color {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 #[repr(C, packed)]
 #[derive(Copy)]
@@ -184,10 +198,14 @@ pub struct Struct_multiboot_mmap_entry {
     pub _type: multiboot_uint32_t,
 }
 impl Clone for Struct_multiboot_mmap_entry {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_mmap_entry {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 pub type multiboot_memory_map_t = Struct_multiboot_mmap_entry;
 #[repr(C)]
@@ -199,10 +217,14 @@ pub struct Struct_multiboot_mod_list {
     pub pad: multiboot_uint32_t,
 }
 impl Clone for Struct_multiboot_mod_list {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_mod_list {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }
 pub type multiboot_module_t = Struct_multiboot_mod_list;
 #[repr(C)]
@@ -219,8 +241,12 @@ pub struct Struct_multiboot_apm_info {
     pub dseg_len: multiboot_uint16_t,
 }
 impl Clone for Struct_multiboot_apm_info {
-    fn clone(&self) -> Self { *self }
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 impl Default for Struct_multiboot_apm_info {
-    fn default() -> Self { unsafe { mem::zeroed() } }
+    fn default() -> Self {
+        unsafe { mem::zeroed() }
+    }
 }

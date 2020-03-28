@@ -1,6 +1,6 @@
 use cairo;
 use cairo::surface::CairoSurface;
-use os::{Result,SharedMem};
+use os::{Result, SharedMem};
 
 pub struct FrameBuffer {
     width: f64,
@@ -10,7 +10,11 @@ pub struct FrameBuffer {
 
 impl FrameBuffer {
     pub fn new(width: f64, height: f64, shared_mem: SharedMem) -> Result<Self> {
-        let mut buffer = FrameBuffer { width, height, shared_mem, };
+        let mut buffer = FrameBuffer {
+            width,
+            height,
+            shared_mem,
+        };
         buffer.resize_shared_mem()?;
         Ok(buffer)
     }
@@ -42,7 +46,13 @@ impl FrameBuffer {
         let width = self.width_i();
         let height = self.height_i();
         let stride = self.stride();
-        CairoSurface::from_slice(&mut *self.shared_mem, cairo::bindings::CAIRO_FORMAT_ARGB32, width, height, stride)
+        CairoSurface::from_slice(
+            &mut *self.shared_mem,
+            cairo::bindings::CAIRO_FORMAT_ARGB32,
+            width,
+            height,
+            stride,
+        )
     }
 }
 

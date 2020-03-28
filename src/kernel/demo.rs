@@ -1,22 +1,20 @@
-use alloc::arc::Arc;
-use arch::cpu;
-use arch::keyboard::Keyboard;
-use arch::vga::Vga;
-use console::Console;
-use deferred::Deferred;
-use kobj::KObjRef;
-use ksyscall::{self,SyscallHandler};
-use prelude::*;
-use process;
-use thread;
+use crate::arch::cpu;
+use crate::arch::keyboard::Keyboard;
+use crate::arch::vga::Vga;
+use crate::console::Console;
+use crate::deferred::Deferred;
+use crate::kobj::KObjRef;
+use crate::ksyscall::{self, SyscallHandler};
+use crate::prelude::*;
+use crate::process;
+use crate::thread;
+use alloc::sync::Arc;
 
 impl<A> Deferred<A> {
     fn poll(mut self) -> A {
         loop {
             match self.try_get() {
-                Ok(result) => {
-                    return result
-                },
+                Ok(result) => return result,
 
                 Err(d) => {
                     thread::schedule();

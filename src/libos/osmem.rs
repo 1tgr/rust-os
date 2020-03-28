@@ -1,14 +1,14 @@
-use core::ops::{Deref,DerefMut};
-use core::ptr::Unique;
+use core::ops::{Deref, DerefMut};
+use core::ptr::NonNull;
 use core::slice;
 use syscall;
 
-pub struct OSMem(Unique<u8>, usize);
+pub struct OSMem(NonNull<u8>, usize);
 
 impl OSMem {
     pub unsafe fn from_raw(ptr: *mut u8, len: usize) -> Self {
         assert!(!ptr.is_null());
-        OSMem(Unique::new(ptr), len)
+        OSMem(NonNull::new_unchecked(ptr), len)
     }
 }
 

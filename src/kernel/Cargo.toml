@@ -2,6 +2,14 @@
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 name = "kernel"
 version = "0.0.0"
+edition = "2018"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+# debug-assertions = true
 
 [[bin]]
 name = "kernel"
@@ -14,8 +22,8 @@ test = []
 
 [dependencies]
 alloc_system = { path = "../liballoc_system" }
-bit-vec = { git = "https://github.com/1tgr/bit-vec", features = ["nightly"] }
-bitflags = "0.8.2"
-lazy_static = { version = "0.2.8", features = ["spin_no_std"] }
+bit-vec = { version = "0.6", default-features = false }
+bitflags = "1"
+lazy_static = { version = "1", features = ["spin_no_std"] }
 libc = { path = "../liblibc" }
 syscall = { path = "../libsyscall", features = ["kernel"] }

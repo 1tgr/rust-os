@@ -1,6 +1,7 @@
+use super::{OSHandle, Result};
 use core::cell::UnsafeCell;
-use core::ops::{Deref,DerefMut};
-use super::{OSHandle,Result};
+use core::marker::PhantomData;
+use core::ops::{Deref, DerefMut};
 use syscall;
 
 pub struct Mutex<T: ?Sized> {
@@ -8,8 +9,8 @@ pub struct Mutex<T: ?Sized> {
     data: UnsafeCell<T>,
 }
 
-unsafe impl<T: ?Sized + Send> Send for Mutex<T> { }
-unsafe impl<T: ?Sized + Send> Sync for Mutex<T> { }
+unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
+unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}
 
 impl<T> Mutex<T> {
     pub fn new(data: T) -> Result<Self> {
@@ -34,14 +35,14 @@ impl<T: ?Sized> Mutex<T> {
 #[must_use]
 pub struct MutexGuard<'mutex, T: ?Sized + 'mutex> {
     lock: &'mutex Mutex<T>,
+    _pd: PhantomData<*mut T>,
 }
 
-impl<'mutex, T: ?Sized> !Send for MutexGuard<'mutex, T> { }
-unsafe impl<'mutex, T: ?Sized + Sync> Sync for MutexGuard<'mutex, T> { }
+unsafe impl<'mutex, T: ?Sized + Sync> Sync for MutexGuard<'mutex, T> {}
 
 impl<'mutex, T: ?Sized> MutexGuard<'mutex, T> {
     fn new(lock: &'mutex Mutex<T>) -> Self {
-        MutexGuard { lock }
+        MutexGuard { lock, _pd: PhantomData }
     }
 }
 

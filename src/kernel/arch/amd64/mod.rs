@@ -35,9 +35,11 @@ pub fn restore_interrupts(token: usize) {
     }
 }
 
+#[allow(unused_attributes)]
 #[link_args = "-T arch/amd64/link.ld"]
 #[link_args = "-L arch/amd64"]
+extern "C" {}
+
 #[link(name = ":setjmp.o")]
 #[link(name = ":start.o")]
-extern {
-}
+extern "C" {}

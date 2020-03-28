@@ -6,6 +6,5 @@ pub use self::window::*;
 
 #[cfg(feature = "test")]
 pub mod test {
-    test! {
-    }
+    test! {}
 }

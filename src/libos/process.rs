@@ -1,5 +1,5 @@
-use super::{OSHandle,Result};
-use syscall::{self,Handle};
+use super::{OSHandle, Result};
+use syscall::{self, Handle};
 
 pub struct Process(OSHandle);
 
@@ -22,6 +22,9 @@ impl Process {
     }
 
     pub fn open_handle(&self, from_handle: usize) -> Result<OSHandle> {
-        Ok(OSHandle::from_raw(syscall::open_handle(self.handle().get(), from_handle)?))
+        Ok(OSHandle::from_raw(syscall::open_handle(
+            self.handle().get(),
+            from_handle,
+        )?))
     }
 }

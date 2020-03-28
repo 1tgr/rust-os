@@ -1,5 +1,5 @@
-use core::ops::{Deref,DerefMut};
-use super::{OSHandle,OSMem,Result};
+use super::{OSHandle, OSMem, Result};
+use core::ops::{Deref, DerefMut};
 use syscall;
 
 fn align_down(value: usize, round: usize) -> usize {
@@ -13,15 +13,15 @@ fn align_up(value: usize, round: usize) -> usize {
 pub struct SharedMem {
     handle: OSHandle,
     writable: bool,
-    ptr: Option<OSMem>
+    ptr: Option<OSMem>,
 }
 
 impl SharedMem {
     pub fn from_raw(handle: OSHandle, writable: bool) -> Self {
         SharedMem {
-            handle: handle,
-            writable: writable,
-            ptr: None
+            handle,
+            writable,
+            ptr: None,
         }
     }
 

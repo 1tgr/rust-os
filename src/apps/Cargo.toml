@@ -1,2 +1,0 @@
-[workspace]
-members = ["cairo_demo", "graphics_client", "graphics_server", "hello", "input"]

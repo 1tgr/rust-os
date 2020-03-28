@@ -1,13 +1,7 @@
 #![no_std]
-
-#![feature(alloc)]
-#![feature(collections)]
-#![feature(fnbox)]
 #![feature(optin_builtin_traits)]
-#![feature(unique)]
 
 extern crate alloc;
-extern crate collections;
 extern crate syscall;
 
 mod file;

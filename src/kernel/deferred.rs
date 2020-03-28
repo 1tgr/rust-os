@@ -1,24 +1,24 @@
-use alloc::arc::Arc;
-use collections::vec_deque::VecDeque;
+use crate::kobj::KObj;
+use crate::spin::Mutex;
+use crate::thread::{self, BlockedThread};
+use alloc::collections::vec_deque::VecDeque;
+use alloc::sync::Arc;
 use core::mem;
-use spin::Mutex;
-use kobj::KObj;
-use thread::{self,BlockedThread};
 
 struct DeferredState<A> {
     result: Option<A>,
-    waiters: VecDeque<BlockedThread>
+    waiters: VecDeque<BlockedThread>,
 }
 
 pub struct Deferred<A> {
-    state: Arc<Mutex<DeferredState<A>>>
+    state: Arc<Mutex<DeferredState<A>>>,
 }
 
 impl<A> Deferred<A> {
     pub fn new() -> Self {
         let dstate = Arc::new(Mutex::new(DeferredState {
             result: None,
-            waiters: VecDeque::new()
+            waiters: VecDeque::new(),
         }));
 
         Deferred { state: dstate }
@@ -28,7 +28,7 @@ impl<A> Deferred<A> {
         let mut dstate = lock!(self.state);
         match dstate.result {
             Some(_) => panic!("promise is already resolved"),
-            None => { }
+            None => {}
         }
 
         dstate.result = Some(result);
@@ -43,7 +43,9 @@ impl<A> Deferred<A> {
         loop {
             let mut dstate = lock!(self.state);
             match mem::replace(&mut dstate.result, None) {
-                Some(result) => { return result; },
+                Some(result) => {
+                    return result;
+                }
                 None => (),
             }
 
@@ -67,7 +69,9 @@ impl<A> Deferred<A> {
 
 impl<A> Clone for Deferred<A> {
     fn clone(&self) -> Self {
-        Deferred { state: self.state.clone() }
+        Deferred {
+            state: self.state.clone(),
+        }
     }
 }
 

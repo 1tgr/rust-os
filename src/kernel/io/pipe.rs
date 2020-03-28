@@ -1,25 +1,21 @@
-use collections::vec_deque::VecDeque;
+use crate::deferred::Deferred;
+use crate::io::{AsyncRead, Promise, Read, Write};
+use crate::kobj::KObj;
+use crate::prelude::*;
+use crate::spin::Mutex;
+use alloc::collections::vec_deque::VecDeque;
 use core::cmp;
-use deferred::Deferred;
-use io::{AsyncRead,Promise,Read,Write};
-use spin::Mutex;
-use prelude::*;
-use kobj::KObj;
 use syscall::Result;
 
 struct IoRequest {
     buf: Vec<u8>,
     d: Deferred<Result<Vec<u8>>>,
-    current: usize
+    current: usize,
 }
 
 impl IoRequest {
     pub fn new(buf: Vec<u8>, d: Deferred<Result<Vec<u8>>>) -> Self {
-        IoRequest {
-            buf: buf,
-            d: d,
-            current: 0
-        }
+        IoRequest { buf, d, current: 0 }
     }
 
     pub fn fulfil(mut self, data: &mut VecDeque<u8>) -> Option<Self> {
@@ -47,14 +43,14 @@ impl IoRequest {
 
 pub struct Pipe {
     data: Mutex<VecDeque<u8>>,
-    requests: Mutex<VecDeque<IoRequest>>
+    requests: Mutex<VecDeque<IoRequest>>,
 }
 
 impl Pipe {
     pub fn new() -> Self {
         Pipe {
             data: Mutex::new(VecDeque::new()),
-            requests: Mutex::new(VecDeque::new())
+            requests: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -66,11 +62,12 @@ impl Pipe {
         let mut data = lock!(self.data);
         loop {
             let mut requests = lock!(self.requests);
-            let request: IoRequest =
-                match requests.pop_front() {
-                    Some(request) => request,
-                    None => { return false; }
-                };
+            let request: IoRequest = match requests.pop_front() {
+                Some(request) => request,
+                None => {
+                    return false;
+                }
+            };
 
             if let Some(request) = request.fulfil(&mut data) {
                 requests.push_front(request);
@@ -101,28 +98,31 @@ impl Write for Pipe {
 }
 
 impl KObj for Pipe {
-    fn async_read(&self) -> Option<&AsyncRead> {
+    fn async_read(&self) -> Option<&dyn AsyncRead> {
         Some(self)
     }
 
-    fn read(&self) -> Option<&Read> {
+    fn read(&self) -> Option<&dyn Read> {
         Some(self)
     }
 
-    fn write(&self) -> Option<&Write> {
+    fn write(&self) -> Option<&dyn Write> {
         Some(self)
     }
 }
 
 #[cfg(feature = "test")]
 pub mod test {
-    use io::{AsyncRead,Write};
     use super::*;
+    use crate::io::{AsyncRead, Write};
 
     fn test_read(pipe: &Pipe, expected: &[u8]) {
         let buf = vec![0; expected.len()];
         let d = pipe.read_async(buf);
-        let buf = d.try_get().unwrap_or_else(|_| panic!("didn't expect to block")).unwrap();
+        let buf = d
+            .try_get()
+            .unwrap_or_else(|_| panic!("didn't expect to block"))
+            .unwrap();
         let mut v = Vec::<u8>::new();
         v.extend(expected);
         assert_eq!(v, buf);

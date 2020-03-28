@@ -1,7 +1,8 @@
+use alloc::rc::Rc;
 use cairo::cairo::Cairo;
-use graphics::{self,Event,FrameBuffer,Rect,Widget};
-use os::{File,Mutex,Process,Result,SharedMem};
-use std::sync::Arc;
+use core::cell::RefCell;
+use graphics::{self, Event, FrameBuffer, Rect, Widget};
+use os::{File, Process, Result, SharedMem};
 use syscall::Handle;
 
 struct WindowState {
@@ -18,21 +19,27 @@ pub enum WindowId {
 
 pub struct Window {
     id: WindowId,
-    server2client: Arc<Mutex<File>>,
-    state: Mutex<WindowState>,
+    server2client: Rc<RefCell<File>>,
+    state: RefCell<WindowState>,
 }
 
 impl Window {
-    pub fn new(owner: &Process, id: usize, pos: Rect, shared_mem_handle: usize, server2client: Arc<Mutex<File>>) -> Result<Self> {
+    pub fn new(
+        owner: &Process,
+        id: usize,
+        pos: Rect,
+        shared_mem_handle: usize,
+        server2client: Rc<RefCell<File>>,
+    ) -> Result<Self> {
         let shared_mem = SharedMem::from_raw(owner.open_handle(shared_mem_handle)?, false);
         Ok(Window {
             id: WindowId::Id(owner.handle().get(), id),
             server2client,
-            state: Mutex::new(WindowState {
+            state: RefCell::new(WindowState {
                 x: pos.x,
                 y: pos.y,
                 buffer: FrameBuffer::new(pos.width, pos.height, shared_mem)?,
-            })?
+            }),
         })
     }
 
@@ -43,11 +50,11 @@ impl Window {
     pub fn send_keypress(&self, c: char) -> Result<()> {
         match self.id {
             WindowId::Id(_, id) => {
-                let mut server2client = self.server2client.lock().unwrap();
+                let mut server2client = self.server2client.borrow_mut();
                 graphics::send_message(&mut *server2client, Event::KeyPress { window_id: id, code: c })?;
-            },
+            }
 
-            _ => { }
+            _ => {}
         }
 
         Ok(())
@@ -56,7 +63,7 @@ impl Window {
 
 impl Widget for Window {
     fn paint_on(&self, cr: &Cairo) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.borrow_mut();
         let (x, y) = (state.x, state.y);
         let surface = state.buffer.create_surface();
         cr.set_source_surface(&surface, x, y);
@@ -64,7 +71,7 @@ impl Widget for Window {
     }
 
     fn move_to(&self, pos: Rect) -> Result<()> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.borrow_mut();
         state.x = pos.x;
         state.y = pos.y;
         state.buffer.resize(pos.width, pos.height)?;

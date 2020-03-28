@@ -1,31 +1,31 @@
-use alloc::arc::Arc;
-use arch::cpu;
-use core::fmt::{Debug,Error,Formatter};
+use crate::arch::cpu;
+use crate::phys_mem::{self, PhysicalBitmap};
+use crate::ptr::Align;
+use crate::spin::Mutex;
+use alloc::sync::Arc;
+use core::fmt::{Debug, Error, Formatter};
 use core::marker::PhantomData;
 use core::result;
-use spin::Mutex;
-use phys_mem::{self,PhysicalBitmap};
-use ptr::Align;
 use syscall::Result;
 
 bitflags! {
-    flags PageFlags: usize {
-        const PAGE_PRESENT = 0x001,
-        const PAGE_WRITABLE = 0x002,
-        const PAGE_USER = 0x004,
-        const PAGE_WRITETHROUGH = 0x008,
-        const PAGE_NOCACHE = 0x010,
-        const PAGE_ACCESSED = 0x020,
-        const PAGE_DIRTY = 0x040, // PTE only
-        const PAGE_BIG = 0x080, // PDE only
-        const PAGE_GLOBAL = 0x100 // PTE only
+    struct PageFlags: usize {
+        const PAGE_PRESENT = 0x001;
+        const PAGE_WRITABLE = 0x002;
+        const PAGE_USER = 0x004;
+        const PAGE_WRITETHROUGH = 0x008;
+        const PAGE_NOCACHE = 0x010;
+        const PAGE_ACCESSED = 0x020;
+        const PAGE_DIRTY = 0x040; // PTE only
+        const PAGE_BIG = 0x080; // PDE only
+        const PAGE_GLOBAL = 0x100; // PTE only
     }
 }
 
 #[repr(C)]
 struct PageEntry<T> {
     entry: usize,
-    phantom: PhantomData<T>
+    phantom: PhantomData<T>,
 }
 
 fn join(addr: usize, flags: PageFlags) -> usize {
@@ -34,7 +34,10 @@ fn join(addr: usize, flags: PageFlags) -> usize {
 
 impl<T> PageEntry<T> {
     pub fn entry(&self) -> (usize, PageFlags) {
-        (self.entry & !PageFlags::all().bits, PageFlags::from_bits_truncate(self.entry))
+        (
+            self.entry & !PageFlags::all().bits,
+            PageFlags::from_bits_truncate(self.entry),
+        )
     }
 
     pub fn addr(&self) -> usize {
@@ -53,11 +56,11 @@ impl<T> PageEntry<T> {
 
     pub fn ensure_present(&mut self, bitmap: &PhysicalBitmap) -> Result<()> {
         let mut flags = self.flags();
-        if flags.contains(PAGE_PRESENT) {
+        if flags.contains(PageFlags::PAGE_PRESENT) {
             assert!(self.addr() != 0);
         } else {
             assert!(self.addr() == 0);
-            flags.insert(PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER);
+            flags.insert(PageFlags::PAGE_PRESENT | PageFlags::PAGE_WRITABLE | PageFlags::PAGE_USER);
 
             let addr = bitmap.alloc_zeroed_page()?;
             assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
@@ -68,13 +71,13 @@ impl<T> PageEntry<T> {
     }
 
     pub fn map(&mut self, addr: usize, user: bool, writable: bool) {
-        let mut flags = PAGE_PRESENT;
+        let mut flags = PageFlags::PAGE_PRESENT;
         if user {
-            flags.insert(PAGE_USER);
+            flags.insert(PageFlags::PAGE_USER);
         }
 
         if writable {
-            flags.insert(PAGE_WRITABLE);
+            flags.insert(PageFlags::PAGE_WRITABLE);
         }
 
         assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
@@ -82,11 +85,11 @@ impl<T> PageEntry<T> {
     }
 
     pub fn present(&self) -> bool {
-        self.flags().contains(PAGE_PRESENT)
+        self.flags().contains(PageFlags::PAGE_PRESENT)
     }
 
     pub fn big(&self) -> bool {
-        self.flags().contains(PAGE_BIG)
+        self.flags().contains(PageFlags::PAGE_BIG)
     }
 }
 
@@ -96,15 +99,15 @@ impl<T> Debug for PageEntry<T> {
         write!(fmt, "{{ addr = {:-16x}, flags = ", addr)?;
 
         static ALL_FLAGS: &'static [(&'static str, PageFlags)] = &[
-            ("G", PAGE_GLOBAL),
-            ("B", PAGE_BIG),
-            ("D", PAGE_DIRTY),
-            ("A", PAGE_ACCESSED),
-            ("C", PAGE_NOCACHE),
-            ("T", PAGE_WRITETHROUGH),
-            ("U", PAGE_USER),
-            ("W", PAGE_WRITABLE),
-            ("P", PAGE_PRESENT)
+            ("G", PageFlags::PAGE_GLOBAL),
+            ("B", PageFlags::PAGE_BIG),
+            ("D", PageFlags::PAGE_DIRTY),
+            ("A", PageFlags::PAGE_ACCESSED),
+            ("C", PageFlags::PAGE_NOCACHE),
+            ("T", PageFlags::PAGE_WRITETHROUGH),
+            ("U", PageFlags::PAGE_USER),
+            ("W", PageFlags::PAGE_WRITABLE),
+            ("P", PageFlags::PAGE_PRESENT),
         ];
 
         for &(s, flag) in ALL_FLAGS.iter() {
@@ -132,30 +135,54 @@ unsafe fn usize2ref<T>(ptr: usize) -> &'static mut T {
 
 const MMU_RECURSIVE_SLOT: usize = 510;
 
-const KADDR_MMU_PT   : usize = 0xFFFF000000000000 + (MMU_RECURSIVE_SLOT<<39);
-const KADDR_MMU_PD   : usize = KADDR_MMU_PT       + (MMU_RECURSIVE_SLOT<<30);
-const KADDR_MMU_PDPT : usize = KADDR_MMU_PD       + (MMU_RECURSIVE_SLOT<<21);
-const KADDR_MMU_PML4 : usize = KADDR_MMU_PDPT     + (MMU_RECURSIVE_SLOT<<12);
+const KADDR_MMU_PT: usize = 0xFFFF000000000000 + (MMU_RECURSIVE_SLOT << 39);
+const KADDR_MMU_PD: usize = KADDR_MMU_PT + (MMU_RECURSIVE_SLOT << 30);
+const KADDR_MMU_PDPT: usize = KADDR_MMU_PD + (MMU_RECURSIVE_SLOT << 21);
+const KADDR_MMU_PML4: usize = KADDR_MMU_PDPT + (MMU_RECURSIVE_SLOT << 12);
 
 type PT = [PageEntry<*mut u8>; 512];
 type PD = [PageEntry<PT>; 512];
 type PDPT = [PageEntry<PD>; 512];
 type PML4 = [PageEntry<PDPT>; 512];
 
-fn pml4()                 -> &'static mut PML4 { unsafe { usize2ref(KADDR_MMU_PML4) } }
-fn pdpt<T>(ptr: *const T) -> &'static mut PDPT { unsafe { usize2ref(KADDR_MMU_PDPT + ((ptr as usize >> 27) & 0x00001FF000)) } }
-fn pd<T>(ptr: *const T)   -> &'static mut PD   { unsafe { usize2ref(KADDR_MMU_PD   + ((ptr as usize >> 18) & 0x003FFFF000)) } }
-fn pt<T>(ptr: *const T)   -> &'static mut PT   { unsafe { usize2ref(KADDR_MMU_PT   + ((ptr as usize >> 9)  & 0x7FFFFFF000)) } }
+fn pml4() -> &'static mut PML4 {
+    unsafe { usize2ref(KADDR_MMU_PML4) }
+}
+fn pdpt<T>(ptr: *const T) -> &'static mut PDPT {
+    unsafe { usize2ref(KADDR_MMU_PDPT + ((ptr as usize >> 27) & 0x00001FF000)) }
+}
+fn pd<T>(ptr: *const T) -> &'static mut PD {
+    unsafe { usize2ref(KADDR_MMU_PD + ((ptr as usize >> 18) & 0x003FFFF000)) }
+}
+fn pt<T>(ptr: *const T) -> &'static mut PT {
+    unsafe { usize2ref(KADDR_MMU_PT + ((ptr as usize >> 9) & 0x7FFFFFF000)) }
+}
 
-fn pml4_index<T>(ptr: *const T) -> usize { (ptr as usize >> 39) & 511 }
-fn pdpt_index<T>(ptr: *const T) -> usize { (ptr as usize >> 30) & 511 }
-fn pd_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 21) & 511 }
-fn pt_index<T>(ptr: *const T)   -> usize { (ptr as usize >> 12) & 511 }
+fn pml4_index<T>(ptr: *const T) -> usize {
+    (ptr as usize >> 39) & 511
+}
+fn pdpt_index<T>(ptr: *const T) -> usize {
+    (ptr as usize >> 30) & 511
+}
+fn pd_index<T>(ptr: *const T) -> usize {
+    (ptr as usize >> 21) & 511
+}
+fn pt_index<T>(ptr: *const T) -> usize {
+    (ptr as usize >> 12) & 511
+}
 
-fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT>    { &mut pml4()[pml4_index(ptr)] }
-fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD>      { &mut pdpt(ptr)[pdpt_index(ptr)] }
-fn pd_entry<T>(ptr: *const T)   -> &'static mut PageEntry<PT>      { &mut pd(ptr)[pd_index(ptr)] }
-fn pt_entry<T>(ptr: *const T)   -> &'static mut PageEntry<*mut u8> { &mut pt(ptr)[pt_index(ptr)] }
+fn pml4_entry<T>(ptr: *const T) -> &'static mut PageEntry<PDPT> {
+    &mut pml4()[pml4_index(ptr)]
+}
+fn pdpt_entry<T>(ptr: *const T) -> &'static mut PageEntry<PD> {
+    &mut pdpt(ptr)[pdpt_index(ptr)]
+}
+fn pd_entry<T>(ptr: *const T) -> &'static mut PageEntry<PT> {
+    &mut pd(ptr)[pd_index(ptr)]
+}
+fn pt_entry<T>(ptr: *const T) -> &'static mut PageEntry<*mut u8> {
+    &mut pt(ptr)[pt_index(ptr)]
+}
 
 pub fn print_mapping<T>(ptr: *const T) {
     let pml4_entry = pml4_entry(ptr);
@@ -174,7 +201,7 @@ pub fn print_mapping<T>(ptr: *const T) {
     }
 }
 
-extern {
+extern "C" {
     static KERNEL_BASE: u8;
     static init_pml4: u8;
 }
@@ -182,7 +209,7 @@ extern {
 pub struct AddressSpace {
     mutex: Mutex<()>,
     bitmap: Arc<PhysicalBitmap>,
-    cr3: usize
+    cr3: usize,
 }
 
 impl AddressSpace {
@@ -208,14 +235,17 @@ impl AddressSpace {
                 pdpt_entry.ensure_present(&bitmap)?;
 
                 let pd_entry = &mut pdpt_entry.as_mut_ref()[pd_index];
-                pd_entry.entry = join(addr, PAGE_PRESENT | PAGE_WRITABLE | PAGE_BIG);
+                pd_entry.entry = join(
+                    addr,
+                    PageFlags::PAGE_PRESENT | PageFlags::PAGE_WRITABLE | PageFlags::PAGE_BIG,
+                );
             }
         }
 
         Ok(AddressSpace {
             mutex: Mutex::new(()),
-            bitmap: bitmap,
-            cr3: pml4_addr
+            bitmap,
+            cr3: pml4_addr,
         })
     }
 
@@ -255,12 +285,12 @@ impl Drop for AddressSpace {
 
 #[cfg(feature = "test")]
 pub mod test {
-    use alloc::arc::Arc;
+    use super::*;
+    use crate::phys_mem::{self, PhysicalBitmap};
+    use crate::ptr::Align;
+    use alloc::sync::Arc;
     use core::intrinsics;
     use core::mem;
-    use phys_mem::{self,PhysicalBitmap};
-    use ptr::Align;
-    use super::*;
 
     test! {
         fn check_pml4() {
