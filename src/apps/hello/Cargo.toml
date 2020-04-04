@@ -10,11 +10,6 @@ panic = "abort"
 [profile.release]
 panic = "abort"
 
-[[bin]]
-name = "hello"
-path = "main.rs"
-test = false
-
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
 rt = { path = "../../librt" }

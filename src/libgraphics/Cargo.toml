@@ -14,13 +14,9 @@ panic = "abort"
 default = []
 test = ["testlite"]
 
-[lib]
-path = "lib.rs"
-test = false
-
 [[bin]]
 name = "test_graphics"
-path = "main.rs"
+path = "src/bin/main.rs"
 test = true
 required-features = ["test"]
 

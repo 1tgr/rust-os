@@ -10,11 +10,6 @@ panic = "abort"
 [profile.release]
 panic = "abort"
 
-[[bin]]
-name = "graphics_server"
-path = "main.rs"
-test = false
-
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
 cairo = { path = "../../libcairo" }

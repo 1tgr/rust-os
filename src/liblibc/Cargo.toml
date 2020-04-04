@@ -5,7 +5,3 @@ authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 build = "build.rs"
 links = "libc"
 edition = "2018"
-
-[lib]
-path = "lib.rs"
-test = false
