@@ -16,6 +16,22 @@ checksum = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
 [[package]]
 name = "cairo"
 version = "0.0.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "cairo_demo"
+version = "0.0.0"
+dependencies = [
+ "alloc_system",
+ "cairo",
+ "libc",
+ "os",
+ "rt",
+ "std",
+ "syscall",
+]
 
 [[package]]
 name = "corepack"
@@ -34,9 +50,13 @@ dependencies = [
  "alloc_system",
  "cairo",
  "corepack",
+ "os",
  "rt",
  "serde",
  "serde_derive",
+ "std",
+ "syscall",
+ "testlite",
 ]
 
 [[package]]
@@ -46,13 +66,58 @@ dependencies = [
  "alloc_system",
  "cairo",
  "graphics",
+ "os",
  "rt",
  "serde",
+ "std",
+ "syscall",
+]
+
+[[package]]
+name = "graphics_server"
+version = "0.0.0"
+dependencies = [
+ "alloc_system",
+ "cairo",
+ "graphics",
+ "os",
+ "rt",
+ "serde",
+ "std",
+ "syscall",
+]
+
+[[package]]
+name = "hello"
+version = "0.0.0"
+dependencies = [
+ "alloc_system",
+ "rt",
+ "std",
+]
+
+[[package]]
+name = "input"
+version = "0.0.0"
+dependencies = [
+ "alloc_system",
+ "os",
+ "rt",
+ "std",
+ "syscall",
 ]
 
 [[package]]
 name = "libc"
 version = "0.0.0"
+
+[[package]]
+name = "os"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "syscall",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -75,22 +140,35 @@ dependencies = [
 [[package]]
 name = "rt"
 version = "0.0.0"
+dependencies = [
+ "libc",
+ "syscall",
+]
 
 [[package]]
 name = "serde"
-version = "1.0.105"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e707fbbf255b8fc8c3b99abb91e7257a622caeb20a9818cbadbeeede4e0932ff"
+checksum = "36df6ac6412072f67cf767ebbde4133a5b2e88e76dc6187fa7104cd16f783399"
 
 [[package]]
 name = "serde_derive"
-version = "1.0.105"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac5d00fc561ba2724df6758a17de23df5914f20e41cb00f94d5b7ae42fffaff8"
+checksum = "9e549e3abf4fb8621bd1609f11dfc9f5e50320802273b12f3811a67e6716ea6c"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "std"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "os",
+ "syscall",
 ]
 
 [[package]]
@@ -103,6 +181,17 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
+
+[[package]]
+name = "syscall"
+version = "0.0.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "testlite"
+version = "0.0.0"
 
 [[package]]
 name = "unicode-xid"

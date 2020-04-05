@@ -1,6 +1,4 @@
-#![crate_name = "syscall"]
 #![feature(asm)]
-#![feature(lang_items)]
 #![no_std]
 
 #[cfg(not(feature = "kernel"))]

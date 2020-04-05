@@ -16,15 +16,17 @@ test = ["testlite"]
 
 [[bin]]
 name = "test_graphics"
-path = "src/bin/main.rs"
-test = true
+path = "src/tests/main.rs"
 required-features = ["test"]
 
 [dependencies]
 alloc_system = { path = "../liballoc_system" }
 cairo = { path = "../libcairo" }
 corepack = { version = "0.4", default-features = false, features = ["alloc"] }
+os = { path = "../libos" }
 rt = { path = "../librt" }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = "1"
+std = { path = "../libstd" }
+syscall = { path = "../libsyscall" }
 testlite = { path = "../libtestlite", optional = true }

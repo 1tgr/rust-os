@@ -1,5 +1,4 @@
 #![feature(link_args)]
-#![feature(rustc_private)]
 #![feature(start)]
 #![allow(dead_code)]
 
@@ -199,7 +198,7 @@ fn run() -> Result<()> {
 
 #[cfg(target_arch = "x86_64")]
 #[allow(unused_attributes)]
-#[link_args = "-T ../../libsyscall/arch/amd64/link.ld"]
+#[link_args = "-T libsyscall/arch/amd64/link.ld"]
 extern "C" {}
 
 #[start]

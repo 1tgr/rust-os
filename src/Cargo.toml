@@ -1,0 +1,27 @@
+[workspace]
+members = [
+    "libstd",
+    "libcairo",
+    "libos",
+    "libsyscall",
+    "libgraphics",
+    "librt",
+    "liballoc_system",
+    "apps/graphics_client",
+    "apps/cairo_demo",
+    "apps/input",
+    "apps/graphics_server",
+    "apps/hello",
+    "libtestlite",
+    "liblibc"
+]
+
+exclude = [
+    "kernel"
+]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

@@ -4,12 +4,9 @@ name = "input"
 version = "0.0.0"
 edition = "2018"
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
+os = { path = "../../libos" }
 rt = { path = "../../librt" }
+std = { path = "../../libstd" }
+syscall = { path = "../../libsyscall" }

@@ -5,3 +5,6 @@ authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 build = "build.rs"
 links = "cairo"
 edition = "2018"
+
+[dependencies]
+libc = { path = "../liblibc" }

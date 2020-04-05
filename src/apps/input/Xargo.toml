@@ -1,3 +1,0 @@
-[dependencies]
-alloc = {}
-std = { path = "../../libstd", stage = 1 }

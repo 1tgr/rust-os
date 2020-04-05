@@ -1,3 +1,5 @@
+#![no_std]
+
 pub type Test = (&'static str, fn());
 pub type Fixture = (&'static str, &'static [Test]);
 

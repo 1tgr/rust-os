@@ -3,3 +3,7 @@ authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 name = "rt"
 version = "0.0.0"
 edition = "2018"
+
+[dependencies]
+libc = { path = "../liblibc" }
+syscall = { path = "../libsyscall" }

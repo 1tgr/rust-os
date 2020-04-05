@@ -1,5 +1,3 @@
-#![crate_name = "cairo"]
-#![feature(rustc_private)]
 #![no_std]
 
 extern crate alloc;

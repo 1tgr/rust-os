@@ -1,23 +1,25 @@
-DIRS_SRC += kernel
+include config.txt
 
-DIRS_SRC += apps/cairo_demo
-DIRS_SRC += apps/graphics_client
-DIRS_SRC += apps/graphics_server
-DIRS_SRC += apps/hello
-DIRS_SRC += apps/input
-DIRS_SRC += libgraphics
+RUSTUP_RUN = RUST_TARGET_PATH=${CURDIR}/libsyscall/arch RUSTFLAGS=-Dwarnings
+
+DIRS_SRC += kernel
 
 DIRS += $(DIRS_SRC)
 DIRS += boot
 
-.PHONY: all test $(DIRS)
+.PHONY: all xargo-build clean test $(DIRS)
 
 all: test
 
-$(DIRS):
-	make -C $@
+xargo-build:
+	$(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET) --release
+	(cd libgraphics && $(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET) --release --features test)
 
-boot: $(DIRS_SRC)
+clean:
+	$(RUSTUP_RUN) xargo clean
+
+$(DIRS): xargo-build
+	make -C $@
 
 test: $(DIRS)
 	python3 test.py qemu-system-x86_64 -no-kvm -display vnc=:1 -no-reboot -kernel kernel/kernel -initrd boot/initrd.tar
