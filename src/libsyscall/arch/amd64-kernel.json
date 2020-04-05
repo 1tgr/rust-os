@@ -4,7 +4,7 @@
     "target-endian": "little",
     "target-pointer-width": "64",
     "target-c-int-width": "32",
-    "os": "tifflin",
+    "os": "rust_os",
     "arch": "x86_64",
     "no-compiler-rt": true,
     "disable-redzone": true,

@@ -36,7 +36,7 @@ test! {
                     KObjRef::new(Arc::new(Vga::new()), |kobj| kobj.write()).unwrap())));
 
             let _x = ksyscall::register_handler(handler);
-            let process = process::spawn("test_graphics".into(), Vec::new()).unwrap();
+            let process = process::spawn("graphics_server".into(), Vec::new()).unwrap();
             assert_eq!(0, process.exit_code().poll());
         });
     }

@@ -1,0 +1,10 @@
+[package]
+name = "ecs"
+version = "0.1.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+edition = "2018"
+
+[target.amd64.dependencies]
+os = { path = "../libos" }
+std = { path = "../libstd" }
+syscall = { path = "../libsyscall" }

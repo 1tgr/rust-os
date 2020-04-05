@@ -1,19 +1,19 @@
 [workspace]
 members = [
-    "libstd",
-    "libcairo",
-    "libos",
-    "libsyscall",
-    "libgraphics",
-    "librt",
-    "liballoc_system",
-    "apps/graphics_client",
     "apps/cairo_demo",
-    "apps/input",
+    "apps/graphics_client",
     "apps/graphics_server",
     "apps/hello",
-    "libtestlite",
-    "liblibc"
+    "apps/input",
+    "liballoc_system",
+    "libcairo",
+    "libecs",
+    "libgraphics",
+    "liblibc",
+    "libos",
+    "librt",
+    "libstd",
+    "libsyscall",
 ]
 
 exclude = [

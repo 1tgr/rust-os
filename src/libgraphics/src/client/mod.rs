@@ -1,10 +1,7 @@
-mod client;
-mod window;
+mod app;
+mod pipe;
+mod portal;
 
-pub use self::client::*;
-pub use self::window::*;
-
-#[cfg(feature = "test")]
-pub mod test {
-    test! {}
-}
+pub use app::App;
+pub use pipe::{alloc_id, ClientPipe};
+pub use portal::ClientPortal;

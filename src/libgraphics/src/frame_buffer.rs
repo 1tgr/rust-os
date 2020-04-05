@@ -42,7 +42,7 @@ impl FrameBuffer {
         self.shared_mem.resize(new_len)
     }
 
-    pub fn create_surface(&mut self) -> CairoSurface {
+    pub fn as_surface(&mut self) -> CairoSurface {
         let width = self.width_i();
         let height = self.height_i();
         let stride = self.stride();
@@ -53,21 +53,5 @@ impl FrameBuffer {
             height,
             stride,
         )
-    }
-}
-
-#[cfg(feature = "test")]
-pub mod test {
-    use super::*;
-
-    test! {
-        fn empty_buffer_works() {
-            fn run() -> Result<()> {
-                FrameBuffer::new(0.0, 0.0, SharedMem::new(false)?)?;
-                Ok(())
-            }
-
-            run().unwrap();
-        }
     }
 }

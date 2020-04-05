@@ -13,7 +13,6 @@ all: test
 
 xargo-build:
 	$(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET) --release
-	(cd libgraphics && $(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET) --release --features test)
 
 clean:
 	$(RUSTUP_RUN) xargo clean

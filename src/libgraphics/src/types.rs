@@ -1,4 +1,4 @@
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Rect {
     pub x: f64,
     pub y: f64,
@@ -12,21 +12,21 @@ pub enum Command {
         id: usize,
     },
 
-    CreateWindow {
+    CreatePortal {
         id: usize,
         pos: Rect,
         shared_mem_handle: usize,
     },
 
-    DestroyWindow {
+    DestroyPortal {
         id: usize,
     },
 
-    InvalidateWindow {
+    InvalidatePortal {
         id: usize,
     },
 
-    MoveWindow {
+    MovePortal {
         id: usize,
         pos: Rect,
     },
@@ -36,5 +36,5 @@ pub enum Command {
 pub enum Event {
     Checkpoint { id: usize },
 
-    KeyPress { window_id: usize, code: char },
+    KeyPress { portal_id: usize, code: char },
 }

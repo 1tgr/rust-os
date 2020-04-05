@@ -29,13 +29,8 @@ pub fn read_message<T: DeserializeOwned>(buf: &mut VecDeque<u8>, file: &mut dyn 
     }
 }
 
-pub fn send_message<T: Serialize>(file: &mut dyn Write, message: T) -> Result<()> {
+pub fn send_message<T: Serialize>(file: &mut dyn Write, message: &T) -> Result<()> {
     let buf = corepack::to_bytes(message).or(Err(ErrNum::NotSupported))?;
     file.write_all(&buf)?;
     Ok(())
-}
-
-#[cfg(feature = "test")]
-pub mod test {
-    test! {}
 }
