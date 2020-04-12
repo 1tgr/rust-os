@@ -17,10 +17,34 @@ pub mod cairo;
 pub mod surface;
 
 use crate::bindings::*;
+use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::NonNull;
-use libc::c_int;
+use core::result;
+use core::slice;
+use core::str;
+use libc::{c_int, c_uint, strlen};
+
+pub struct Error(pub cairo_status_t);
+
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let slice = unsafe {
+            let p = cairo_status_to_string(self.0);
+            let len = strlen(p);
+            slice::from_raw_parts(p as *const u8, len as usize)
+        };
+
+        if let Ok(s) = str::from_utf8(slice) {
+            f.write_str(s)
+        } else {
+            fmt::Debug::fmt(&(self.0 as c_uint), f)
+        }
+    }
+}
+
+pub type Result<T> = result::Result<T, Error>;
 
 pub fn stride_for_width(format: cairo_format_t, width: u16) -> usize {
     unsafe { cairo_format_stride_for_width(format, width as c_int) as usize }

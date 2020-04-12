@@ -1,8 +1,9 @@
 use crate::bindings::*;
-use crate::CairoObj;
+use crate::cairo::Cairo;
+use crate::{CairoFunc, CairoObj, Error, Result};
 use core::marker::PhantomData;
 use core::ops::Deref;
-use core::ptr::NonNull;
+use core::ptr::{self, NonNull};
 use libc::{c_int, c_uchar};
 
 pub struct CairoSurface<'a>(CairoObj<cairo_surface_t>, PhantomData<&'a mut [u8]>);
@@ -20,7 +21,45 @@ impl<'a> CairoSurface<'a> {
                 stride as c_int,
             )
         };
-        CairoSurface(CairoObj::wrap(ptr), PhantomData)
+
+        Self(CairoObj::wrap(ptr), PhantomData)
+    }
+
+    pub fn into_cairo(self) -> Cairo {
+        Cairo::new(self)
+    }
+}
+
+impl CairoSurface<'static> {
+    pub fn from_png_slice(slice: &[u8]) -> Result<Self> {
+        let mut reader = {
+            let mut offset = 0;
+            CairoFunc::new(move |data: *mut u8, length: libc::c_uint| -> cairo_status_t {
+                let length = length as usize;
+                if offset + length > slice.len() {
+                    return CAIRO_STATUS_READ_ERROR;
+                }
+
+                unsafe {
+                    ptr::copy_nonoverlapping(slice.as_ptr().offset(offset as isize), data, length);
+                }
+                offset += length;
+                CAIRO_STATUS_SUCCESS
+            })
+        };
+
+        let ptr = unsafe {
+            let ptr = cairo_image_surface_create_from_png_stream(Some(reader.func()), reader.closure());
+
+            let status = cairo_surface_status(ptr);
+            if status != CAIRO_STATUS_SUCCESS {
+                return Err(Error(status));
+            }
+
+            ptr
+        };
+
+        Ok(Self(CairoObj::wrap(ptr), PhantomData))
     }
 }
 

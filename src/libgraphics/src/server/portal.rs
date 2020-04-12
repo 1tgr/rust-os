@@ -2,16 +2,154 @@ use crate::client;
 use crate::frame_buffer::FrameBuffer;
 use crate::types::Rect;
 use alloc::sync::Arc;
-use cairo::bindings::*;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
 use ecs::{ComponentStorage, System};
-use os::{File, Mutex, OSMem, Result, SharedMem};
+use os::{File, Mutex, Result, SharedMem};
+
+const CURSOR_WIDTH: f64 = 32.0;
+const CURSOR_HEIGHT: f64 = 32.0;
+const CURSOR_HOTSPOT_X: f64 = 12.0;
+const CURSOR_HOTSPOT_Y: f64 = 8.0;
 
 #[derive(Clone)]
 pub struct PortalRef {
     pub server2client: Arc<Mutex<File>>,
     pub id: usize,
+}
+
+pub struct ScreenState {
+    cursor_x: f64,
+    cursor_y: f64,
+    lfb: FrameBuffer,
+    cursor_composite: FrameBuffer,
+    cursor: CairoSurface<'static>,
+    buffers: Vec<(Rect, *mut u8)>,
+}
+
+unsafe impl Send for ScreenState {}
+
+impl ScreenState {
+    pub fn new(cursor_x: u16, cursor_y: u16, lfb: FrameBuffer) -> Self {
+        static CURSOR_BYTES: &'static [u8] = include_bytes!("icons8-cursor-32.png");
+
+        let cursor_composite = FrameBuffer::new(0.0, 0.0);
+        let cursor = CairoSurface::from_png_slice(CURSOR_BYTES).unwrap();
+
+        Self {
+            cursor_x: cursor_x as f64 - CURSOR_HOTSPOT_X,
+            cursor_y: cursor_y as f64 - CURSOR_HOTSPOT_Y,
+            lfb,
+            cursor_composite,
+            cursor,
+            buffers: Vec::new(),
+        }
+    }
+
+    fn draw_buffers(cr: &Cairo, buffers: &[(Rect, *mut u8)]) {
+        cr.set_source_rgb(0.0, 0.0, 0.5).paint();
+
+        for (rect, buffer_ptr) in buffers {
+            let Rect { x, y, width, height } = *rect;
+            let mut frame_buffer = unsafe { FrameBuffer::from_ptr(width, height, *buffer_ptr) };
+            let surface = frame_buffer.as_surface();
+            cr.set_source_surface(&surface, x, y).paint();
+        }
+    }
+
+    fn cursor_composite_rect(&self) -> Rect {
+        Rect {
+            x: self.cursor_x - CURSOR_WIDTH,
+            y: self.cursor_y - CURSOR_HEIGHT,
+            width: CURSOR_WIDTH * 3.0 - CURSOR_HOTSPOT_X,
+            height: CURSOR_HEIGHT * 3.0 - CURSOR_HOTSPOT_Y,
+        }
+    }
+
+    fn draw_around_cursor(&mut self) {
+        let cursor_composite_rect = self.cursor_composite_rect();
+
+        let screen_rect = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.lfb.width,
+            height: self.lfb.height,
+        };
+
+        {
+            let cr = self.lfb.as_surface().into_cairo();
+
+            cr.reset_clip()
+                .new_path()
+                .rectangle(
+                    cursor_composite_rect.x,
+                    cursor_composite_rect.y,
+                    cursor_composite_rect.width,
+                    cursor_composite_rect.height,
+                )
+                .new_sub_path()
+                .move_to(screen_rect.x, screen_rect.y)
+                .rel_line_to(0.0, screen_rect.height)
+                .rel_line_to(screen_rect.width, 0.0)
+                .rel_line_to(0.0, -screen_rect.height)
+                .rel_line_to(-screen_rect.width, 0.0)
+                .close_path()
+                .clip();
+
+            Self::draw_buffers(&cr, &self.buffers);
+        }
+    }
+
+    fn draw_cursor(&mut self) {
+        let cursor_composite_rect = self.cursor_composite_rect();
+        self.cursor_composite
+            .resize(cursor_composite_rect.width, cursor_composite_rect.height)
+            .unwrap();
+
+        {
+            let cr = self.cursor_composite.as_surface().into_cairo();
+            cr.save()
+                .translate(-cursor_composite_rect.x, -cursor_composite_rect.y)
+                .set_source_rgb(0.0, 0.0, 0.5)
+                .paint();
+
+            Self::draw_buffers(&cr, &self.buffers);
+
+            cr.restore()
+                .set_source_surface(&self.cursor, CURSOR_WIDTH, CURSOR_HEIGHT)
+                .paint();
+        }
+
+        {
+            let cursor_composite_surface = self.cursor_composite.as_surface();
+            self.lfb
+                .as_surface()
+                .into_cairo()
+                .set_source_surface(
+                    &cursor_composite_surface,
+                    cursor_composite_rect.x,
+                    cursor_composite_rect.y,
+                )
+                .paint();
+        }
+    }
+
+    pub fn update_mouse_state(&mut self, x: u16, y: u16) {
+        let prev_cursor_x = self.cursor_x;
+        let prev_cursor_y = self.cursor_y;
+        self.cursor_x = x as f64 - CURSOR_HOTSPOT_X;
+        self.cursor_y = y as f64 - CURSOR_HOTSPOT_Y;
+
+        let cr = self.lfb.as_surface().into_cairo();
+        cr.rectangle(prev_cursor_x, prev_cursor_y, CURSOR_WIDTH, CURSOR_HEIGHT)
+            .clip();
+
+        Self::draw_buffers(&cr, &self.buffers);
+
+        cr.reset_clip()
+            .set_source_surface(&self.cursor, self.cursor_x, self.cursor_y)
+            .paint();
+    }
 }
 
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
@@ -62,7 +200,7 @@ impl ServerPortal {
             .cloned()
             .unwrap_or_else(|| ZIndex::new());
 
-        let frame_buffer = FrameBuffer::new(pos.width, pos.height, shared_mem)?;
+        let frame_buffer = FrameBuffer::from_shared_mem(pos.width, pos.height, shared_mem)?;
 
         Ok(Self {
             portal_ref: PortalRef { server2client, id },
@@ -84,13 +222,16 @@ impl ServerPortal {
 }
 
 pub struct ServerPortalSystem {
-    lfb_mem: OSMem,
+    screen_state: Arc<Mutex<ScreenState>>,
     input_state: Arc<Mutex<Option<PortalRef>>>,
 }
 
 impl ServerPortalSystem {
-    pub fn new(lfb_mem: OSMem, input_state: Arc<Mutex<Option<PortalRef>>>) -> Self {
-        ServerPortalSystem { lfb_mem, input_state }
+    pub fn new(screen_state: Arc<Mutex<ScreenState>>, input_state: Arc<Mutex<Option<PortalRef>>>) -> Self {
+        ServerPortalSystem {
+            screen_state,
+            input_state,
+        }
     }
 }
 
@@ -111,25 +252,18 @@ impl System for ServerPortalSystem {
         *self.input_state.lock().unwrap() = portals.last().map(|p| p.portal_ref.clone());
 
         if any_deleted || portals.iter().any(|p| p.needs_paint) {
-            let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
-            let surface = CairoSurface::from_slice(&mut *self.lfb_mem, CAIRO_FORMAT_ARGB32, 800, 600, stride);
-            let cr = Cairo::new(surface);
-            cr.set_source_rgb(0.0, 0.0, 0.5);
-            cr.paint();
+            let mut screen = self.screen_state.lock().unwrap();
+            screen.buffers.clear();
 
-            for portal in portals {
-                let ServerPortal {
-                    pos: Rect { x, y, .. },
-                    ref mut frame_buffer,
-                    ref mut needs_paint,
-                    ..
-                } = *portal;
-
-                let surface = frame_buffer.as_surface();
-                cr.set_source_surface(&surface, x, y);
-                cr.paint();
-                *needs_paint = false;
+            for portal in portals.iter_mut() {
+                screen
+                    .buffers
+                    .push((portal.pos, portal.frame_buffer.as_mut_slice().as_mut_ptr()));
+                portal.needs_paint = false;
             }
+
+            screen.draw_around_cursor();
+            screen.draw_cursor();
         }
 
         Ok(())

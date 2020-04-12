@@ -12,13 +12,63 @@ impl Cairo {
         Cairo(CairoObj::wrap(unsafe { cairo_create(surface.as_ptr()) }))
     }
 
+    pub fn save(&self) -> &Self {
+        unsafe { cairo_save(self.0.as_ptr()) }
+        self
+    }
+
+    pub fn restore(&self) -> &Self {
+        unsafe { cairo_restore(self.0.as_ptr()) }
+        self
+    }
+
     pub fn fill(&self) -> &Self {
         unsafe { cairo_fill(self.0.as_ptr()) }
         self
     }
 
+    pub fn clip(&self) -> &Self {
+        unsafe { cairo_clip(self.0.as_ptr()) }
+        self
+    }
+
+    pub fn reset_clip(&self) -> &Self {
+        unsafe { cairo_reset_clip(self.0.as_ptr()) }
+        self
+    }
+
+    pub fn new_path(&self) -> &Self {
+        unsafe { cairo_new_path(self.0.as_ptr()) }
+        self
+    }
+
+    pub fn new_sub_path(&self) -> &Self {
+        unsafe { cairo_new_sub_path(self.0.as_ptr()) }
+        self
+    }
+
+    pub fn close_path(&self) -> &Self {
+        unsafe { cairo_close_path(self.0.as_ptr()) }
+        self
+    }
+
     pub fn move_to(&self, x: f64, y: f64) -> &Self {
         unsafe { cairo_move_to(self.0.as_ptr(), x, y) };
+        self
+    }
+
+    pub fn line_to(&self, x: f64, y: f64) -> &Self {
+        unsafe { cairo_line_to(self.0.as_ptr(), x, y) };
+        self
+    }
+
+    pub fn rel_line_to(&self, dx: f64, dy: f64) -> &Self {
+        unsafe { cairo_rel_line_to(self.0.as_ptr(), dx, dy) };
+        self
+    }
+
+    pub fn translate(&self, tx: f64, ty: f64) -> &Self {
+        unsafe { cairo_translate(self.0.as_ptr(), tx, ty) };
         self
     }
 

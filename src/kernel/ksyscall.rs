@@ -1,3 +1,4 @@
+use crate::arch::ps2_mouse::Ps2Mouse;
 use crate::arch::thread as arch_thread;
 use crate::arch::vga_bochs;
 use crate::console::Console;
@@ -15,6 +16,7 @@ use syscall::{self, ErrNum, Handle, HandleSyscall, PackedArgs, Result};
 
 pub struct SyscallHandler {
     console: Arc<Console>,
+    mouse: Arc<Ps2Mouse>,
 }
 
 static HANDLER: Singleton<SyscallHandler> = Singleton::new();
@@ -34,8 +36,8 @@ pub fn dispatch(num: usize, args: PackedArgs) -> isize {
 }
 
 impl SyscallHandler {
-    pub fn new(console: Arc<Console>) -> Self {
-        SyscallHandler { console }
+    pub fn new(console: Arc<Console>, mouse: Arc<Ps2Mouse>) -> Self {
+        SyscallHandler { console, mouse }
     }
 }
 
@@ -73,6 +75,7 @@ impl HandleSyscall for SyscallHandler {
         let file: Arc<dyn KObj> = match filename {
             "stdin" => self.console.clone(),
             "stdout" => self.console.clone(),
+            "ps2_mouse" => self.mouse.clone(),
             _ => return Err(ErrNum::FileNotFound),
         };
 

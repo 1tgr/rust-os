@@ -43,7 +43,7 @@ impl ClientPortal {
             pipe.send_command(&command)?;
         }
 
-        let frame_buffer = FrameBuffer::new(pos.width, pos.height, shared_mem)?;
+        let frame_buffer = FrameBuffer::from_shared_mem(pos.width, pos.height, shared_mem)?;
 
         Ok(Self {
             pos,
@@ -109,8 +109,7 @@ impl System for ClientPortalSystem {
             }
 
             if portal.needs_paint {
-                let surface = portal.frame_buffer.as_surface();
-                let cr = Cairo::new(surface);
+                let cr = portal.frame_buffer.as_surface().into_cairo();
                 cr.set_source_rgb(1.0, 1.0, 1.5);
                 cr.paint();
                 (portal.on_paint)(&cr);

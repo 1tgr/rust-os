@@ -774,7 +774,7 @@ pub mod funcs {
     pub mod c95 {
         pub mod stdlib {
             use crate::types::common::c95::c_void;
-            use crate::types::os::arch::c95::{c_int, jmp_buf, size_t};
+            use crate::types::os::arch::c95::{c_char, c_int, jmp_buf, size_t};
 
             extern "C" {
                 pub fn malloc(size: size_t) -> *mut c_void;
@@ -783,6 +783,7 @@ pub mod funcs {
                 pub fn setjmp(env: *mut jmp_buf) -> c_int;
                 pub fn longjmp(env: *const jmp_buf, val: c_int) -> !;
                 pub fn memchr(cx: *const c_void, c: c_int, n: size_t) -> *mut c_void;
+                pub fn strlen(p: *const c_char) -> size_t;
             }
         }
     }

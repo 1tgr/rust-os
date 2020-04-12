@@ -1,28 +1,74 @@
 use cairo;
 use cairo::surface::CairoSurface;
-use os::{Result, SharedMem};
+use core::slice;
+use os::{OSMem, Result, SharedMem};
+
+pub enum Buffer {
+    Vec(Vec<u8>),
+    OSMem(OSMem),
+    SharedMem(SharedMem),
+    Ptr(*mut u8),
+}
 
 pub struct FrameBuffer {
-    width: f64,
-    height: f64,
-    shared_mem: SharedMem,
+    pub width: f64,
+    pub height: f64,
+    pub buffer: Buffer,
+}
+
+fn byte_len(width: f64, height: f64) -> usize {
+    let width = (width + 0.5) as u16;
+    let height = (height + 0.5) as u16;
+    let stride = cairo::stride_for_width(cairo::bindings::CAIRO_FORMAT_ARGB32, width);
+    stride * height as usize
 }
 
 impl FrameBuffer {
-    pub fn new(width: f64, height: f64, shared_mem: SharedMem) -> Result<Self> {
-        let mut buffer = FrameBuffer {
+    pub fn new(width: f64, height: f64) -> Self {
+        let len = byte_len(width, height);
+        let buffer = Buffer::Vec(vec![0; len]);
+        Self { width, height, buffer }
+    }
+
+    pub fn from_os_mem(width: f64, height: f64, os_mem: OSMem) -> Self {
+        Self {
             width,
             height,
-            shared_mem,
-        };
-        buffer.resize_shared_mem()?;
-        Ok(buffer)
+            buffer: Buffer::OSMem(os_mem),
+        }
+    }
+
+    pub fn from_shared_mem(width: f64, height: f64, mut shared_mem: SharedMem) -> Result<Self> {
+        let len = byte_len(width, height);
+        shared_mem.resize(len)?;
+
+        Ok(Self {
+            width,
+            height,
+            buffer: Buffer::SharedMem(shared_mem),
+        })
+    }
+
+    pub unsafe fn from_ptr(width: f64, height: f64, ptr: *mut u8) -> Self {
+        Self {
+            width,
+            height,
+            buffer: Buffer::Ptr(ptr),
+        }
     }
 
     pub fn resize(&mut self, width: f64, height: f64) -> Result<()> {
+        let len = byte_len(width, height);
+        match &mut self.buffer {
+            Buffer::Vec(vec) => vec.resize(len, 0),
+            Buffer::OSMem(_) => panic!("can't resize OSMem"),
+            Buffer::SharedMem(shared_mem) => shared_mem.resize(len)?,
+            Buffer::Ptr(_) => panic!("can't resize Ptr"),
+        }
+
         self.width = width;
         self.height = height;
-        self.resize_shared_mem()
+        Ok(())
     }
 
     pub fn width_i(&self) -> u16 {
@@ -37,21 +83,26 @@ impl FrameBuffer {
         cairo::stride_for_width(cairo::bindings::CAIRO_FORMAT_ARGB32, self.width_i())
     }
 
-    fn resize_shared_mem(&mut self) -> Result<()> {
-        let new_len = self.stride() * self.height_i() as usize;
-        self.shared_mem.resize(new_len)
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        let height = self.height_i();
+        let stride = self.stride();
+
+        match self.buffer {
+            Buffer::Vec(ref mut vec) => &mut vec[..],
+            Buffer::OSMem(ref mut os_mem) => &mut *os_mem,
+            Buffer::SharedMem(ref mut shared_mem) => &mut *shared_mem,
+            Buffer::Ptr(ptr) => {
+                let len = stride * height as usize;
+                unsafe { slice::from_raw_parts_mut(ptr, len) }
+            }
+        }
     }
 
     pub fn as_surface(&mut self) -> CairoSurface {
         let width = self.width_i();
         let height = self.height_i();
         let stride = self.stride();
-        CairoSurface::from_slice(
-            &mut *self.shared_mem,
-            cairo::bindings::CAIRO_FORMAT_ARGB32,
-            width,
-            height,
-            stride,
-        )
+        let data = self.as_mut_slice();
+        CairoSurface::from_slice(data, cairo::bindings::CAIRO_FORMAT_ARGB32, width, height, stride)
     }
 }

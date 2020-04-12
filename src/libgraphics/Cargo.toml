@@ -4,12 +4,6 @@ version = "0.0.0"
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 edition = "2018"
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-
 [features]
 default = ["client"]
 client = []

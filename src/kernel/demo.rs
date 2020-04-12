@@ -1,5 +1,6 @@
 use crate::arch::cpu;
 use crate::arch::keyboard::Keyboard;
+use crate::arch::ps2_mouse::Ps2Mouse;
 use crate::arch::vga::Vga;
 use crate::console::Console;
 use crate::deferred::Deferred;
@@ -33,7 +34,8 @@ test! {
             let handler = SyscallHandler::new(
                 Arc::new(Console::new(
                     KObjRef::new(Arc::new(Keyboard::new()), |kobj| kobj.async_read()).unwrap(),
-                    KObjRef::new(Arc::new(Vga::new()), |kobj| kobj.write()).unwrap())));
+                    KObjRef::new(Arc::new(Vga::new()), |kobj| kobj.write()).unwrap())),
+                Arc::new(Ps2Mouse::new()));
 
             let _x = ksyscall::register_handler(handler);
             let process = process::spawn("graphics_server".into(), Vec::new()).unwrap();

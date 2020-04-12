@@ -24,6 +24,7 @@ test = []
 alloc_system = { path = "../liballoc_system" }
 bit-vec = { version = "0.6", default-features = false }
 bitflags = "1"
+byteorder = { version = "1", default-features = false }
 lazy_static = { version = "1", features = ["spin_no_std"] }
 libc = { path = "../liblibc" }
 syscall = { path = "../libsyscall", features = ["kernel"] }

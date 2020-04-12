@@ -2,11 +2,22 @@ use crate::arch::cpu;
 use crate::arch::isr::{self, DropIrqHandler};
 use crate::io::{AsyncRead, Pipe, Write};
 use crate::kobj::KObj;
-use crate::prelude::*;
 use crate::spin::Mutex;
 use alloc::sync::Arc;
 use core::char;
-use core::mem;
+
+unsafe fn read_keyboard() -> u8 {
+    loop {
+        let stat = cpu::inb(0x64);
+        if (stat & 0x01) != 0 {
+            let data = cpu::inb(0x60);
+
+            if (stat & 0xc0) == 0 {
+                return data;
+            }
+        }
+    }
+}
 
 //                  S    C    C+S  AGr  AGr+S
 pub struct Key(u32, u32, u32, u32, u32, u32);
@@ -230,44 +241,34 @@ impl KeyboardState {
         }
     }
 
-    pub fn translate(&mut self, code: u8) -> Vec<u8> {
-        let c = match self.decode(code) {
-            Some(Keypress::Char(c)) => c,
+    pub fn translate(&mut self, code: u8) -> Option<[u8; 4]> {
+        let c = match self.decode(code)? {
+            Keypress::Char(c) => c,
 
-            Some(Keypress::Scancode(mut keys, scan, down)) => {
+            Keypress::Scancode(mut keys, scan, down) => {
                 keys.set(keys::Bucky::BUCKY_RELEASE, !down);
 
-                if let Some(key) = british::KEYS.get(scan as usize) {
-                    let c = key.pick(keys);
+                let key = british::KEYS.get(scan as usize)?;
+                let c = key.pick(keys);
 
-                    let c = match char::from_u32(c) {
-                        Some(c) if keys.contains(keys::Bucky::BUCKY_CAPS) => {
-                            c.to_uppercase().next().unwrap_or(c) as u32
-                        }
-                        _ => c,
-                    };
+                let c = match char::from_u32(c) {
+                    Some(c) if keys.contains(keys::Bucky::BUCKY_CAPS) => c.to_uppercase().next().unwrap_or(c) as u32,
+                    _ => c,
+                };
 
-                    keys.bits() | c
-                } else {
-                    return Vec::new();
-                }
+                keys.bits() | c
             }
 
-            Some(Keypress::Leds(flags)) => {
+            Keypress::Leds(flags) => {
                 unsafe {
                     cpu::outb(0x60, 0xed);
                     cpu::outb(0x60, flags);
                 }
-                return Vec::new();
-            }
-
-            None => {
-                return Vec::new();
+                return None;
             }
         };
 
-        let data: [u8; 4] = unsafe { mem::transmute(c) };
-        data.to_vec()
+        Some(c.to_le_bytes())
     }
 }
 
@@ -287,13 +288,14 @@ impl Keyboard {
             let device = device.clone();
             move || {
                 let mut state = lock!(state);
-                let code = unsafe { cpu::inb(0x60) };
-                let bytes = state.translate(code);
-                let _ = Write::write(&*device, &bytes[..]);
+                let code = unsafe { read_keyboard() };
+                if let Some(bytes) = state.translate(code) {
+                    let _ = Write::write(&*device, &bytes[..]);
+                }
             }
         };
 
-        Keyboard {
+        Self {
             _drop_irq_handler: isr::register_irq_handler(1, handler),
             device,
         }

@@ -17,6 +17,6 @@ mod types;
 pub use client::{App, ClientPortal};
 
 #[cfg(feature = "server")]
-pub use server::{ServerApp, ServerPipe};
+pub use server::{ServerApp, ServerInput, ServerPipe};
 
 pub use types::{Event, Rect};

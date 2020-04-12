@@ -16,8 +16,13 @@ impl Console {
             input: FlatMap::new(
                 input,
                 4,
-                move |keys| {
-                    let c = unsafe { *(keys[0..4].as_ptr() as *const u32) };
+                move |v| {
+                    assert_eq!(v.len(), 4);
+
+                    let mut keys = [0; 4];
+                    keys.copy_from_slice(&v);
+
+                    let c = u32::from_le_bytes(keys);
                     let keys = keys::Bucky::from_bits_truncate(c);
                     let c = c & !keys.bits();
                     if keys.intersects(
