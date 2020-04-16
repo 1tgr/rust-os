@@ -1,6 +1,6 @@
 use crate::client::ClientPipe;
 use crate::frame_buffer::FrameBuffer;
-use crate::types::{Command, Rect};
+use crate::types::{Command, EventInput, Rect};
 use crate::{client, Event};
 use alloc::rc::Rc;
 use cairo::cairo::Cairo;
@@ -8,27 +8,25 @@ use core::mem;
 use ecs::{ComponentStorage, System};
 use os::{Result, SharedMem};
 
+pub trait Handler {
+    fn on_paint(&self, cr: &Cairo);
+    fn on_input(&self, e: &mut ComponentStorage, inputs: Vec<EventInput>);
+}
+
 pub struct ClientPortal {
     pos: Rect,
-    on_paint: Box<dyn Fn(&Cairo) -> ()>,
-    on_key_press: Rc<dyn Fn(&mut ComponentStorage, char) -> ()>,
+    handler: Rc<dyn Handler>,
     prev_pos: Rect,
     id: usize,
     frame_buffer: FrameBuffer,
     needs_paint: bool,
-    waiting_keys: Vec<char>,
+    input: Vec<EventInput>,
 }
 
 impl ClientPortal {
-    pub fn new<OnPaint, OnKeyPress>(
-        e: &mut ComponentStorage,
-        pos: Rect,
-        on_paint: OnPaint,
-        on_key_press: OnKeyPress,
-    ) -> Result<Self>
+    pub fn new<H>(e: &mut ComponentStorage, pos: Rect, handler: H) -> Result<Self>
     where
-        OnPaint: Fn(&Cairo) -> () + 'static,
-        OnKeyPress: Fn(&mut ComponentStorage, char) -> () + 'static,
+        H: Handler + 'static,
     {
         let id = client::alloc_id();
         let shared_mem = SharedMem::new(true)?;
@@ -47,13 +45,12 @@ impl ClientPortal {
 
         Ok(Self {
             pos,
-            on_paint: Box::new(on_paint),
-            on_key_press: Rc::new(on_key_press),
+            handler: Rc::new(handler),
             prev_pos: pos,
             id,
             frame_buffer,
             needs_paint: true,
-            waiting_keys: Vec::new(),
+            input: Vec::new(),
         })
     }
 
@@ -68,8 +65,8 @@ impl ClientPortal {
 
     pub fn dispatch_event(&mut self, event: &Event) {
         match *event {
-            Event::KeyPress { portal_id, code } if portal_id == self.id => {
-                self.waiting_keys.push(code);
+            Event::Input { portal_id, ref input } if portal_id == self.id => {
+                self.input.push(input.clone());
             }
             _ => (),
         }
@@ -80,20 +77,15 @@ pub struct ClientPortalSystem;
 
 impl System for ClientPortalSystem {
     fn run(&mut self, e: &mut ComponentStorage) -> Result<()> {
-        let mut waiting_keys = Vec::new();
+        let mut input_handlers = Vec::new();
         for portal in e.components_mut::<ClientPortal>() {
-            if !portal.waiting_keys.is_empty() {
-                waiting_keys.push((
-                    portal.on_key_press.clone(),
-                    mem::replace(&mut portal.waiting_keys, Vec::new()),
-                ));
+            if !portal.input.is_empty() {
+                input_handlers.push((portal.handler.clone(), mem::replace(&mut portal.input, Vec::new())));
             }
         }
 
-        for (f, codes) in waiting_keys {
-            for code in codes {
-                f(e, code);
-            }
+        for (handler, v) in input_handlers {
+            handler.on_input(e, v);
         }
 
         let mut commands = Vec::new();
@@ -112,7 +104,7 @@ impl System for ClientPortalSystem {
                 let cr = portal.frame_buffer.as_surface().into_cairo();
                 cr.set_source_rgb(1.0, 1.0, 1.5);
                 cr.paint();
-                (portal.on_paint)(&cr);
+                portal.handler.on_paint(&cr);
                 portal.needs_paint = false;
                 commands.push(Command::InvalidatePortal { id: portal.id });
             }

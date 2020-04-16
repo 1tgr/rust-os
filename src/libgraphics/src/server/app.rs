@@ -1,7 +1,7 @@
 use crate::frame_buffer::FrameBuffer;
-use crate::ipc;
 use crate::server::portal::{PortalRef, ScreenState, ServerPortal, ServerPortalSystem};
-use crate::types::{Command, Event};
+use crate::types::{Command, Event, EventInput};
+use crate::{ipc, MouseButton};
 use alloc::collections::btree_map::{BTreeMap, Entry};
 use alloc::sync::Arc;
 use cairo::bindings::*;
@@ -19,13 +19,74 @@ struct MouseState {
 }
 
 impl MouseState {
-    fn update(&mut self, dx: i16, dy: i16, _dw: i8, left: bool, middle: bool, right: bool) -> (u16, u16) {
-        self.cursor_x = ((self.cursor_x as i32 + dx as i32).max(0) as u16).min(self.screen_width - 1);
-        self.cursor_y = ((self.cursor_y as i32 + dy as i32).max(0) as u16).min(self.screen_height - 1);
+    fn update(
+        &mut self,
+        dx: i16,
+        dy: i16,
+        _dw: i8,
+        left: bool,
+        middle: bool,
+        right: bool,
+    ) -> (f64, f64, Vec<EventInput>) {
+        let x = ((self.cursor_x as i32 + dx as i32).max(0) as u16).min(self.screen_width - 1);
+        let y = ((self.cursor_y as i32 + dy as i32).max(0) as u16).min(self.screen_height - 1);
+        let mut inputs = Vec::new();
+
+        if x != self.cursor_x || y != self.cursor_y {
+            inputs.push(EventInput::MouseMove {
+                x: x as f64,
+                y: y as f64,
+            });
+        }
+
+        if left && !self.left {
+            inputs.push(EventInput::MouseDown {
+                x: x as f64,
+                y: y as f64,
+                button: MouseButton::Left,
+            });
+        } else if !left && self.left {
+            inputs.push(EventInput::MouseUp {
+                x: x as f64,
+                y: y as f64,
+                button: MouseButton::Left,
+            });
+        }
+
+        if middle && !self.middle {
+            inputs.push(EventInput::MouseDown {
+                x: x as f64,
+                y: y as f64,
+                button: MouseButton::Middle,
+            });
+        } else if !middle && self.middle {
+            inputs.push(EventInput::MouseUp {
+                x: x as f64,
+                y: y as f64,
+                button: MouseButton::Middle,
+            });
+        }
+
+        if right && !self.right {
+            inputs.push(EventInput::MouseDown {
+                x: x as f64,
+                y: y as f64,
+                button: MouseButton::Right,
+            });
+        } else if !right && self.right {
+            inputs.push(EventInput::MouseUp {
+                x: x as f64,
+                y: y as f64,
+                button: MouseButton::Right,
+            });
+        }
+
+        self.cursor_x = x;
+        self.cursor_y = y;
         self.left = left;
         self.middle = middle;
         self.right = right;
-        (self.cursor_x, self.cursor_y)
+        (x as f64, y as f64, inputs)
     }
 }
 
@@ -63,20 +124,29 @@ impl ServerInput {
     }
 
     pub fn send_keypress(&self, code: char) -> Result<()> {
-        let (server2client, portal_id) =
-            if let Some(PortalRef { server2client, id }) = &*self.keyboard_focus.lock().unwrap() {
-                (server2client.clone(), *id)
-            } else {
-                return Ok(());
-            };
+        let (server2client, portal_id) = if let Some(PortalRef {
+            server2client,
+            portal_id: id,
+        }) = &*self.keyboard_focus.lock().unwrap()
+        {
+            (server2client.clone(), *id)
+        } else {
+            return Ok(());
+        };
 
         let mut server2client = server2client.lock().unwrap();
-        ipc::send_message(&mut *server2client, &Event::KeyPress { portal_id, code })
+        ipc::send_message(
+            &mut *server2client,
+            &Event::Input {
+                portal_id,
+                input: EventInput::KeyPress { code },
+            },
+        )
     }
 
-    pub fn update_mouse_state(&self, dx: i16, dy: i16, dw: i8, left: bool, middle: bool, right: bool) {
-        let (x, y) = self.mouse_state.lock().unwrap().update(dx, dy, dw, left, middle, right);
-        self.screen_state.lock().unwrap().update_mouse_state(x, y);
+    pub fn update_mouse_state(&self, dx: i16, dy: i16, dw: i8, left: bool, middle: bool, right: bool) -> Result<()> {
+        let (x, y, inputs) = self.mouse_state.lock().unwrap().update(dx, dy, dw, left, middle, right);
+        self.screen_state.lock().unwrap().update_mouse_state(x, y, inputs)
     }
 }
 
@@ -112,7 +182,6 @@ impl ServerApp {
         server2client: &Arc<Mutex<File>>,
         command: Command,
     ) -> Result<()> {
-        println!("[Server] {:?}", command);
         match command {
             Command::Checkpoint { id } => {
                 let mut server2client = server2client.lock().unwrap();

@@ -6,7 +6,7 @@ pub struct Rect {
     pub height: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Command {
     Checkpoint {
         id: usize,
@@ -32,9 +32,23 @@ pub enum Command {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum MouseButton {
+    Left,
+    Middle,
+    Right,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum EventInput {
+    KeyPress { code: char },
+    MouseDown { x: f64, y: f64, button: MouseButton },
+    MouseUp { x: f64, y: f64, button: MouseButton },
+    MouseMove { x: f64, y: f64 },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
     Checkpoint { id: usize },
-
-    KeyPress { portal_id: usize, code: char },
+    Input { portal_id: usize, input: EventInput },
 }

@@ -180,7 +180,7 @@ pub fn exit(code: i32) -> ! {
 }
 
 fn spawn_inner<'a>(process: Arc<Process>, start: Box<dyn FnOnce() + 'a>) -> Deferred<i32> {
-    let stack_len = 4096;
+    let stack_len = 4096 * 8;
     let stack_base_ptr = unsafe { alloc_mod::alloc_zeroed(Layout::from_size_align_unchecked(stack_len, 16)) };
     let b: Box<dyn FnOnce() + 'a> = Box::new(start);
     let jmp_buf = thread::new_jmp_buf(b, unsafe { stack_base_ptr.offset(stack_len as isize) });

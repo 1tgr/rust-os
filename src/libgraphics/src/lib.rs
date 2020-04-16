@@ -14,9 +14,9 @@ mod ipc;
 mod types;
 
 #[cfg(feature = "client")]
-pub use client::{App, ClientPortal};
+pub use client::{App, ClientPortal, Handler};
 
 #[cfg(feature = "server")]
 pub use server::{ServerApp, ServerInput, ServerPipe};
 
-pub use types::{Event, Rect};
+pub use types::{Event, EventInput, MouseButton, Rect};

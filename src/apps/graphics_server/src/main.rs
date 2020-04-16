@@ -49,7 +49,7 @@ fn mouse_thread(input: ServerInput) -> Result<()> {
         let left = (event.buttons & 1) != 0;
         let middle = (event.buttons & 2) != 0;
         let right = (event.buttons & 4) != 0;
-        input.update_mouse_state(event.dx, event.dy, event.dw, left, middle, right);
+        input.update_mouse_state(event.dx, event.dy, event.dw, left, middle, right)?;
     }
 }
 
