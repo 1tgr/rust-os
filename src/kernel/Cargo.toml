@@ -4,13 +4,6 @@ name = "kernel"
 version = "0.0.0"
 edition = "2018"
 
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
-# debug-assertions = true
-
 [[bin]]
 name = "kernel"
 path = "main.rs"

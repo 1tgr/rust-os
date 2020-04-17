@@ -19,5 +19,6 @@
             "--strip-all"
         ]
     },
-    "dynamic-linking-available": false
+    "dynamic-linking-available": false,
+    "panic-strategy": "abort"
 }

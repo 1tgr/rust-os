@@ -19,5 +19,6 @@
         ]
     },
     "dynamic-linking-available": false,
+    "panic-strategy": "abort",
     "code-model": "kernel"
 }
