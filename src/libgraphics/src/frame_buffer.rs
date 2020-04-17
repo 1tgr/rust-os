@@ -4,7 +4,6 @@ use core::slice;
 use os::{OSMem, Result, SharedMem};
 
 pub enum Buffer {
-    Vec(Vec<u8>),
     OSMem(OSMem),
     SharedMem(SharedMem),
     Ptr(*mut u8),
@@ -24,12 +23,6 @@ fn byte_len(width: f64, height: f64) -> usize {
 }
 
 impl FrameBuffer {
-    pub fn new(width: f64, height: f64) -> Self {
-        let len = byte_len(width, height);
-        let buffer = Buffer::Vec(vec![0; len]);
-        Self { width, height, buffer }
-    }
-
     pub fn from_os_mem(width: f64, height: f64, os_mem: OSMem) -> Self {
         Self {
             width,
@@ -60,7 +53,6 @@ impl FrameBuffer {
     pub fn resize(&mut self, width: f64, height: f64) -> Result<()> {
         let len = byte_len(width, height);
         match &mut self.buffer {
-            Buffer::Vec(vec) => vec.resize(len, 0),
             Buffer::OSMem(_) => panic!("can't resize OSMem"),
             Buffer::SharedMem(shared_mem) => shared_mem.resize(len)?,
             Buffer::Ptr(_) => panic!("can't resize Ptr"),
@@ -88,7 +80,6 @@ impl FrameBuffer {
         let stride = self.stride();
 
         match self.buffer {
-            Buffer::Vec(ref mut vec) => &mut vec[..],
             Buffer::OSMem(ref mut os_mem) => &mut *os_mem,
             Buffer::SharedMem(ref mut shared_mem) => &mut *shared_mem,
             Buffer::Ptr(ptr) => {

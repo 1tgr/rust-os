@@ -1,5 +1,6 @@
 use crate::frame_buffer::FrameBuffer;
-use crate::server::portal::{PortalRef, ScreenState, ServerPortal, ServerPortalSystem};
+use crate::server::portal::{ServerPortal, ServerPortalSystem};
+use crate::server::screen::{PortalRef, ScreenState};
 use crate::types::{Command, Event, EventInput};
 use crate::{ipc, MouseButton};
 use alloc::collections::btree_map::{BTreeMap, Entry};
