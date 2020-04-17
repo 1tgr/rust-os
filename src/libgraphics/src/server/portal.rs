@@ -120,7 +120,7 @@ impl System for ServerPortalSystem {
             let mut screen = self.screen_state.lock().unwrap();
             screen.buffers.clear();
 
-            for portal in portals.iter_mut() {
+            for portal in portals.iter_mut().rev() {
                 screen.buffers.push(portal.as_screen_buffer());
                 portal.needs_paint = false;
             }

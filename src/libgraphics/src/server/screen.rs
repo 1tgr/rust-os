@@ -48,8 +48,13 @@ impl ScreenState {
         }
     }
 
-    fn draw_buffers(cr: &Cairo, buffers: &[ScreenBuffer]) {
-        cr.set_source_rgb(0.0, 0.0, 0.5).paint();
+    fn draw_buffers(cr: &Cairo, screen_width: f64, screen_height: f64, buffers: &[ScreenBuffer]) {
+        cr.new_path()
+            .move_to(0.0, 0.0)
+            .rel_line_to(0.0, screen_height)
+            .rel_line_to(screen_width, 0.0)
+            .rel_line_to(0.0, -screen_height)
+            .rel_line_to(-screen_width, 0.0);
 
         for buffer in buffers {
             let ScreenBuffer {
@@ -57,14 +62,22 @@ impl ScreenState {
                 frame_buffer_ptr,
                 ..
             } = *buffer;
+
             let mut frame_buffer = unsafe { FrameBuffer::from_ptr(width, height, frame_buffer_ptr) };
             let surface = frame_buffer.as_surface();
-            cr.set_source_surface(&surface, x, y).paint();
+            cr.set_source_surface(&surface, x, y)
+                .paint()
+                .new_sub_path()
+                .rectangle(x, y, width, height)
+                .close_path()
+                .clip_preserve();
         }
+
+        cr.set_source_rgb(0.0, 0.0, 0.5).paint();
     }
 
     fn find_portal(buffers: &[ScreenBuffer], x: f64, y: f64) -> Option<&PortalRef> {
-        for buffer in buffers.iter().rev() {
+        for buffer in buffers {
             let ScreenBuffer {
                 pos, ref portal_ref, ..
             } = *buffer;
@@ -77,8 +90,9 @@ impl ScreenState {
     }
 
     pub fn draw(&mut self) {
+        let FrameBuffer { width, height, .. } = self.lfb;
         let cr = self.lfb.as_surface().into_cairo();
-        Self::draw_buffers(&cr, &self.buffers);
+        Self::draw_buffers(&cr, width, height, &self.buffers);
 
         cr.reset_clip()
             .set_source_surface(&self.cursor, self.cursor_x, self.cursor_y)
@@ -91,11 +105,12 @@ impl ScreenState {
         self.cursor_x = x as f64 - CURSOR_HOTSPOT_X;
         self.cursor_y = y as f64 - CURSOR_HOTSPOT_Y;
 
+        let FrameBuffer { width, height, .. } = self.lfb;
         let cr = self.lfb.as_surface().into_cairo();
         cr.rectangle(prev_cursor_x, prev_cursor_y, CURSOR_WIDTH, CURSOR_HEIGHT)
             .clip();
 
-        Self::draw_buffers(&cr, &self.buffers);
+        Self::draw_buffers(&cr, width, height, &self.buffers);
 
         cr.reset_clip()
             .set_source_surface(&self.cursor, self.cursor_x, self.cursor_y)

@@ -32,6 +32,11 @@ impl Cairo {
         self
     }
 
+    pub fn clip_preserve(&self) -> &Self {
+        unsafe { cairo_clip_preserve(self.0.as_ptr()) }
+        self
+    }
+
     pub fn reset_clip(&self) -> &Self {
         unsafe { cairo_reset_clip(self.0.as_ptr()) }
         self
