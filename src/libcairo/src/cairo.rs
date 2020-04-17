@@ -2,14 +2,15 @@ use crate::bindings::*;
 use crate::surface::CairoSurface;
 use crate::CairoObj;
 use alloc::string::ToString;
+use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::NonNull;
 
-pub struct Cairo(CairoObj<cairo_t>);
+pub struct Cairo<'a>(CairoObj<cairo_t>, PhantomData<CairoSurface<'a>>);
 
-impl Cairo {
+impl<'a> Cairo<'a> {
     pub fn new(surface: CairoSurface) -> Self {
-        Cairo(CairoObj::wrap(unsafe { cairo_create(surface.as_ptr()) }))
+        Cairo(CairoObj::wrap(unsafe { cairo_create(surface.as_ptr()) }), PhantomData)
     }
 
     pub fn save(&self) -> &Self {
@@ -112,7 +113,7 @@ impl Cairo {
     }
 }
 
-impl Deref for Cairo {
+impl<'a> Deref for Cairo<'a> {
     type Target = NonNull<cairo_t>;
 
     fn deref(&self) -> &NonNull<cairo_t> {

@@ -25,7 +25,7 @@ impl<'a> CairoSurface<'a> {
         Self(CairoObj::wrap(ptr), PhantomData)
     }
 
-    pub fn into_cairo(self) -> Cairo {
+    pub fn into_cairo(self) -> Cairo<'a> {
         Cairo::new(self)
     }
 }
