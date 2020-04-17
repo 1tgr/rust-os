@@ -94,6 +94,6 @@ impl FrameBuffer {
         let height = self.height_i();
         let stride = self.stride();
         let data = self.as_mut_slice();
-        CairoSurface::from_slice(data, cairo::bindings::CAIRO_FORMAT_ARGB32, width, height, stride)
+        CairoSurface::from_slice(data, cairo::bindings::CAIRO_FORMAT_RGB24, width, height, stride)
     }
 }
