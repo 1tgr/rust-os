@@ -40,19 +40,6 @@ unsafe fn write_ps2_aux(data: u8) {
     assert_eq!(response, 0xfa);
 }
 
-unsafe fn read_ps2_aux() -> u8 {
-    loop {
-        let stat = cpu::inb(0x64);
-        if (stat & 0x01) != 0 {
-            let data = cpu::inb(0x60);
-
-            if (stat & 0xc0) == 0 {
-                return data;
-            }
-        }
-    }
-}
-
 struct Ps2MouseState {
     has_wheel: bool,
     data: [u8; 4],
@@ -161,7 +148,7 @@ impl Ps2Mouse {
             let device = device.clone();
             move || {
                 let mut state = lock!(state);
-                let code = unsafe { read_ps2_aux() };
+                let code = unsafe { read_keyboard() };
                 if let Some(bytes) = state.translate(code) {
                     let _ = Write::write(&*device, &bytes[..]);
                 }
