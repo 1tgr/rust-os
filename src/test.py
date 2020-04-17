@@ -5,17 +5,19 @@ import subprocess
 import tempfile
 from pexpect import fdpexpect
 from subprocess import Popen
+from vncdotool import api
 
-if __name__ == '__main__':
+def main():
     fifo_name = os.path.join(tempfile.mkdtemp(), 'fifo')
     os.mkfifo(fifo_name)
 
     try:
-        child_args = sys.argv[1:] + ['-serial', 'pipe:' + fifo_name]
+        child_args = sys.argv[1:] + ['-serial', 'pipe:' + fifo_name, '-vnc', ':0']
         print('> %s' % subprocess.list2cmdline(child_args))
         with Popen(child_args) as child_proc:
             print('[test.py] Started process %d' % child_proc.pid)
             try:
+
                 with open(fifo_name, 'rb') as fifo:
                     child = fdpexpect.fdspawn(fifo, encoding='utf8', logfile=sys.stdout, timeout=10)
                     result = child.expect([r'\[kernel\] end kmain|System ready', r'\[kernel::unwind\] (.*)', pexpect.TIMEOUT])
@@ -28,6 +30,29 @@ if __name__ == '__main__':
                         print('[test.py] Timed out')
 
             finally:
+                client = api.connect('localhost:0', password=None)
+
+                filename = 'screenshot.png'
+                print('[test.py] Saving screenshot to %s' % filename)
+
+                prev_screenshot_bytes = None
+
+                if result == 0:
+                    try:
+                        with open(filename, 'rb') as f:
+                            prev_screenshot_bytes = f.read()
+                    except:
+                        pass
+
+                client.captureScreen(filename)
+
+                if prev_screenshot_bytes is not None:
+                    with open(filename, 'rb') as f:
+                        screenshot_bytes = f.read()
+
+                    if prev_screenshot_bytes != screenshot_bytes:
+                        result = 3
+
                 print('[test.py] Stopping process %d' % child_proc.pid)
                 child_proc.kill()
                 print('[test.py] Waiting for process %d to exit... ' % child_proc.pid, end='', flush=True)
@@ -37,4 +62,8 @@ if __name__ == '__main__':
     finally:
         os.unlink(fifo_name)
 
+    return result
+
+if __name__ == '__main__':
+    result = main()
     exit(result)

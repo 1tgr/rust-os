@@ -3,6 +3,8 @@
 A Rust operating system
 =======================
 
+![Screenshot](src/screenshot.png)
+
 Based on the [Rust barebones kernel](https://github.com/thepowersgang/rust-barebones-kernel).
 
 Rustdocs for the kernel: http://1tgr.github.io/rust-os/kernel/
