@@ -1,9 +1,10 @@
 use crate::ipc;
 use crate::server::app::ServerApp;
+use crate::Result;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::sync::Arc;
 use core::str;
-use os::{File, Mutex, Process, Result};
+use os::{File, Mutex, Process};
 use syscall::libc_helpers;
 
 pub struct ServerPipe {

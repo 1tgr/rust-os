@@ -5,108 +5,84 @@ extern crate alloc;
 extern crate alloc_system;
 extern crate rt;
 
-use alloc::rc::Rc;
 use cairo::bindings::*;
-use cairo::cairo::Cairo;
 use cairo::CairoObj;
-use core::cell::RefCell;
 use core::fmt::Write;
 use core::mem::MaybeUninit;
-use ecs::{ComponentStorage, Entity};
-use graphics::{App, ClientPortal, Event, EventInput, Handler, Rect};
-use os::Result;
+use graphics::{App, ClientPortal, Event, EventInput, NeedsPaint, OnInput, OnPaint, Position, Rect, Result};
 
-struct DemoWindow {
-    portal: Entity,
-    text: Rc<RefCell<String>>,
-}
-
-impl Handler for DemoWindow {
-    fn on_paint(&self, cr: &Cairo) {
-        unsafe {
-            let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 100.0));
-            cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 1.0, 0.0, 0.0, 0.0, 1.0);
-            cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 0.0, 1.0, 1.0, 1.0, 1.0);
-            cairo_rectangle(cr.as_ptr(), 0.0, 0.0, 150.0, 120.0);
-            cairo_set_source(cr.as_ptr(), pat.as_ptr());
-            cairo_fill(cr.as_ptr());
-
-            let text = self.text.borrow();
-            let mut v = Vec::<u8>::with_capacity(text.len() + 1);
-            v.extend(text.as_bytes());
-            v.push(0);
-
-            let text_ptr = (&v[..]).as_ptr() as *const i8;
-            let mut extents = MaybeUninit::uninit();
-            cairo_text_extents(cr.as_ptr(), text_ptr, extents.as_mut_ptr());
-
-            let extents = extents.assume_init();
-            cairo_set_source_rgb(cr.as_ptr(), 0.0, 0.0, 0.0);
-            cairo_move_to(cr.as_ptr(), 0.0, extents.height);
-            cairo_show_text(cr.as_ptr(), text_ptr);
-        }
-    }
-
-    fn on_input(&self, e: &mut ComponentStorage, inputs: Vec<EventInput>) {
-        for input in inputs {
-            match input {
-                EventInput::KeyPress { code } => {
-                    match code {
-                        '\x08' => {
-                            self.text.borrow_mut().pop();
-                        }
-                        '\u{1b}' => {
-                            e.clear_entity(&self.portal);
-                            return;
-                        }
-                        _ => {
-                            self.text.borrow_mut().push(code);
-                        }
-                    }
-
-                    e.update_component(&self.portal, |state: &mut ClientPortal| {
-                        state.invalidate();
-                        Ok(())
-                    })
-                    .unwrap();
-                }
-
-                _ => {
-                    let mut text = self.text.borrow_mut();
-                    text.clear();
-                    write!(&mut *text, "{:?}", input).unwrap();
-
-                    e.update_component(&self.portal, |state: &mut ClientPortal| {
-                        state.invalidate();
-                        Ok(())
-                    })
-                    .unwrap();
-                }
-            }
-        }
-    }
-}
+struct Text(String);
 
 fn run() -> Result<()> {
-    let mut app = App::new()?;
-    let entities = app.entities_mut();
+    let mut app = App::new();
+    let world = app.world_mut();
     for i in 0..5 {
-        let portal = Entity::new();
-        let portal_state = ClientPortal::new(
-            entities,
-            Rect {
+        world.spawn((
+            ClientPortal,
+            Position(Rect {
                 x: i as f64 * 100.0,
                 y: i as f64 * 100.0,
                 width: 150.0,
                 height: 120.0,
-            },
-            DemoWindow {
-                portal: portal.clone(),
-                text: Rc::new(RefCell::new("hello".to_owned())),
-            },
-        )?;
+            }),
+            Text("hello".to_owned()),
+            OnPaint::new(|world, entity, cr| unsafe {
+                let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 100.0));
+                cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 1.0, 0.0, 0.0, 0.0, 1.0);
+                cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 0.0, 1.0, 1.0, 1.0, 1.0);
+                cairo_rectangle(cr.as_ptr(), 0.0, 0.0, 150.0, 120.0);
+                cairo_set_source(cr.as_ptr(), pat.as_ptr());
+                cairo_fill(cr.as_ptr());
 
-        entities.add_component(&portal, portal_state);
+                let Text(text) = &*world.get::<Text>(entity).unwrap();
+                let mut v = Vec::<u8>::with_capacity(text.len() + 1);
+                v.extend(text.as_bytes());
+                v.push(0);
+
+                let text_ptr = (&v[..]).as_ptr() as *const i8;
+                let mut extents = MaybeUninit::uninit();
+                cairo_text_extents(cr.as_ptr(), text_ptr, extents.as_mut_ptr());
+
+                let extents = extents.assume_init();
+                cairo_set_source_rgb(cr.as_ptr(), 0.0, 0.0, 0.0);
+                cairo_move_to(cr.as_ptr(), 0.0, extents.height);
+                cairo_show_text(cr.as_ptr(), text_ptr);
+            }),
+            OnInput::new(|world, entity, input| {
+                match *input {
+                    EventInput::KeyPress { code } => {
+                        match code {
+                            '\x08' => {
+                                let Text(text) = &mut *world.get_mut::<Text>(entity).unwrap();
+                                text.pop();
+                            }
+                            '\u{1b}' => {
+                                world.despawn(entity).unwrap();
+                                return Ok(());
+                            }
+                            _ => {
+                                let Text(text) = &mut *world.get_mut::<Text>(entity).unwrap();
+                                text.push(code);
+                            }
+                        }
+
+                        world.insert_one(entity, NeedsPaint).unwrap();
+                    }
+
+                    _ => {
+                        {
+                            let Text(text) = &mut *world.get_mut::<Text>(entity).unwrap();
+                            text.clear();
+                            write!(text, "{:?}", input).unwrap();
+                        }
+
+                        world.insert_one(entity, NeedsPaint).unwrap();
+                    }
+                }
+
+                Ok(())
+            }),
+        ));
     }
 
     let checkpoint_id = app.checkpoint()?;
@@ -119,7 +95,7 @@ fn run() -> Result<()> {
             }
         }
 
-        app.dispatch_event(&e);
+        app.dispatch_event(&e)?;
     }
 }
 

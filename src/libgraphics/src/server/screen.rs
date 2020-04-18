@@ -1,10 +1,11 @@
 use crate::frame_buffer::FrameBuffer;
 use crate::ipc;
 use crate::types::{Event, EventInput, Rect};
+use crate::Result;
 use alloc::sync::Arc;
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
-use os::{File, Mutex, Result};
+use os::{File, Mutex};
 
 const CURSOR_WIDTH: f64 = 32.0;
 const CURSOR_HEIGHT: f64 = 32.0;

@@ -7,8 +7,8 @@ edition = "2018"
 [dependencies]
 alloc_system = { path = "../../liballoc_system" }
 cairo = { path = "../../libcairo" }
-ecs = { path = "../../libecs" }
 graphics = { path = "../../libgraphics" }
+hecs = { version = "0.2", default-features = false, git = "https://github.com/1tgr/hecs.git", rev = "2f50eb184834a3693b68f5ce7901beeacf4e0189" }
 os = { path = "../../libos" }
 rt = { path = "../../librt" }
 serde = { version = "1", default-features = false, features = ["alloc"] }

@@ -1,46 +1,69 @@
-use crate::client::portal::ClientPortalSystem;
-use crate::client::ClientPipe;
+use crate::client::pipe::ClientPipe;
+use crate::client::portal::{ClientPortalId, ClientPortalSystem};
+use crate::components::OnInput;
+use crate::system::System;
 use crate::types::Event;
-use crate::ClientPortal;
-use ecs::{ComponentStorage, Entity};
-use os::Result;
+use crate::Result;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+use hecs::World;
 
 pub struct App {
-    pipe: Entity,
-    entities: ComponentStorage,
+    pipe: Rc<RefCell<ClientPipe>>,
+    world: World,
+    systems: Vec<Box<dyn System>>,
 }
 
 impl App {
-    pub fn new() -> Result<Self> {
-        let mut entities = ComponentStorage::new();
-        let pipe = Entity::new();
-        entities.add_component(&pipe, ClientPipe::new());
-        entities.add_system(ClientPortalSystem);
-        Ok(Self { pipe, entities })
+    pub fn new() -> Self {
+        let pipe = Rc::new(RefCell::new(ClientPipe::new()));
+        let mut systems: Vec<Box<dyn System>> = Vec::new();
+        systems.push(Box::new(ClientPortalSystem::new(pipe.clone())));
+        Self {
+            pipe,
+            world: World::new(),
+            systems,
+        }
     }
 
-    pub fn entities(&self) -> &ComponentStorage {
-        &self.entities
+    pub fn world(&self) -> &World {
+        &self.world
     }
 
-    pub fn entities_mut(&mut self) -> &mut ComponentStorage {
-        &mut self.entities
+    pub fn world_mut(&mut self) -> &mut World {
+        &mut self.world
     }
 
     pub fn checkpoint(&mut self) -> Result<usize> {
-        self.entities
-            .update_component(&self.pipe, |state: &mut ClientPipe| state.checkpoint())
+        self.pipe.borrow_mut().checkpoint()
     }
 
     pub fn wait_for_event(&mut self) -> Result<Event> {
-        self.entities.run_systems()?;
-        self.entities
-            .update_component(&self.pipe, |state: &mut ClientPipe| state.wait_for_event())
+        for system in self.systems.iter_mut() {
+            system.run(&mut self.world)?;
+        }
+
+        self.pipe.borrow_mut().wait_for_event()
     }
 
-    pub fn dispatch_event(&mut self, event: &Event) {
-        for portal in self.entities.components_mut::<ClientPortal>() {
-            portal.dispatch_event(event);
+    pub fn dispatch_event(&mut self, event: &Event) -> Result<()> {
+        let mut inputs = Vec::new();
+
+        for (entity, (&ClientPortalId(id), &OnInput(ref on_input))) in
+            self.world.query::<(&ClientPortalId, &OnInput)>().iter()
+        {
+            match *event {
+                Event::Input { portal_id, ref input } if portal_id == id => {
+                    inputs.push((entity, on_input.clone(), input));
+                }
+                _ => (),
+            }
         }
+
+        for (entity, on_input, input) in inputs {
+            (on_input)(&mut self.world, entity, input)?;
+        }
+
+        Ok(())
     }
 }

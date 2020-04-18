@@ -1,13 +1,15 @@
 use crate::frame_buffer::FrameBuffer;
+use crate::ipc;
 use crate::server::portal::{ServerPortal, ServerPortalSystem};
 use crate::server::screen::{PortalRef, ScreenState};
-use crate::types::{Command, Event, EventInput};
-use crate::{ipc, MouseButton};
-use alloc::collections::btree_map::{BTreeMap, Entry};
+use crate::system::System;
+use crate::types::{Command, Event, EventInput, MouseButton};
+use crate::Result;
 use alloc::sync::Arc;
 use cairo::bindings::*;
-use ecs::{ComponentStorage, Entity};
-use os::{File, Mutex, OSMem, Process, Result, SharedMem};
+use hashbrown::HashMap;
+use hecs::{Entity, World};
+use os::{File, Mutex, OSMem, Process, SharedMem};
 
 struct MouseState {
     screen_width: u16,
@@ -152,28 +154,30 @@ impl ServerInput {
 }
 
 pub struct ServerApp {
-    portals_by_id: BTreeMap<usize, Entity>,
+    portals_by_id: HashMap<usize, Entity>,
     input: ServerInput,
-    entities: ComponentStorage,
+    world: World,
+    systems: Vec<Box<dyn System>>,
 }
 
 impl ServerApp {
     pub fn new() -> Result<Self> {
-        let mut entities = ComponentStorage::new();
+        let mut systems: Vec<Box<dyn System>> = Vec::new();
         let lfb_ptr = syscall::init_video_mode(800, 600, 32)?;
         let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
         let lfb_mem = unsafe { OSMem::from_raw(lfb_ptr, stride * 600) };
         let lfb = FrameBuffer::from_os_mem(800.0, 600.0, lfb_mem);
         let input = ServerInput::new(lfb)?;
-        entities.add_system(ServerPortalSystem::new(
+        systems.push(Box::new(ServerPortalSystem::new(
             input.screen_state.clone(),
             input.keyboard_focus.clone(),
-        ));
+        )));
 
         Ok(Self {
-            portals_by_id: BTreeMap::new(),
+            portals_by_id: HashMap::new(),
             input,
-            entities,
+            world: World::new(),
+            systems,
         })
     }
 
@@ -194,43 +198,36 @@ impl ServerApp {
                 pos,
                 shared_mem_handle,
             } => {
-                let portal = Entity::new();
                 let shared_mem = SharedMem::from_raw(client_process.open_handle(shared_mem_handle)?, false);
-                self.entities.add_component(
-                    &portal,
-                    ServerPortal::new(&self.entities, server2client.clone(), id, pos, shared_mem)?,
-                );
-
-                self.portals_by_id.insert(id, portal);
+                let portal = ServerPortal::new(&self.world, server2client.clone(), id, pos, shared_mem)?;
+                let entity = self.world.spawn((portal,));
+                self.portals_by_id.insert(id, entity);
             }
 
             Command::DestroyPortal { id } => {
-                if let Entry::Occupied(entry) = self.portals_by_id.entry(id) {
-                    self.entities.clear_entity(entry.get());
-                    entry.remove();
+                if let Some(entity) = self.portals_by_id.remove(&id) {
+                    self.world.despawn(entity).unwrap();
                 }
             }
 
             Command::InvalidatePortal { id } => {
-                if let Some(portal) = self.portals_by_id.get(&id) {
-                    self.entities.update_component(portal, |state: &mut ServerPortal| {
-                        state.invalidate();
-                        Ok(())
-                    })?;
+                if let Some(entity) = self.portals_by_id.get(&id).copied() {
+                    self.world.get_mut::<ServerPortal>(entity).unwrap().invalidate();
                 }
             }
 
             Command::MovePortal { id, pos } => {
-                if let Some(portal) = self.portals_by_id.get(&id) {
-                    self.entities.update_component(portal, |state: &mut ServerPortal| {
-                        state.move_to(pos);
-                        Ok(())
-                    })?;
+                if let Some(entity) = self.portals_by_id.get(&id).copied() {
+                    self.world.get_mut::<ServerPortal>(entity).unwrap().move_to(pos);
                 }
             }
         }
 
-        self.entities.run_systems()
+        for system in self.systems.iter_mut() {
+            system.run(&mut self.world)?;
+        }
+
+        Ok(())
     }
 
     pub fn input(&self) -> ServerInput {

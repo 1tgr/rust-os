@@ -1,10 +1,12 @@
 use crate::client;
 use crate::frame_buffer::FrameBuffer;
 use crate::server::screen::{PortalRef, ScreenBuffer, ScreenState};
+use crate::system::{DeletedIndex, System};
 use crate::types::Rect;
+use crate::Result;
 use alloc::sync::Arc;
-use ecs::{ComponentStorage, System};
-use os::{File, Mutex, Result, SharedMem};
+use hecs::World;
+use os::{File, Mutex, SharedMem};
 
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
 pub struct ZIndex {
@@ -41,15 +43,16 @@ pub struct ServerPortal {
 
 impl ServerPortal {
     pub fn new(
-        e: &ComponentStorage,
+        world: &World,
         server2client: Arc<Mutex<File>>,
         id: usize,
         pos: Rect,
         shared_mem: SharedMem,
     ) -> Result<Self> {
-        let z_index = e
-            .components::<Self>()
-            .map(|p| &p.z_index)
+        let z_index = world
+            .query::<&Self>()
+            .iter()
+            .map(|(_, portal)| &portal.z_index)
             .max()
             .cloned()
             .unwrap_or_else(|| ZIndex::new());
@@ -89,6 +92,7 @@ impl ServerPortal {
 pub struct ServerPortalSystem {
     screen_state: Arc<Mutex<ScreenState>>,
     input_state: Arc<Mutex<Option<PortalRef>>>,
+    deleted_index: DeletedIndex<()>,
 }
 
 impl ServerPortalSystem {
@@ -96,14 +100,15 @@ impl ServerPortalSystem {
         ServerPortalSystem {
             screen_state,
             input_state,
+            deleted_index: DeletedIndex::new(),
         }
     }
 }
 
 impl System for ServerPortalSystem {
-    fn run(&mut self, e: &mut ComponentStorage) -> Result<()> {
-        let any_deleted = e.deleted_components::<ServerPortal>().any(|_| true);
-        let mut portals = e.components_mut::<ServerPortal>().collect::<Vec<_>>();
+    fn run(&mut self, world: &mut World) -> Result<()> {
+        let mut portals_borrow = world.query::<&mut ServerPortal>();
+        let mut portals = portals_borrow.iter().map(|(_, portal)| portal).collect::<Vec<_>>();
         portals.sort_by(|a, b| a.z_index.cmp(&b.z_index));
 
         for portal in portals.iter_mut() {
@@ -116,7 +121,10 @@ impl System for ServerPortalSystem {
 
         *self.input_state.lock().unwrap() = portals.last().map(|p| p.portal_ref.clone());
 
-        if any_deleted || portals.iter().any(|p| p.needs_paint) {
+        let deleted_entities = self
+            .deleted_index
+            .update(world.query::<()>().with::<ServerPortal>().iter());
+        if !deleted_entities.is_empty() || portals.iter().any(|p| p.needs_paint) {
             let mut screen = self.screen_state.lock().unwrap();
             screen.buffers.clear();
 

@@ -1,7 +1,8 @@
+use crate::Result;
 use cairo;
 use cairo::surface::CairoSurface;
 use core::slice;
-use os::{OSMem, Result, SharedMem};
+use os::{OSMem, SharedMem};
 
 pub enum Buffer {
     OSMem(OSMem),

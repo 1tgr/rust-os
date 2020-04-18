@@ -7,7 +7,6 @@ members = [
     "apps/input",
     "liballoc_system",
     "libcairo",
-    "libecs",
     "libgraphics",
     "liblibc",
     "libos",
