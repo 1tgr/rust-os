@@ -454,8 +454,27 @@ pub fn map_shared<T>(
     Allocation::shared(len, block).user(user).writable(writable).allocate()
 }
 
-pub fn free(p: *mut u8) -> bool {
-    thread::current_process().user_virt.free(p)
+pub fn free(ptr: *mut u8) -> bool {
+    let process = thread::current_process();
+    let ptr = Align::down(ptr, phys_mem::PAGE_SIZE);
+    let (len, _) = if let Some(tuple) = process.user_virt.free(ptr) {
+        tuple
+    } else {
+        return false;
+    };
+
+    assert!(Align::is_aligned(len, phys_mem::PAGE_SIZE));
+
+    for offset in (0..len).step_by(phys_mem::PAGE_SIZE) {
+        unsafe {
+            process
+                .arch
+                .map(ptr.offset(offset as isize), None, false, false)
+                .unwrap()
+        }
+    }
+
+    true
 }
 
 pub fn resolve_page_fault(ptr: *mut u8) -> bool {
@@ -476,14 +495,14 @@ pub fn resolve_page_fault(ptr: *mut u8) -> bool {
 
     unsafe {
         if dirty {
-            try_or_false!(process.arch.map(ptr, addr, block.user, true).ok());
+            try_or_false!(process.arch.map(ptr, Some(addr), block.user, true).ok());
             intrinsics::write_bytes(ptr, 0, phys_mem::PAGE_SIZE);
 
             if !block.writable {
-                try_or_false!(process.arch.map(ptr, addr, block.user, false).ok());
+                try_or_false!(process.arch.map(ptr, Some(addr), block.user, false).ok());
             }
         } else {
-            try_or_false!(process.arch.map(ptr, addr, block.user, block.writable).ok());
+            try_or_false!(process.arch.map(ptr, Some(addr), block.user, block.writable).ok());
         }
     }
 

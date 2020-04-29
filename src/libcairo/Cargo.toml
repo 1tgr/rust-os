@@ -6,5 +6,8 @@ build = "build.rs"
 links = "cairo"
 edition = "2018"
 
-[dependencies]
+[target.'cfg(not(target_os = "rust_os"))'.dependencies]
+cratesio_libc = { version = "0.2", package = "libc" }
+
+[target.'cfg(target_os = "rust_os")'.dependencies]
 libc = { path = "../liblibc" }

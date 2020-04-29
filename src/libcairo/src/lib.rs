@@ -1,15 +1,17 @@
 #![no_std]
 
 extern crate alloc;
-extern crate libc;
+
+#[cfg(not(target_os = "rust_os"))]
+extern crate cratesio_libc as libc;
 
 #[link(name = "c")]
 #[link(name = "cairo")]
 #[link(name = "pixman-1")]
 #[link(name = "png16")]
 #[link(name = "z")]
-#[link(name = "gcc")]
 #[link(name = "m")]
+#[cfg_attr(target_os = "rust_os", link(name = "gcc"))]
 extern "C" {}
 
 pub mod bindings;

@@ -11,7 +11,6 @@ use crate::process::{self, SharedMemBlock};
 use crate::singleton::{DropSingleton, Singleton};
 use crate::thread;
 use alloc::sync::Arc;
-use core::fmt;
 use syscall::{self, ErrNum, Handle, HandleSyscall, PackedArgs, Result};
 
 pub struct SyscallHandler {
@@ -42,9 +41,29 @@ impl SyscallHandler {
 }
 
 impl HandleSyscall for SyscallHandler {
-    fn log_entry(&self, _msg: fmt::Arguments) {}
+    /*
+    fn log_entry(&self, name: &'static str, args: fmt::Arguments) {
+        if name != "read" && name != "write" && name != "lock_mutex" && name != "unlock_mutex" {
+            use core::fmt::Write;
+            let mut writer = crate::logging::Writer;
+            let _ = write!(
+                &mut writer,
+                "[{}] {}{:?} => ",
+                thread::current_process().name(),
+                name,
+                args
+            );
+        }
+    }
 
-    fn log_exit(&self, _msg: fmt::Arguments) {}
+    fn log_exit(&self, name: &'static str, result: fmt::Arguments) {
+        if name != "read" && name != "write" && name != "lock_mutex" && name != "unlock_mutex" {
+            use core::fmt::Write;
+            let mut writer = crate::logging::Writer;
+            let _ = write!(&mut writer, "{:?}\n", result);
+        }
+    }
+    */
 
     fn exit_thread(&self, code: i32) -> Result<()> {
         thread::exit(code)

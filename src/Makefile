@@ -13,7 +13,6 @@ all: test
 
 xargo-build:
 	$(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET) --release
-	$(RUSTUP_RUN) cargo test -p graphics
 
 clean:
 	$(RUSTUP_RUN) xargo clean

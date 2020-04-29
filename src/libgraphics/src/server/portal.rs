@@ -1,12 +1,13 @@
 use crate::client;
-use crate::frame_buffer::FrameBuffer;
-use crate::server::screen::{PortalRef, ScreenBuffer, ScreenState};
+use crate::compat::Mutex;
+use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
+use crate::server::screen::{Screen, ScreenBuffer};
 use crate::system::{DeletedIndex, System};
 use crate::types::Rect;
 use crate::Result;
 use alloc::sync::Arc;
+use core::mem;
 use hecs::World;
-use os::{File, Mutex, SharedMem};
 
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
 pub struct ZIndex {
@@ -32,23 +33,87 @@ impl Clone for ZIndex {
     }
 }
 
+#[cfg(target_os = "rust_os")]
+mod rust_os {
+    use crate::ipc;
+    use crate::types::{Event, EventInput};
+    use crate::Result;
+    use alloc::sync::Arc;
+    use os::{File, Mutex};
+
+    #[derive(Clone)]
+    pub struct PortalRef {
+        pub server2client: Arc<Mutex<File>>,
+        pub portal_id: usize,
+    }
+
+    impl PortalRef {
+        pub fn send_input(&self, input: EventInput) -> Result<()> {
+            let mut server2client = self.server2client.lock().unwrap();
+            ipc::send_message(
+                &mut *server2client,
+                &Event::Input {
+                    portal_id: self.portal_id,
+                    input,
+                },
+            )
+        }
+    }
+}
+
+#[cfg(not(target_os = "rust_os"))]
+mod posix {
+    use crate::types::{Event, EventInput};
+    use crate::Result;
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::rc::Rc;
+
+    #[derive(Clone)]
+    pub struct PortalRef {
+        pub portal_id: usize,
+        pub events: Rc<RefCell<VecDeque<Event>>>,
+    }
+
+    impl PortalRef {
+        pub fn send_input(&self, input: EventInput) -> Result<()> {
+            let event = Event::Input {
+                portal_id: self.portal_id,
+                input,
+            };
+
+            self.events.borrow_mut().push_back(event);
+            Ok(())
+        }
+    }
+}
+
+#[cfg(target_os = "rust_os")]
+pub use rust_os::PortalRef;
+
+#[cfg(not(target_os = "rust_os"))]
+pub use posix::PortalRef;
+
 pub struct ServerPortal {
     portal_ref: PortalRef,
     pos: Rect,
     prev_pos: Rect,
     z_index: ZIndex,
-    frame_buffer: FrameBuffer,
+    frame_buffer_id: usize,
+    frame_buffer_size: (u16, u16),
+    frame_buffer: Arc<FrameBuffer>,
     needs_paint: bool,
 }
 
 impl ServerPortal {
     pub fn new(
         world: &World,
-        server2client: Arc<Mutex<File>>,
-        id: usize,
+        portal_ref: PortalRef,
         pos: Rect,
-        shared_mem: SharedMem,
-    ) -> Result<Self> {
+        frame_buffer_id: usize,
+        frame_buffer_size: (u16, u16),
+        frame_buffer: FrameBuffer,
+    ) -> Self {
         let z_index = world
             .query::<&Self>()
             .iter()
@@ -57,55 +122,63 @@ impl ServerPortal {
             .cloned()
             .unwrap_or_else(|| ZIndex::new());
 
-        let frame_buffer = FrameBuffer::from_shared_mem(pos.width, pos.height, shared_mem)?;
-
-        Ok(Self {
-            portal_ref: PortalRef {
-                server2client,
-                portal_id: id,
-            },
+        Self {
+            portal_ref,
             pos,
             prev_pos: pos,
             z_index,
-            frame_buffer,
+            frame_buffer_id,
+            frame_buffer_size,
+            frame_buffer: Arc::new(frame_buffer),
             needs_paint: true,
-        })
+        }
     }
+}
 
+impl ServerPortal {
     pub fn move_to(&mut self, pos: Rect) {
         self.pos = pos;
     }
 
-    pub fn invalidate(&mut self) {
+    pub fn draw(&mut self, frame_buffer_id: usize, frame_buffer_size: (u16, u16), frame_buffer: FrameBuffer) -> usize {
+        self.frame_buffer_size = frame_buffer_size;
+        self.frame_buffer = Arc::new(frame_buffer);
         self.needs_paint = true;
+        mem::replace(&mut self.frame_buffer_id, frame_buffer_id)
     }
+}
 
-    fn as_screen_buffer(&mut self) -> ScreenBuffer {
+impl ServerPortal {
+    fn as_screen_buffer(&self) -> ScreenBuffer {
         ScreenBuffer {
             pos: self.pos,
-            frame_buffer_ptr: self.frame_buffer.as_mut_slice().as_mut_ptr(),
+            frame_buffer_size: self.frame_buffer_size,
+            frame_buffer: Arc::downgrade(&self.frame_buffer),
             portal_ref: self.portal_ref.clone(),
         }
     }
 }
 
-pub struct ServerPortalSystem {
-    screen_state: Arc<Mutex<ScreenState>>,
+pub struct ServerPortalSystem<S> {
+    screen: Arc<Mutex<Screen<S>>>,
     input_state: Arc<Mutex<Option<PortalRef>>>,
     deleted_index: DeletedIndex<()>,
 }
 
-impl ServerPortalSystem {
-    pub fn new(screen_state: Arc<Mutex<ScreenState>>, input_state: Arc<Mutex<Option<PortalRef>>>) -> Self {
+impl<S> ServerPortalSystem<S> {
+    pub fn new(screen: Arc<Mutex<Screen<S>>>, input_state: Arc<Mutex<Option<PortalRef>>>) -> Self {
         ServerPortalSystem {
-            screen_state,
+            screen,
             input_state,
             deleted_index: DeletedIndex::new(),
         }
     }
 }
 
-impl System for ServerPortalSystem {
+impl<S> System for ServerPortalSystem<S>
+where
+    S: AsSurfaceMut,
+{
     fn run(&mut self, world: &mut World) -> Result<()> {
         let mut portals_borrow = world.query::<&mut ServerPortal>();
         let mut portals = portals_borrow.iter().map(|(_, portal)| portal).collect::<Vec<_>>();
@@ -113,7 +186,6 @@ impl System for ServerPortalSystem {
 
         for portal in portals.iter_mut() {
             if portal.prev_pos != portal.pos {
-                portal.frame_buffer.resize(portal.pos.width, portal.pos.height)?;
                 portal.prev_pos = portal.pos;
                 portal.needs_paint = true;
             }
@@ -124,16 +196,15 @@ impl System for ServerPortalSystem {
         let deleted_entities = self
             .deleted_index
             .update(world.query::<()>().with::<ServerPortal>().iter());
+
         if !deleted_entities.is_empty() || portals.iter().any(|p| p.needs_paint) {
-            let mut screen = self.screen_state.lock().unwrap();
-            screen.buffers.clear();
-
-            for portal in portals.iter_mut().rev() {
-                screen.buffers.push(portal.as_screen_buffer());
-                portal.needs_paint = false;
-            }
-
-            screen.draw();
+            self.screen
+                .lock()
+                .unwrap()
+                .update_buffers(portals.iter_mut().rev().map(|portal| {
+                    portal.needs_paint = false;
+                    portal.as_screen_buffer()
+                }));
         }
 
         Ok(())

@@ -89,13 +89,15 @@ impl<T> VirtualState<T> {
             .position(|block| block.ptr <= ptr && ptr < unsafe { block.ptr.offset(block.len as isize) })
     }
 
-    fn free(&mut self, ptr: *mut u8) -> bool {
-        let pos = match self.find_block_position(ptr) {
-            Some(pos) => pos,
-            None => return false,
-        };
+    fn free(&mut self, ptr: *mut u8) -> Option<(usize, Option<T>)> {
+        let pos = self.find_block_position(ptr)?;
 
-        self.blocks[pos].tag = None;
+        let info = {
+            let block = &mut self.blocks[pos];
+            let len = block.len;
+            let tag = mem::replace(&mut block.tag, None);
+            (len, tag)
+        };
 
         if pos < self.blocks.len() - 1 && self.blocks[pos + 1].tag.is_none() {
             let block2 = self.blocks.remove(pos + 1);
@@ -103,7 +105,7 @@ impl<T> VirtualState<T> {
             block1.len += block2.len;
         }
 
-        true
+        Some(info)
     }
 
     fn tag_at(&self, ptr: *mut u8) -> Option<(*mut u8, usize, &T)> {
@@ -152,7 +154,7 @@ impl<T> VirtualTree<T> {
         lock!(self.state).reserve(slice.as_mut_ptr(), slice.len(), tag)
     }
 
-    pub fn free(&self, p: *mut u8) -> bool {
+    pub fn free(&self, p: *mut u8) -> Option<(usize, Option<T>)> {
         lock!(self.state).free(p)
     }
 }
@@ -183,7 +185,7 @@ pub mod test {
 
            //tree.tag_at(slice.as_mut_ptr()).unwrap();
 
-           assert!(tree.free(slice.as_mut_ptr()));
+           assert_eq!(Some((4096, Some(()))), tree.free(slice.as_mut_ptr()));
            assert_eq!(1, tree.block_count());
        }
 
@@ -200,7 +202,7 @@ pub mod test {
            assert_eq!(4, tree.block_count());
            assert_eq!(8192 as *const u8, slice.as_ptr());
 
-           assert!(tree.free(slice.as_mut_ptr()));
+           assert_eq!(Some((4096, Some(()))), tree.free(slice.as_mut_ptr()));
            assert_eq!(3, tree.block_count());
        }
     }

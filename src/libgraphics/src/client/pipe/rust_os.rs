@@ -1,14 +1,9 @@
+use crate::client::pipe;
 use crate::ipc;
 use crate::types::{Command, Event};
+use crate::Result;
 use alloc::collections::vec_deque::VecDeque;
-use core::sync::atomic::{AtomicUsize, Ordering};
 use os::{File, OSHandle};
-use syscall::Result;
-
-pub fn alloc_id() -> usize {
-    static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
-    NEXT_ID.fetch_add(1, Ordering::SeqCst)
-}
 
 pub struct ClientPipe {
     buf: VecDeque<u8>,
@@ -34,7 +29,7 @@ impl ClientPipe {
     }
 
     pub fn checkpoint(&mut self) -> Result<usize> {
-        let id = alloc_id();
+        let id = pipe::alloc_id();
         self.send_command(&Command::Checkpoint { id })?;
         Ok(id)
     }

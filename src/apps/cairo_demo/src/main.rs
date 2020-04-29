@@ -9,7 +9,7 @@ extern crate rt;
 extern crate syscall;
 
 use cairo::bindings::*;
-use cairo::surface::CairoSurface;
+use cairo::surface::CairoSurfaceMut;
 use cairo::{CairoFunc, CairoObj};
 use os::OSMem;
 use std::f64::consts;
@@ -20,7 +20,7 @@ unsafe fn main() -> isize {
     let lfb_ptr = syscall::init_video_mode(800, 600, 32).unwrap();
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
     let mut lfb = OSMem::from_raw(lfb_ptr, stride * 600);
-    let cr = CairoSurface::from_slice(&mut lfb, CAIRO_FORMAT_ARGB32, 800, 600, stride).into_cairo();
+    let cr = CairoSurfaceMut::from_slice(&mut lfb, CAIRO_FORMAT_ARGB32, 800, 600).into_cairo();
 
     let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0));
     cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 1.0, 0.0, 0.0, 0.0, 1.0);

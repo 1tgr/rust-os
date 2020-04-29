@@ -15,6 +15,8 @@ pub enum Command {
     CreatePortal {
         id: usize,
         pos: Rect,
+        size: (u16, u16),
+        frame_buffer_id: usize,
         shared_mem_handle: usize,
     },
 
@@ -22,8 +24,11 @@ pub enum Command {
         id: usize,
     },
 
-    InvalidatePortal {
+    DrawPortal {
         id: usize,
+        size: (u16, u16),
+        frame_buffer_id: usize,
+        shared_mem_handle: usize,
     },
 
     MovePortal {
@@ -32,7 +37,7 @@ pub enum Command {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum MouseButton {
     Left,
     Middle,
@@ -40,15 +45,21 @@ pub enum MouseButton {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum MouseInput {
+    ButtonDown { button: MouseButton },
+    ButtonUp { button: MouseButton },
+    Move,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum EventInput {
     KeyPress { code: char },
-    MouseDown { x: f64, y: f64, button: MouseButton },
-    MouseUp { x: f64, y: f64, button: MouseButton },
-    MouseMove { x: f64, y: f64 },
+    Mouse { x: f64, y: f64, input: MouseInput },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Event {
     Checkpoint { id: usize },
+    ReuseFrameBuffer { frame_buffer_id: usize },
     Input { portal_id: usize, input: EventInput },
 }

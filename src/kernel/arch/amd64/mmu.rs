@@ -70,8 +70,12 @@ impl<T> PageEntry<T> {
         Ok(())
     }
 
-    pub fn map(&mut self, addr: usize, user: bool, writable: bool) {
-        let mut flags = PageFlags::PAGE_PRESENT;
+    pub fn map(&mut self, addr: Option<usize>, user: bool, writable: bool) {
+        let mut flags = PageFlags::empty();
+        if addr.is_some() {
+            flags.insert(PageFlags::PAGE_PRESENT);
+        }
+
         if user {
             flags.insert(PageFlags::PAGE_USER);
         }
@@ -80,8 +84,12 @@ impl<T> PageEntry<T> {
             flags.insert(PageFlags::PAGE_WRITABLE);
         }
 
-        assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
-        self.entry = join(addr, flags);
+        self.entry = if let Some(addr) = addr {
+            assert!(Align::is_aligned(addr, phys_mem::PAGE_SIZE));
+            join(addr, flags | PageFlags::PAGE_PRESENT)
+        } else {
+            join(0, flags)
+        }
     }
 
     pub fn present(&self) -> bool {
@@ -219,7 +227,7 @@ impl AddressSpace {
 
         unsafe {
             let pml4: &mut PML4 = &mut phys_mem::phys2virt(pml4_addr);
-            pml4[MMU_RECURSIVE_SLOT].map(pml4_addr, false, true);
+            pml4[MMU_RECURSIVE_SLOT].map(Some(pml4_addr), false, true);
 
             let kernel_base_ptr = Align::down(&KERNEL_BASE as *const u8, phys_mem::PAGE_SIZE);
             for addr in (0..bitmap.total_bytes()).step_by(two_meg) {
@@ -242,7 +250,7 @@ impl AddressSpace {
             }
         }
 
-        Ok(AddressSpace {
+        Ok(Self {
             mutex: Mutex::new(()),
             bitmap,
             cr3: pml4_addr,
@@ -256,7 +264,7 @@ impl AddressSpace {
         }
     }
 
-    pub unsafe fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
+    pub unsafe fn map<T>(&self, ptr: *const T, addr: Option<usize>, user: bool, writable: bool) -> Result<()> {
         let _x = lock!(self.mutex);
         let pml4_entry = pml4_entry(ptr);
         let pdpt_entry = pdpt_entry(ptr);
@@ -324,7 +332,7 @@ pub mod test {
             let address_space = AddressSpace::new(bitmap).unwrap();
             unsafe {
                 address_space.switch();
-                address_space.map(ptr1, addr, false, true).unwrap();
+                address_space.map(ptr1, Some(addr), false, true).unwrap();
 
                 let ptr2 = phys_mem::phys2virt(addr);
                 let sentinel = 0x55aa;
@@ -348,7 +356,7 @@ pub mod test {
             let address_space = AddressSpace::new(bitmap).unwrap();
             unsafe {
                 address_space.switch();
-                address_space.map(ptr1, addr, false, true).unwrap();
+                address_space.map(ptr1, Some(addr), false, true).unwrap();
 
                 let ptr2 = phys_mem::phys2virt(addr);
                 let sentinel = 0x55aa;

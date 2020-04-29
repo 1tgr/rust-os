@@ -10,16 +10,19 @@ client = []
 server = []
 
 [dependencies]
+cairo = { path = "../libcairo" }
 hashbrown = { version = "0.7", default-features = false }
-hecs = { version = "0.2", default-features = false, features = ["single_threaded"], git = "https://github.com/1tgr/hecs.git", rev = "2f50eb184834a3693b68f5ce7901beeacf4e0189" }
+hecs = { version = "0.2", default-features = false, features = ["single_threaded"], git = "https://github.com/1tgr/hecs.git", rev = "e719aeae2234995a1403b5fb59587a8e2a2bb951" }
 serde = { version = "1", default-features = false, features = ["alloc"] }
 serde_derive = "1"
 
-[target.amd64.dependencies]
+[target.'cfg(target_os="rust_os")'.dependencies]
 alloc_system = { path = "../liballoc_system" }
-cairo = { path = "../libcairo" }
 corepack = { version = "0.4", default-features = false, features = ["alloc"] }
 os = { path = "../libos" }
 rt = { path = "../librt" }
 std = { path = "../libstd" }
 syscall = { path = "../libsyscall" }
+
+[target.'cfg(not(target_os="rust_os"))'.dependencies]
+minifb = "0.16"

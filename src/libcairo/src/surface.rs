@@ -6,10 +6,31 @@ use core::ops::Deref;
 use core::ptr::{self, NonNull};
 use libc::{c_int, c_uchar};
 
-pub struct CairoSurface<'a>(CairoObj<cairo_surface_t>, PhantomData<&'a mut [u8]>);
+pub struct CairoSurface<'a>(CairoObj<cairo_surface_t>, PhantomData<&'a [u8]>);
+pub struct CairoSurfaceMut<'a>(CairoObj<cairo_surface_t>, PhantomData<&'a mut [u8]>);
 
 impl<'a> CairoSurface<'a> {
-    pub fn from_slice(data: &'a mut [u8], format: cairo_format_t, width: u16, height: u16, stride: usize) -> Self {
+    pub fn from_slice(data: &'a [u8], format: cairo_format_t, width: u16, height: u16) -> Self {
+        let stride = crate::stride_for_width(format, width);
+        assert_eq!(data.len(), stride * height as usize);
+
+        let ptr = unsafe {
+            cairo_image_surface_create_for_data(
+                data.as_ptr() as *mut c_uchar,
+                format,
+                width as c_int,
+                height as c_int,
+                stride as c_int,
+            )
+        };
+
+        Self(CairoObj::wrap(ptr), PhantomData)
+    }
+}
+
+impl<'a> CairoSurfaceMut<'a> {
+    pub fn from_slice(data: &'a mut [u8], format: cairo_format_t, width: u16, height: u16) -> Self {
+        let stride = crate::stride_for_width(format, width);
         assert_eq!(data.len(), stride * height as usize);
 
         let ptr = unsafe {
@@ -31,6 +52,13 @@ impl<'a> CairoSurface<'a> {
 }
 
 impl CairoSurface<'static> {
+    pub fn from_png_slice(slice: &[u8]) -> Result<Self> {
+        let CairoSurfaceMut(ptr, _) = CairoSurfaceMut::from_png_slice(slice)?;
+        Ok(Self(ptr, PhantomData))
+    }
+}
+
+impl CairoSurfaceMut<'static> {
     pub fn from_png_slice(slice: &[u8]) -> Result<Self> {
         let mut reader = {
             let mut offset = 0;
@@ -64,6 +92,14 @@ impl CairoSurface<'static> {
 }
 
 impl<'a> Deref for CairoSurface<'a> {
+    type Target = NonNull<cairo_surface_t>;
+
+    fn deref(&self) -> &NonNull<cairo_surface_t> {
+        &self.0
+    }
+}
+
+impl<'a> Deref for CairoSurfaceMut<'a> {
     type Target = NonNull<cairo_surface_t>;
 
     fn deref(&self) -> &NonNull<cairo_surface_t> {

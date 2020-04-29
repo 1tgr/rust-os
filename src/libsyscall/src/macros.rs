@@ -37,8 +37,11 @@ macro_rules! syscalls {
         use core::fmt;
 
         pub trait HandleSyscall {
-            fn log_entry(&self, msg: fmt::Arguments);
-            fn log_exit(&self, msg: fmt::Arguments);
+            #[allow(unused_variables)]
+            fn log_entry(&self, name: &'static str, args: fmt::Arguments) { }
+
+            #[allow(unused_variables)]
+            fn log_exit(&self, name: &'static str, result: fmt::Arguments) { }
 
             $(
                 fn $name<'a>(&self, $($arg_name: $arg_ty),*) -> Result<$result, ErrNum>;
@@ -51,10 +54,10 @@ macro_rules! syscalls {
                     $num =>
                         (match SyscallArgs::from_args(&mut args) {
                             Ok(tuple) => {
-                                handler.log_entry(format_args!("{}{:?}", stringify!($name), tuple));
+                                handler.log_entry(stringify!($name), format_args!("{:?}", tuple));
                                 let ($($arg_name,)*) = tuple;
                                 let result = handler.$name($($arg_name),*);
-                                handler.log_exit(format_args!("{:?}", result));
+                                handler.log_exit(stringify!($name), format_args!("{:?}", result));
                                 result
                             },
                             Err(num) => Err(num)

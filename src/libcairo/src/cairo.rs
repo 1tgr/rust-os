@@ -1,15 +1,15 @@
 use crate::bindings::*;
-use crate::surface::CairoSurface;
+use crate::surface::{CairoSurface, CairoSurfaceMut};
 use crate::CairoObj;
 use alloc::string::ToString;
 use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::NonNull;
 
-pub struct Cairo<'a>(CairoObj<cairo_t>, PhantomData<CairoSurface<'a>>);
+pub struct Cairo<'a>(CairoObj<cairo_t>, PhantomData<CairoSurfaceMut<'a>>);
 
 impl<'a> Cairo<'a> {
-    pub fn new(surface: CairoSurface) -> Self {
+    pub fn new(surface: CairoSurfaceMut) -> Self {
         Cairo(CairoObj::wrap(unsafe { cairo_create(surface.as_ptr()) }), PhantomData)
     }
 

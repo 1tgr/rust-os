@@ -1,14 +1,110 @@
 use crate::client;
 use crate::client::pipe::ClientPipe;
-use crate::components::{NeedsPaint, OnPaint, Position};
-use crate::frame_buffer::FrameBuffer;
+use crate::components::{NeedsPaint, OnInput, OnPaint, Parent, Position};
+use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
 use crate::system::{ChangedIndex, DeletedIndex, System};
-use crate::types::Command;
+use crate::types::{Command, Event, EventInput, Rect};
 use crate::Result;
-use alloc::rc::Rc;
-use core::cell::RefCell;
-use hecs::World;
-use os::SharedMem;
+use cairo::bindings::CAIRO_FORMAT_RGB24;
+use cairo::cairo::Cairo;
+use hashbrown::{HashMap, HashSet};
+use hecs::{Entity, World};
+
+fn find_needs_paint_children(world: &World, entity: Entity, entities: &mut HashSet<Entity>) -> bool {
+    let mut any = false;
+    for (child, (&Parent(parent), needs_paint)) in world.query::<(&Parent, Option<&NeedsPaint>)>().iter() {
+        if parent != entity {
+            continue;
+        }
+
+        if needs_paint.is_some() {
+            entities.insert(child);
+            any = true;
+        }
+
+        if find_needs_paint_children(world, child, entities) {
+            any = true;
+        }
+    }
+
+    if any {
+        entities.insert(entity);
+    }
+
+    any
+}
+
+fn render_tree(world: &World, entity: Entity, on_paint: Option<&OnPaint>, cr: &Cairo) {
+    if let Some(OnPaint(on_paint)) = on_paint {
+        (on_paint)(world, entity, &cr);
+    }
+
+    for (child, (&Parent(parent), &Position(pos), on_paint)) in
+        world.query::<(&Parent, &Position, Option<&OnPaint>)>().iter()
+    {
+        if parent != entity {
+            continue;
+        }
+
+        cr.save()
+            .rectangle(pos.x, pos.y, pos.width, pos.height)
+            .clip()
+            .translate(-pos.x, -pos.y);
+
+        render_tree(world, child, on_paint, cr);
+
+        cr.restore();
+    }
+}
+
+fn hit_test(world: &World, entity: Entity, x: f64, y: f64) -> Option<(Entity, Option<OnInput>, f64, f64)> {
+    for (child, (on_input, &Parent(parent), &Position(pos))) in
+        world.query::<(Option<&OnInput>, &Parent, &Position)>().iter()
+    {
+        if parent != entity {
+            continue;
+        }
+
+        if x >= pos.x && y >= pos.y && x < pos.x + pos.width && y < pos.y + pos.height {
+            let x = x - pos.x;
+            let y = y - pos.y;
+            return Some(hit_test(world, child, x, y).unwrap_or_else(|| (child, on_input.cloned(), x, y)));
+        }
+    }
+
+    None
+}
+
+fn find_input_entity(
+    world: &World,
+    portal_id: usize,
+    input: EventInput,
+) -> Option<(Entity, Option<OnInput>, EventInput)> {
+    for (entity, (&ClientPortalId(id), on_input)) in world.query::<(&ClientPortalId, Option<&OnInput>)>().iter() {
+        if portal_id != id {
+            continue;
+        }
+
+        let tuple = match input {
+            EventInput::KeyPress { .. } => {
+                // TODO keyboard focus
+                (entity, on_input.cloned(), input)
+            }
+
+            EventInput::Mouse { x, y, input } => {
+                if let Some((entity, on_input, x, y)) = hit_test(world, entity, x, y) {
+                    (entity, on_input, EventInput::Mouse { x, y, input })
+                } else {
+                    (entity, on_input.cloned(), EventInput::Mouse { x, y, input })
+                }
+            }
+        };
+
+        return Some(tuple);
+    }
+
+    None
+}
 
 #[derive(Copy, Clone)]
 pub struct ClientPortalId(pub usize);
@@ -16,53 +112,101 @@ pub struct ClientPortalId(pub usize);
 pub struct ClientPortal;
 
 pub struct ClientPortalSystem {
-    pipe: Rc<RefCell<ClientPipe>>,
+    pub pipe: ClientPipe,
+    idle_frame_buffers: Vec<FrameBuffer>,
+    busy_frame_buffers: HashMap<usize, FrameBuffer>,
     deleted_index: DeletedIndex<ClientPortalId>,
     prev_position_index: ChangedIndex<Position>,
 }
 
 impl ClientPortalSystem {
-    pub fn new(pipe: Rc<RefCell<ClientPipe>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            pipe,
+            pipe: ClientPipe::new(),
+            idle_frame_buffers: Vec::new(),
+            busy_frame_buffers: HashMap::new(),
             deleted_index: DeletedIndex::new(),
             prev_position_index: ChangedIndex::new(),
         }
+    }
+
+    fn render_portal(
+        &mut self,
+        world: &World,
+        entity: Entity,
+        pos: Rect,
+        on_paint: Option<&OnPaint>,
+    ) -> Result<((u16, u16), usize, usize)> {
+        let Rect { width, height, .. } = pos;
+        let size = ((width + 0.5) as u16, (height + 0.5) as u16);
+
+        let mut frame_buffer = if let Some(mut frame_buffer) = self.idle_frame_buffers.pop() {
+            frame_buffer.resize(size)?;
+            frame_buffer
+        } else {
+            FrameBuffer::new(size)?
+        };
+
+        {
+            let cr = frame_buffer.as_surface_mut(CAIRO_FORMAT_RGB24, size).into_cairo();
+            cr.set_source_rgb(1.0, 1.0, 1.5);
+            cr.paint();
+            render_tree(world, entity, on_paint, &cr);
+        }
+
+        let frame_buffer_id = client::alloc_id();
+        let shared_mem_handle = frame_buffer.as_raw();
+        self.busy_frame_buffers.insert(frame_buffer_id, frame_buffer);
+        Ok((size, frame_buffer_id, shared_mem_handle))
+    }
+
+    pub fn dispatch_event(&mut self, world: &mut World, event: Event) -> Result<()> {
+        match event {
+            Event::Input { portal_id, input } => {
+                if let Some(tuple) = find_input_entity(world, portal_id, input) {
+                    if let (entity, Some(OnInput(on_input)), input) = tuple {
+                        (on_input)(world, entity, &input)?;
+                    }
+                }
+            }
+
+            Event::ReuseFrameBuffer { frame_buffer_id } => {
+                let frame_buffer = self.busy_frame_buffers.remove(&frame_buffer_id).unwrap();
+                if self.idle_frame_buffers.len() < 5 {
+                    self.idle_frame_buffers.push(frame_buffer);
+                }
+            }
+
+            _ => (),
+        }
+
+        Ok(())
     }
 }
 
 impl System for ClientPortalSystem {
     fn run(&mut self, world: &mut World) -> Result<()> {
-        let mut pipe = self.pipe.borrow_mut();
-
         let new_portals = world
-            .query::<&Position>()
+            .query::<(&Position, Option<&OnPaint>)>()
             .with::<ClientPortal>()
             .without::<ClientPortalId>()
             .iter()
-            .map(|(entity, &Position(pos))| (entity, pos))
+            .map(|(entity, (&Position(pos), on_paint))| (entity, pos, on_paint.cloned()))
             .collect::<Vec<_>>();
 
-        for (entity, pos) in new_portals {
+        for (entity, pos, on_paint) in new_portals {
             let id = client::alloc_id();
-            let shared_mem = SharedMem::new(true)?;
-
-            pipe.send_command(&Command::CreatePortal {
+            let (size, frame_buffer_id, shared_mem_handle) =
+                self.render_portal(world, entity, pos, on_paint.as_ref())?;
+            self.pipe.send_command(&Command::CreatePortal {
                 id,
                 pos,
-                shared_mem_handle: shared_mem.handle().get(),
+                size,
+                frame_buffer_id,
+                shared_mem_handle,
             })?;
 
-            world
-                .insert(
-                    entity,
-                    (
-                        ClientPortalId(id),
-                        NeedsPaint,
-                        FrameBuffer::from_shared_mem(pos.width, pos.height, shared_mem)?,
-                    ),
-                )
-                .unwrap();
+            world.insert(entity, (ClientPortalId(id),)).unwrap();
         }
 
         let changed_position = self
@@ -70,33 +214,45 @@ impl System for ClientPortalSystem {
             .update(world.query::<&Position>().with::<ClientPortalId>().iter());
 
         for &entity in changed_position.keys() {
-            if let Some(q) = world.query_one::<(&ClientPortalId, &Position)>(entity) {
-                let (&ClientPortalId(id), &Position(pos)) = q.get();
-                pipe.send_command(&Command::MovePortal { id, pos })?;
+            if let Ok(mut q) = world.query_one::<(&ClientPortalId, &Position)>(entity) {
+                if let Some((&ClientPortalId(id), &Position(pos))) = q.get() {
+                    self.pipe.send_command(&Command::MovePortal { id, pos })?;
+                }
             }
         }
 
-        let mut painted_entities = Vec::new();
-        for (entity, (&ClientPortalId(id), frame_buffer, on_paint)) in world
-            .query::<(&ClientPortalId, &mut FrameBuffer, &OnPaint)>()
+        let mut needs_paint_entities = HashSet::new();
+        for (entity, ()) in world.query::<()>().with::<ClientPortalId>().iter() {
+            if find_needs_paint_children(world, entity, &mut needs_paint_entities) {
+                needs_paint_entities.insert(entity);
+            }
+        }
+
+        for &entity in needs_paint_entities.iter() {
+            world.insert_one(entity, NeedsPaint).unwrap();
+        }
+
+        for (entity, (&ClientPortalId(id), &Position(pos), on_paint)) in world
+            .query::<(&ClientPortalId, &Position, Option<&OnPaint>)>()
             .with::<NeedsPaint>()
             .iter()
         {
-            let OnPaint(on_paint) = on_paint;
-            let cr = frame_buffer.as_surface().into_cairo();
-            cr.set_source_rgb(1.0, 1.0, 1.5);
-            cr.paint();
-            (on_paint)(world, entity, &cr);
-            pipe.send_command(&Command::InvalidatePortal { id })?;
-            painted_entities.push(entity);
+            let (size, frame_buffer_id, shared_mem_handle) = self.render_portal(world, entity, pos, on_paint)?;
+            self.pipe.send_command(&Command::DrawPortal {
+                id,
+                size,
+                frame_buffer_id,
+                shared_mem_handle,
+            })?;
+            needs_paint_entities.insert(entity);
         }
 
-        for entity in painted_entities {
+        for entity in needs_paint_entities {
             world.remove_one::<NeedsPaint>(entity).unwrap();
         }
 
         for (_, ClientPortalId(id)) in self.deleted_index.update(world.query::<&ClientPortalId>().iter()) {
-            pipe.send_command(&Command::DestroyPortal { id })?;
+            self.pipe.send_command(&Command::DestroyPortal { id })?;
         }
 
         Ok(())

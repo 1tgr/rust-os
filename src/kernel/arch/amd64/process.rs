@@ -18,7 +18,7 @@ impl ArchProcess {
         self.address_space.switch()
     }
 
-    pub unsafe fn map<T>(&self, ptr: *const T, addr: usize, user: bool, writable: bool) -> Result<()> {
+    pub unsafe fn map<T>(&self, ptr: *const T, addr: Option<usize>, user: bool, writable: bool) -> Result<()> {
         self.address_space.map(ptr, addr, user, writable)
     }
 }

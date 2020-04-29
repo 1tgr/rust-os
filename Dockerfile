@@ -1,5 +1,7 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq
+
 RUN apt-get install -qq -y \
     curl \
     genisoimage \
@@ -7,6 +9,9 @@ RUN apt-get install -qq -y \
     libfdt-dev \
     libglib2.0-dev \
     libpixman-1-dev \
+    libwayland-cursor0 \
+    libwayland-dev \
+    libxkbcommon-dev \
     python3-pip \
     zlib1g-dev
 

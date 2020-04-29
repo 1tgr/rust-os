@@ -7,47 +7,50 @@ extern crate alloc;
 
 #[cfg(target_os = "rust_os")]
 mod compat {
+    pub use os::Mutex;
     pub use syscall::{ErrNum as Error, Result};
-
-    pub(crate) use cairo::cairo::Cairo;
 }
 
 #[cfg(not(target_os = "rust_os"))]
 mod compat {
-    use core::result;
+    use std::result;
 
+    pub use std::sync::Mutex;
+
+    #[derive(Clone, Debug)]
     pub enum Error {
         NotSupported,
     }
 
     pub type Result<T> = result::Result<T, Error>;
-
-    pub struct Cairo;
 }
 
-#[cfg(all(target_os = "rust_os", feature = "client"))]
+#[cfg(feature = "client")]
 mod client;
-
-#[cfg(all(target_os = "rust_os", feature = "server"))]
-mod server;
-
-#[cfg(target_os = "rust_os")]
-mod frame_buffer;
 
 #[cfg(target_os = "rust_os")]
 mod ipc;
 
-mod components;
+#[cfg(not(target_os = "rust_os"))]
+mod frame_buffer;
+
+#[cfg(not(target_os = "rust_os"))]
+mod server;
+
 mod system;
 mod types;
 
-#[cfg(all(target_os = "rust_os", feature = "client"))]
-pub use client::{App, ClientPortal};
+pub mod components;
 
 #[cfg(all(target_os = "rust_os", feature = "server"))]
-pub use server::{ServerApp, ServerInput, ServerPipe};
+pub mod frame_buffer;
+
+#[cfg(all(target_os = "rust_os", feature = "server"))]
+pub mod server;
+
+#[cfg(feature = "client")]
+pub use client::{App, ClientPortal};
 
 pub use compat::{Error, Result};
-pub use components::{NeedsPaint, OnInput, OnPaint, Position};
 pub use system::System;
-pub use types::{Event, EventInput, MouseButton, Rect};
+pub use types::{Event, EventInput, MouseButton, MouseInput, Rect};
