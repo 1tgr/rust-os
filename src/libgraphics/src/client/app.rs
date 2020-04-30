@@ -1,19 +1,25 @@
 use crate::client::portal::ClientPortalSystem;
 use crate::system::System;
 use crate::types::Event;
+use crate::widgets::{Button, Widget};
 use crate::Result;
 use hecs::World;
 
 pub struct App {
     world: World,
     system: ClientPortalSystem,
+    systems: Vec<Box<dyn System>>,
 }
 
 impl App {
     pub fn new() -> Self {
+        let mut systems: Vec<Box<dyn System>> = Vec::new();
+        systems.push(Box::new(<Button as Widget>::System::default()));
+
         Self {
             world: World::new(),
             system: ClientPortalSystem::new(),
+            systems,
         }
     }
 
@@ -30,6 +36,10 @@ impl App {
     }
 
     pub fn wait_for_event(&mut self) -> Result<Event> {
+        for system in self.systems.iter_mut() {
+            system.run(&mut self.world)?;
+        }
+
         self.system.run(&mut self.world)?;
         self.system.pipe.wait_for_event()
     }

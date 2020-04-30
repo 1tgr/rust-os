@@ -1,6 +1,6 @@
 use crate::client;
 use crate::client::pipe::ClientPipe;
-use crate::components::{NeedsPaint, OnInput, OnPaint, Parent, Position};
+use crate::components::{CapturesMouseInput, NeedsPaint, OnInput, OnPaint, Parent, Position};
 use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
 use crate::system::{ChangedIndex, DeletedIndex, System};
 use crate::types::{Command, Event, EventInput, Rect};
@@ -49,12 +49,23 @@ fn render_tree(world: &World, entity: Entity, on_paint: Option<&OnPaint>, cr: &C
         cr.save()
             .rectangle(pos.x, pos.y, pos.width, pos.height)
             .clip()
-            .translate(-pos.x, -pos.y);
+            .translate(pos.x, pos.y);
 
         render_tree(world, child, on_paint, cr);
 
         cr.restore();
     }
+}
+
+fn portal_to_child(world: &World, parent: Entity, pos: Rect, x: f64, y: f64) -> (f64, f64) {
+    let x = x - pos.x;
+    let y = y - pos.y;
+    world
+        .query_one::<(&Parent, &Position)>(parent)
+        .unwrap()
+        .get()
+        .map(|(&Parent(parent), &Position(pos))| portal_to_child(world, parent, pos, x, y))
+        .unwrap_or((x, y))
 }
 
 fn hit_test(world: &World, entity: Entity, x: f64, y: f64) -> Option<(Entity, Option<OnInput>, f64, f64)> {
@@ -65,7 +76,7 @@ fn hit_test(world: &World, entity: Entity, x: f64, y: f64) -> Option<(Entity, Op
             continue;
         }
 
-        if x >= pos.x && y >= pos.y && x < pos.x + pos.width && y < pos.y + pos.height {
+        if pos.contains(x, y) {
             let x = x - pos.x;
             let y = y - pos.y;
             return Some(hit_test(world, child, x, y).unwrap_or_else(|| (child, on_input.cloned(), x, y)));
@@ -92,7 +103,20 @@ fn find_input_entity(
             }
 
             EventInput::Mouse { x, y, input } => {
-                if let Some((entity, on_input, x, y)) = hit_test(world, entity, x, y) {
+                if let Some((entity, (on_input, parent, &Position(pos)))) = world
+                    .query::<(Option<&OnInput>, Option<&Parent>, &Position)>()
+                    .with::<CapturesMouseInput>()
+                    .iter()
+                    .next()
+                {
+                    let (x, y) = if let Some(&Parent(parent)) = parent {
+                        portal_to_child(world, parent, pos, x, y)
+                    } else {
+                        (x, y)
+                    };
+
+                    (entity, on_input.cloned(), EventInput::Mouse { x, y, input })
+                } else if let Some((entity, on_input, x, y)) = hit_test(world, entity, x, y) {
                     (entity, on_input, EventInput::Mouse { x, y, input })
                 } else {
                     (entity, on_input.cloned(), EventInput::Mouse { x, y, input })
@@ -165,7 +189,7 @@ impl ClientPortalSystem {
             Event::Input { portal_id, input } => {
                 if let Some(tuple) = find_input_entity(world, portal_id, input) {
                     if let (entity, Some(OnInput(on_input)), input) = tuple {
-                        (on_input)(world, entity, &input)?;
+                        (on_input)(world, entity, input)?;
                     }
                 }
             }

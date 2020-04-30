@@ -6,6 +6,12 @@ pub struct Rect {
     pub height: f64,
 }
 
+impl Rect {
+    pub fn contains(&self, x: f64, y: f64) -> bool {
+        x >= self.x && y >= self.y && x < self.x + self.width && y < self.y + self.height
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Command {
     Checkpoint {

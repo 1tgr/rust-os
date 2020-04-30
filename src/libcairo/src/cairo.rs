@@ -1,10 +1,23 @@
 use crate::bindings::*;
 use crate::surface::{CairoSurface, CairoSurfaceMut};
 use crate::CairoObj;
+use alloc::borrow::Cow;
 use alloc::string::ToString;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::ops::Deref;
 use core::ptr::NonNull;
+use libc::c_char;
+
+fn to_cstr(s: &str) -> Cow<str> {
+    if s.len() == 0 || !s.ends_with('\0') {
+        let mut buf = s.to_string();
+        buf.push_str("\0");
+        Cow::Owned(buf)
+    } else {
+        Cow::Borrowed(s)
+    }
+}
 
 pub struct Cairo<'a>(CairoObj<cairo_t>, PhantomData<CairoSurfaceMut<'a>>);
 
@@ -98,17 +111,26 @@ impl<'a> Cairo<'a> {
         self
     }
 
-    pub fn show_text(&self, text: &str) -> &Self {
-        let mut buf;
-        let text = if text.len() == 0 || !text.ends_with('\0') {
-            buf = text.to_string();
-            buf.push_str("\0");
-            buf.as_str()
-        } else {
-            text
-        };
+    pub fn font_extents(&self) -> cairo_font_extents_t {
+        let mut extents = MaybeUninit::uninit();
+        unsafe {
+            cairo_font_extents(self.0.as_ptr(), extents.as_mut_ptr());
+            extents.assume_init()
+        }
+    }
 
-        unsafe { cairo_show_text(self.0.as_ptr(), text.as_bytes().as_ptr() as *const i8) };
+    pub fn text_extents(&self, text: &str) -> cairo_text_extents_t {
+        let text = to_cstr(text);
+        let mut extents = MaybeUninit::uninit();
+        unsafe {
+            cairo_text_extents(self.0.as_ptr(), text.as_ptr() as *const c_char, extents.as_mut_ptr());
+            extents.assume_init()
+        }
+    }
+
+    pub fn show_text(&self, text: &str) -> &Self {
+        let text = to_cstr(text);
+        unsafe { cairo_show_text(self.0.as_ptr(), text.as_ptr() as *const c_char) };
         self
     }
 }

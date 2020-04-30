@@ -49,6 +49,9 @@ pub mod frame_buffer;
 pub mod server;
 
 #[cfg(feature = "client")]
+pub mod widgets;
+
+#[cfg(feature = "client")]
 pub use client::{App, ClientPortal};
 
 pub use compat::{Error, Result};

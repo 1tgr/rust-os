@@ -94,7 +94,7 @@ where
                 pos, ref portal_ref, ..
             } = *buffer;
 
-            if x >= pos.x && y >= pos.y && x < pos.x + pos.width && y < pos.y + pos.height {
+            if pos.contains(x, y) {
                 return Some((x - pos.x, y - pos.y, portal_ref));
             }
         }
