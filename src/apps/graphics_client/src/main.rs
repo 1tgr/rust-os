@@ -11,13 +11,24 @@ use cairo::bindings::*;
 use cairo::CairoObj;
 use core::fmt::Write;
 use graphics::components::{NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text};
-use graphics::widgets::Button;
+use graphics::widgets::{Button, Label};
 use graphics::{App, ClientPortal, Event, EventInput, Rect, Result};
 
 fn main() -> Result<()> {
     let mut app = App::new();
     let world = app.world_mut();
     for i in 0..5 {
+        let label = world.spawn((
+            Label,
+            Position(Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 300.0,
+                height: 10.0,
+            }),
+            Text::new(format!("[{}] hello", i)),
+        ));
+
         let portal = world.spawn((
             ClientPortal,
             Position(Rect {
@@ -26,8 +37,7 @@ fn main() -> Result<()> {
                 width: 300.0,
                 height: 120.0,
             }),
-            Text::new("hello"),
-            OnPaint::new(move |world, entity, cr| {
+            OnPaint::new(move |_world, _entity, cr| {
                 unsafe {
                     let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 100.0));
                     cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -37,20 +47,13 @@ fn main() -> Result<()> {
                 }
 
                 cr.fill();
-
-                let Text(text) = &*world.get::<Text>(entity).unwrap();
-                let s = format!("[{}] {}", i, text);
-                let extents = cr.font_extents();
-                cr.set_source_rgb(0.0, 0.0, 0.0)
-                    .move_to(0.0, extents.height)
-                    .show_text(&s);
             }),
-            OnInput::new(|world, entity, input| {
+            OnInput::new(move |world, entity, input| {
                 match input {
                     EventInput::KeyPress { code } => {
                         match code {
                             '\x08' => {
-                                let Text(text) = &mut *world.get_mut::<Text>(entity).unwrap();
+                                let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
                                 text.pop();
                             }
                             '\u{1b}' => {
@@ -58,28 +61,30 @@ fn main() -> Result<()> {
                                 return Ok(());
                             }
                             _ => {
-                                let Text(text) = &mut *world.get_mut::<Text>(entity).unwrap();
+                                let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
                                 text.push(code);
                             }
                         }
 
-                        world.insert_one(entity, NeedsPaint).unwrap();
+                        world.insert_one(label, NeedsPaint).unwrap();
                     }
 
                     _ => {
                         {
-                            let Text(text) = &mut *world.get_mut::<Text>(entity).unwrap();
+                            let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
                             text.clear();
-                            write!(text, "{:?}", input).unwrap();
+                            write!(text, "[{}] {:?}", i, input).unwrap();
                         }
 
-                        world.insert_one(entity, NeedsPaint).unwrap();
+                        world.insert_one(label, NeedsPaint).unwrap();
                     }
                 }
 
                 Ok(())
             }),
         ));
+
+        world.insert_one(label, Parent(portal)).unwrap();
 
         world.spawn((
             Button,

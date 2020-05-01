@@ -56,7 +56,7 @@ pub struct Position(pub Rect);
 pub struct Text(pub String);
 
 impl Text {
-    pub fn new(s: &str) -> Self {
-        Self(s.to_owned())
+    pub fn new<S>(s: S) -> Self where S: Into<String> {
+        Self(s.into())
     }
 }

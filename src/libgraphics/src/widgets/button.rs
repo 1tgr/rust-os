@@ -16,7 +16,7 @@ impl Default for ButtonSystem {
     fn default() -> Self {
         Self {
             on_paint: OnPaint::new(Self::on_paint),
-            on_input: OnInput::new(Self::on_input)
+            on_input: OnInput::new(Self::on_input),
         }
     }
 }
