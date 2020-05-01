@@ -4,7 +4,7 @@ use crate::server::portal::{PortalRef, ServerPortal, ServerPortalSystem};
 use crate::server::screen::Screen;
 use crate::system::System;
 use crate::types::{Command, Event};
-use crate::Result;
+use crate::{EventInput, Result};
 use alloc::sync::Arc;
 use cairo::bindings::CAIRO_FORMAT_ARGB32;
 use core::slice;
@@ -12,11 +12,26 @@ use hashbrown::HashMap;
 use hecs::{Entity, World};
 use minifb::{MouseButton, MouseMode, Window, WindowOptions};
 use std::cell::RefCell;
+use std::char;
 use std::collections::VecDeque;
 use std::process;
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
+
+struct InputCallback(Arc<Mutex<Option<PortalRef>>>);
+
+impl minifb::InputCallback for InputCallback {
+    fn add_char(&mut self, uni_char: u32) {
+        if let &Some(PortalRef { portal_id, ref events }) = &*self.0.lock().unwrap() {
+            let code = char::from_u32(uni_char).unwrap();
+            events.borrow_mut().push_back(Event::Input {
+                portal_id,
+                input: EventInput::KeyPress { code },
+            });
+        }
+    }
+}
 
 pub struct ClientPipe {
     window: Window,
@@ -25,23 +40,21 @@ pub struct ClientPipe {
     world: World,
     screen: Arc<Mutex<Screen<&'static mut [u8]>>>,
     system: ServerPortalSystem<&'static mut [u8]>,
-    mouse_x: u16,
-    mouse_y: u16,
-    mouse_down: [bool; 3],
     events: Rc<RefCell<VecDeque<Event>>>,
 }
 
 impl ClientPipe {
     pub fn new() -> Self {
+        let input_state = Arc::new(Mutex::new(None));
         let mut window = Window::new("libgraphics", 800, 600, WindowOptions::default()).unwrap();
         window.limit_update_rate(Some(Duration::from_micros(16600)));
+        window.set_input_callback(Box::new(InputCallback(input_state.clone())));
 
         let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
         let byte_len = stride * 600;
         let mut buffer = vec![0; byte_len / 4].into_boxed_slice();
         let aliased_buffer = unsafe { slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut u8, byte_len) };
         let screen = Arc::new(Mutex::new(Screen::new((800, 600), aliased_buffer)));
-        let input_state = Arc::new(Mutex::new(None));
         let system = ServerPortalSystem::new(screen.clone(), input_state);
 
         Self {
@@ -51,9 +64,6 @@ impl ClientPipe {
             world: World::new(),
             screen,
             system,
-            mouse_x: 0,
-            mouse_y: 0,
-            mouse_down: [false; 3],
             events: Rc::new(RefCell::new(VecDeque::new())),
         }
     }

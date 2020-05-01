@@ -1,7 +1,7 @@
 use crate::client::portal::ClientPortalSystem;
 use crate::system::System;
 use crate::types::Event;
-use crate::widgets::{Button, Label, Widget};
+use crate::widgets;
 use crate::Result;
 use hecs::World;
 
@@ -14,8 +14,7 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         let mut systems: Vec<Box<dyn System>> = Vec::new();
-        systems.push(Box::new(<Button as Widget>::System::default()));
-        systems.push(Box::new(<Label as Widget>::System::default()));
+        widgets::register(&mut systems);
 
         Self {
             world: World::new(),

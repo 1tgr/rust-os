@@ -1,21 +1,21 @@
 use crate::components::{OnPaint, Position, Text};
-use crate::widgets::{Widget, WidgetSystem};
+use crate::widgets::WidgetSystem;
 use cairo::cairo::Cairo;
 use hecs::{Entity, World};
 
-pub struct LabelSystem {
+pub struct Label;
+
+pub(super) struct LabelSystem {
     on_paint: OnPaint,
 }
 
-impl Default for LabelSystem {
-    fn default() -> Self {
+impl LabelSystem {
+    pub fn new() -> Self {
         Self {
             on_paint: OnPaint::new(Self::on_paint),
         }
     }
-}
 
-impl LabelSystem {
     fn on_paint(world: &World, entity: Entity, cr: &Cairo) {
         let mut query = world.query_one::<(&Position, &Text)>(entity).unwrap();
 
@@ -35,10 +35,4 @@ impl WidgetSystem for LabelSystem {
     fn components(&self) -> Self::Components {
         (self.on_paint.clone(),)
     }
-}
-
-pub struct Label;
-
-impl Widget for Label {
-    type System = LabelSystem;
 }

@@ -1,5 +1,3 @@
-#![cfg_attr(all(not(test), not(target_os = "rust_os")), allow(dead_code))]
-
 #[macro_use]
 extern crate serde_derive;
 
@@ -52,7 +50,7 @@ pub mod server;
 pub mod widgets;
 
 #[cfg(feature = "client")]
-pub use client::{App, ClientPortal};
+pub use client::App;
 
 pub use compat::{Error, Result};
 pub use system::System;

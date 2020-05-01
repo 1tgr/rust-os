@@ -7,6 +7,8 @@ use hecs::{Entity, World};
 #[derive(Clone)]
 pub struct CapturesMouseInput;
 
+pub struct Focus(pub Option<Entity>);
+
 #[derive(Clone)]
 pub struct OnClick(pub Rc<dyn Fn(&mut World, Entity) -> Result<()>>);
 
@@ -52,11 +54,20 @@ pub struct Parent(pub Entity);
 #[derive(Clone, PartialEq)]
 pub struct Position(pub Rect);
 
+impl Position {
+    pub fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
+        Self(Rect { x, y, width, height })
+    }
+}
+
 #[derive(Clone)]
 pub struct Text(pub String);
 
 impl Text {
-    pub fn new<S>(s: S) -> Self where S: Into<String> {
+    pub fn new<S>(s: S) -> Self
+    where
+        S: Into<String>,
+    {
         Self(s.into())
     }
 }

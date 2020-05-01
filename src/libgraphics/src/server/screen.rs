@@ -102,6 +102,7 @@ where
         None
     }
 
+    #[cfg(target_os = "rust_os")]
     pub fn update_mouse_state_delta(&mut self, dx: i16, dy: i16, dw: i8, buttons: [bool; 3]) -> Result<()> {
         let x = ((self.cursor_hotspot.0 as i32 + dx as i32).max(0) as u16).min(self.screen_size.0 - 1);
         let y = ((self.cursor_hotspot.1 as i32 + dy as i32).max(0) as u16).min(self.screen_size.1 - 1);

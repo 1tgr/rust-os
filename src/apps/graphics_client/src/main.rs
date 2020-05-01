@@ -7,12 +7,10 @@ extern crate alloc_system;
 #[cfg(target_os = "rust_os")]
 extern crate rt;
 
-use cairo::bindings::*;
-use cairo::CairoObj;
 use core::fmt::Write;
-use graphics::components::{NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text};
-use graphics::widgets::{Button, Label};
-use graphics::{App, ClientPortal, Event, EventInput, Rect, Result};
+use graphics::components::{NeedsPaint, OnClick, OnInput, Parent, Position, Text};
+use graphics::widgets::{Button, ClientPortal, Label, TextBox};
+use graphics::{App, Event, Result};
 
 fn main() -> Result<()> {
     let mut app = App::new();
@@ -20,66 +18,21 @@ fn main() -> Result<()> {
     for i in 0..5 {
         let label = world.spawn((
             Label,
-            Position(Rect {
-                x: 0.0,
-                y: 0.0,
-                width: 300.0,
-                height: 10.0,
-            }),
+            Position::new(0.0, 0.0, 300.0, 10.0),
             Text::new(format!("[{}] hello", i)),
         ));
 
         let portal = world.spawn((
             ClientPortal,
-            Position(Rect {
-                x: i as f64 * 100.0,
-                y: i as f64 * 100.0,
-                width: 300.0,
-                height: 120.0,
-            }),
-            OnPaint::new(move |_world, _entity, cr| {
-                unsafe {
-                    let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 100.0));
-                    cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 1.0, 0.0, 0.0, 0.0, 1.0);
-                    cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 0.0, 1.0, 1.0, 1.0, 1.0);
-                    cairo_rectangle(cr.as_ptr(), 0.0, 0.0, 300.0, 120.0);
-                    cairo_set_source(cr.as_ptr(), pat.as_ptr());
+            Position::new(i as f64 * 100.0, i as f64 * 100.0, 300.0, 120.0),
+            OnInput::new(move |world, _entity, input| {
+                {
+                    let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
+                    text.clear();
+                    write!(text, "[{}] {:?}", i, input).unwrap();
                 }
 
-                cr.fill();
-            }),
-            OnInput::new(move |world, entity, input| {
-                match input {
-                    EventInput::KeyPress { code } => {
-                        match code {
-                            '\x08' => {
-                                let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
-                                text.pop();
-                            }
-                            '\u{1b}' => {
-                                world.despawn(entity).unwrap();
-                                return Ok(());
-                            }
-                            _ => {
-                                let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
-                                text.push(code);
-                            }
-                        }
-
-                        world.insert_one(label, NeedsPaint).unwrap();
-                    }
-
-                    _ => {
-                        {
-                            let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();
-                            text.clear();
-                            write!(text, "[{}] {:?}", i, input).unwrap();
-                        }
-
-                        world.insert_one(label, NeedsPaint).unwrap();
-                    }
-                }
-
+                world.insert_one(label, NeedsPaint).unwrap();
                 Ok(())
             }),
         ));
@@ -90,17 +43,21 @@ fn main() -> Result<()> {
             Button,
             Text::new("Close"),
             Parent(portal),
-            Position(Rect {
-                x: 10.0,
-                y: 10.0,
-                width: 50.0,
-                height: 20.0,
-            }),
+            Position::new(10.0, 10.0, 50.0, 20.0),
             OnClick::new(move |world, _entity| {
                 world.despawn(portal).unwrap();
                 Ok(())
             }),
         ));
+
+        world.spawn((
+            Label,
+            Text::new("Label:"),
+            Parent(portal),
+            Position::new(10.0, 40.0, 50.0, 20.0),
+        ));
+
+        world.spawn((TextBox, Parent(portal), Position::new(60.0, 40.0, 230.0, 20.0)));
     }
 
     let checkpoint_id = app.checkpoint()?;

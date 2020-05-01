@@ -1,52 +1,60 @@
 use crate::components::{CapturesMouseInput, NeedsPaint, OnClick, OnInput, OnPaint, Position, Text};
 use crate::types::{EventInput, MouseButton, MouseInput, Rect};
-use crate::widgets::{Widget, WidgetSystem};
+use crate::widgets::WidgetSystem;
 use crate::Result;
 use cairo::cairo::Cairo;
 use hecs::{Entity, World};
 
+pub struct Button;
+
 struct ButtonPressed;
 
-pub struct ButtonSystem {
+pub(super) struct ButtonSystem {
     on_paint: OnPaint,
     on_input: OnInput,
 }
 
-impl Default for ButtonSystem {
-    fn default() -> Self {
+impl ButtonSystem {
+    pub fn new() -> Self {
         Self {
             on_paint: OnPaint::new(Self::on_paint),
             on_input: OnInput::new(Self::on_input),
         }
     }
-}
 
-impl ButtonSystem {
     fn on_paint(world: &World, entity: Entity, cr: &Cairo) {
         let mut query = world
-            .query_one::<(Option<&ButtonPressed>, Option<(&Position, &Text)>)>(entity)
+            .query_one::<(Option<&ButtonPressed>, Option<(&Position, Option<&Text>)>)>(entity)
             .unwrap();
 
         let (button_pressed, position_text) = query.get().unwrap();
 
         if button_pressed.is_some() {
             cr.set_source_rgb(0.8, 0.0, 0.0);
-            cr.translate(1.0, 1.0);
         } else {
             cr.set_source_rgb(1.0, 0.0, 0.0);
         }
 
         cr.paint();
 
-        if let Some((&Position(pos), Text(ref text))) = position_text {
-            let font_extents = cr.font_extents();
-            let text_extents = cr.text_extents(text);
+        if let Some((&Position(pos), text)) = position_text {
             cr.set_source_rgb(0.0, 0.0, 0.0)
-                .move_to(
+                .rectangle(0.0, 0.0, pos.width, pos.height)
+                .stroke();
+
+            if button_pressed.is_some() {
+                cr.translate(1.0, 1.0);
+            }
+
+            if let Some(Text(ref text)) = text {
+                let font_extents = cr.font_extents();
+                let text_extents = cr.text_extents(text);
+                cr.move_to(
                     (pos.width - text_extents.width) / 2.0,
                     (pos.height + font_extents.height) / 2.0,
                 )
                 .show_text(text);
+            }
         }
     }
 
@@ -122,10 +130,4 @@ impl WidgetSystem for ButtonSystem {
     fn components(&self) -> Self::Components {
         (self.on_paint.clone(), self.on_input.clone())
     }
-}
-
-pub struct Button;
-
-impl Widget for Button {
-    type System = ButtonSystem;
 }

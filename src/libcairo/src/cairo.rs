@@ -96,6 +96,11 @@ impl<'a> Cairo<'a> {
         self
     }
 
+    pub fn stroke(&self) -> &Self {
+        unsafe { cairo_stroke(self.0.as_ptr()) }
+        self
+    }
+
     pub fn rectangle(&self, x: f64, y: f64, width: f64, height: f64) -> &Self {
         unsafe { cairo_rectangle(self.0.as_ptr(), x, y, width, height) };
         self

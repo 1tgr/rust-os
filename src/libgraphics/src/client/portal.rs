@@ -1,9 +1,10 @@
 use crate::client;
 use crate::client::pipe::ClientPipe;
-use crate::components::{CapturesMouseInput, NeedsPaint, OnInput, OnPaint, Parent, Position};
+use crate::components::{CapturesMouseInput, Focus, NeedsPaint, OnInput, OnPaint, Parent, Position};
 use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
 use crate::system::{ChangedIndex, DeletedIndex, System};
 use crate::types::{Command, Event, EventInput, Rect};
+use crate::widgets::ClientPortal;
 use crate::Result;
 use cairo::bindings::CAIRO_FORMAT_RGB24;
 use cairo::cairo::Cairo;
@@ -91,15 +92,22 @@ fn find_input_entity(
     portal_id: usize,
     input: EventInput,
 ) -> Option<(Entity, Option<OnInput>, EventInput)> {
-    for (entity, (&ClientPortalId(id), on_input)) in world.query::<(&ClientPortalId, Option<&OnInput>)>().iter() {
+    for (entity, (&ClientPortalId(id), &Focus(focus), on_input)) in
+        world.query::<(&ClientPortalId, &Focus, Option<&OnInput>)>().iter()
+    {
         if portal_id != id {
             continue;
         }
 
         let tuple = match input {
             EventInput::KeyPress { .. } => {
-                // TODO keyboard focus
-                (entity, on_input.cloned(), input)
+                if let Some(entity) = focus {
+                    let mut query = world.query_one::<Option<&OnInput>>(entity).unwrap();
+                    let on_input = query.get().unwrap();
+                    (entity, on_input.cloned(), input)
+                } else {
+                    (entity, on_input.cloned(), input)
+                }
             }
 
             EventInput::Mouse { x, y, input } => {
@@ -131,9 +139,7 @@ fn find_input_entity(
 }
 
 #[derive(Copy, Clone)]
-pub struct ClientPortalId(pub usize);
-
-pub struct ClientPortal;
+struct ClientPortalId(pub usize);
 
 pub struct ClientPortalSystem {
     pub pipe: ClientPipe,
@@ -173,8 +179,7 @@ impl ClientPortalSystem {
 
         {
             let cr = frame_buffer.as_surface_mut(CAIRO_FORMAT_RGB24, size).into_cairo();
-            cr.set_source_rgb(1.0, 1.0, 1.5);
-            cr.paint();
+            cr.save().set_source_rgb(0.95, 0.95, 1.0).paint().restore();
             render_tree(world, entity, on_paint, &cr);
         }
 
@@ -230,7 +235,7 @@ impl System for ClientPortalSystem {
                 shared_mem_handle,
             })?;
 
-            world.insert(entity, (ClientPortalId(id),)).unwrap();
+            world.insert(entity, (ClientPortalId(id), Focus(None))).unwrap();
         }
 
         let changed_position = self

@@ -3,10 +3,6 @@ use crate::Result;
 use core::marker::PhantomData;
 use hecs::{DynamicBundle, World};
 
-pub trait Widget {
-    type System: System + Default;
-}
-
 pub trait WidgetSystem {
     type Widget;
     type Components: Clone + DynamicBundle;
@@ -43,6 +39,16 @@ where
 
 mod button;
 mod label;
+mod text_box;
 
 pub use button::Button;
 pub use label::Label;
+pub use text_box::TextBox;
+
+pub struct ClientPortal;
+
+pub(crate) fn register(systems: &mut Vec<Box<dyn System>>) {
+    systems.push(Box::new(button::ButtonSystem::new()));
+    systems.push(Box::new(label::LabelSystem::new()));
+    systems.push(Box::new(text_box::TextBoxSystem::new()));
+}
