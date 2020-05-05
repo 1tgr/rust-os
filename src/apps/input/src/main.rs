@@ -1,4 +1,3 @@
-#![feature(link_args)]
 #![feature(start)]
 
 extern crate alloc_system;
@@ -49,11 +48,6 @@ fn run() -> Result<()> {
         }
     }
 }
-
-#[cfg(target_arch = "x86_64")]
-#[allow(unused_attributes)]
-#[link_args = "-T libsyscall/arch/amd64/link.ld"]
-extern "C" {}
 
 #[start]
 #[no_mangle]

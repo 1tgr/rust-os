@@ -4,6 +4,10 @@ name = "kernel"
 version = "0.0.0"
 edition = "2018"
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 [[bin]]
 name = "kernel"
 path = "main.rs"

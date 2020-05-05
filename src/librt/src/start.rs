@@ -1,22 +1,31 @@
 use syscall::libc_helpers;
+use syscall::Result;
+
+#[lang = "termination"]
+trait Termination {
+    fn report(self) -> i32;
+}
+
+impl Termination for () {
+    fn report(self) -> i32 {
+        Ok(()).report()
+    }
+}
+
+impl Termination for Result<()> {
+    fn report(self) -> i32 {
+        self.map(|()| 0).report()
+    }
+}
+
+impl Termination for Result<i32> {
+    fn report(self) -> i32 {
+        self.unwrap_or_else(|num| -(num as i32))
+    }
+}
 
 #[lang = "start"]
-fn dummy_start(_main: *const u8, _argc: isize, _argv: *const *const u8) -> isize {
-    panic!("dummy_start was called")
-}
-
-extern "C" {
-    fn start(argc: isize, argv: *const *const u8) -> isize;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn entry() {
-    let result = libc_helpers::init().and_then(|()| Ok(start(0, 0 as *const _)));
-
-    let code = match result {
-        Ok(code) => code,
-        Err(num) => -(num as isize),
-    };
-
+unsafe fn lang_start<T: Termination + 'static>(main: fn() -> T, _argc: isize, _argv: *const *const u8) -> isize {
+    let code = libc_helpers::init().map(|()| main().report()).report();
     libc_helpers::shutdown(code as i32);
 }

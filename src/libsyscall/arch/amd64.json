@@ -9,6 +9,7 @@
     "no-compiler-rt": true,
     "disable-redzone": true,
     "eliminate-frame-pointer": false,
+    "main-needs-argc-argv": false,
     "morestack": false,
     "executables": true,
     "linker": "x86_64-elf-ld",
@@ -16,7 +17,8 @@
     "pre-link-args": {
         "ld": [
             "-z", "max-page-size=0x1000",
-            "--strip-all"
+            "-T", "libsyscall/arch/amd64/link.ld",
+            "--require-defined", "main"
         ]
     },
     "dynamic-linking-available": false,

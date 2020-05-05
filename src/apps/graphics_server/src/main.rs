@@ -1,6 +1,3 @@
-#![feature(link_args)]
-#![feature(start)]
-
 extern crate alloc;
 extern crate alloc_system;
 extern crate rt;
@@ -63,7 +60,7 @@ where
     }
 }
 
-fn run() -> Result<()> {
+fn main() -> Result<()> {
     let lfb_ptr = syscall::init_video_mode(800, 600, 32)?;
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
     let lfb = unsafe { OSMem::from_raw(lfb_ptr, stride * 600) };
@@ -81,15 +78,4 @@ fn run() -> Result<()> {
     })?;
 
     ServerPipe::new(app, "graphics_client")?.run()
-}
-
-#[cfg(target_arch = "x86_64")]
-#[allow(unused_attributes)]
-#[link_args = "-T libsyscall/arch/amd64/link.ld"]
-extern "C" {}
-
-#[start]
-#[no_mangle]
-pub fn start(_: isize, _: *const *const u8) -> isize {
-    run().map(|()| 0).unwrap_or_else(|num| -(num as isize))
 }

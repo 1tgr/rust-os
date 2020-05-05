@@ -1,6 +1,3 @@
-#![cfg_attr(target_os = "rust_os", feature(link_args))]
-#![cfg_attr(target_os = "rust_os", feature(start))]
-
 #[cfg(target_os = "rust_os")]
 extern crate alloc_system;
 
@@ -72,16 +69,4 @@ fn main() -> Result<()> {
 
         app.dispatch_event(e)?;
     }
-}
-
-#[cfg(all(target_os = "rust_os", target_arch = "x86_64"))]
-#[allow(unused_attributes)]
-#[link_args = "-T libsyscall/arch/amd64/link.ld"]
-extern "C" {}
-
-#[cfg(target_os = "rust_os")]
-#[start]
-#[no_mangle]
-pub fn start(_: isize, _: *const *const u8) -> isize {
-    main().map(|()| 0).unwrap_or_else(|num| -(num as isize))
 }
