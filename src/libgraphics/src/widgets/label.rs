@@ -1,11 +1,12 @@
-use crate::components::{OnPaint, Position, Text};
+use crate::components::{BackColor, OnPaint, Position, Text, TextColor};
+use crate::types::Color;
 use crate::widgets::WidgetSystem;
 use cairo::cairo::Cairo;
 use hecs::{Entity, World};
 
 pub struct Label;
 
-pub(super) struct LabelSystem {
+pub struct LabelSystem {
     on_paint: OnPaint,
 }
 
@@ -17,13 +18,25 @@ impl LabelSystem {
     }
 
     fn on_paint(world: &World, entity: Entity, cr: &Cairo) {
-        let mut query = world.query_one::<(&Position, &Text)>(entity).unwrap();
+        let mut query = world
+            .query_one::<(&Position, Option<&BackColor>, Option<(&Text, Option<&TextColor>)>)>(entity)
+            .unwrap();
 
-        if let Some((&Position(pos), Text(ref text))) = query.get() {
-            let font_extents = cr.font_extents();
-            cr.set_source_rgb(0.0, 0.0, 0.0)
-                .move_to(0.0, (pos.height + font_extents.height) / 2.0)
-                .show_text(text);
+        if let Some((&Position(pos), back_color, text_and_text_color)) = query.get() {
+            if let Some(&BackColor(Color { r, g, b })) = back_color {
+                cr.set_source_rgb(r, g, b).paint();
+            }
+
+            if let Some((Text(ref text), text_color)) = text_and_text_color {
+                let TextColor(Color { r, g, b }) = text_color.cloned().unwrap_or_else(|| TextColor::new(0.0, 0.0, 0.2));
+                let font_extents = cr.font_extents();
+                cr.set_source_rgb(r, g, b)
+                    .move_to(
+                        (pos.height - font_extents.height) / 2.0,
+                        (pos.height + font_extents.height) / 2.0,
+                    )
+                    .show_text(text);
+            }
         }
     }
 }

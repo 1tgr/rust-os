@@ -1,15 +1,17 @@
 use crate::client;
 use crate::client::pipe::ClientPipe;
-use crate::components::{CapturesMouseInput, Focus, NeedsPaint, OnInput, OnPaint, Parent, Position};
+use crate::components::{CapturesMouseInput, Focus, NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text};
 use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
 use crate::system::{ChangedIndex, DeletedIndex, System};
 use crate::types::{Command, Event, EventInput, Rect};
-use crate::widgets::ClientPortal;
+use crate::widgets::{Button, ClientPortal, Label};
 use crate::Result;
 use cairo::bindings::CAIRO_FORMAT_RGB24;
 use cairo::cairo::Cairo;
 use hashbrown::{HashMap, HashSet};
 use hecs::{Entity, World};
+
+struct Decoration;
 
 fn find_needs_paint_children(world: &World, entity: Entity, entities: &mut HashSet<Entity>) -> bool {
     let mut any = false;
@@ -40,8 +42,10 @@ fn render_tree(world: &World, entity: Entity, on_paint: Option<&OnPaint>, cr: &C
         (on_paint)(world, entity, &cr);
     }
 
-    for (child, (&Parent(parent), &Position(pos), on_paint)) in
-        world.query::<(&Parent, &Position, Option<&OnPaint>)>().iter()
+    for (child, (&Parent(parent), &Position(pos), on_paint)) in world
+        .query::<(&Parent, &Position, Option<&OnPaint>)>()
+        .without::<Decoration>()
+        .iter()
     {
         if parent != entity {
             continue;
@@ -111,6 +115,8 @@ fn find_input_entity(
             }
 
             EventInput::Mouse { x, y, input } => {
+                let x = x - 2.0;
+                let y = y - 22.0;
                 if let Some((entity, (on_input, parent, &Position(pos)))) = world
                     .query::<(Option<&OnInput>, Option<&Parent>, &Position)>()
                     .with::<CapturesMouseInput>()
@@ -140,6 +146,48 @@ fn find_input_entity(
 
 #[derive(Copy, Clone)]
 struct ClientPortalId(pub usize);
+
+pub struct ClientPortalSystemPre;
+
+impl System for ClientPortalSystemPre {
+    fn run(&mut self, world: &mut World) -> Result<()> {
+        struct HasDecoration;
+
+        let new_portals = world
+            .query::<&Position>()
+            .with::<ClientPortal>()
+            .without::<HasDecoration>()
+            .iter()
+            .map(|(entity, &Position(pos))| (entity, pos))
+            .collect::<Vec<_>>();
+
+        for (entity, pos) in new_portals {
+            world.spawn((
+                Label,
+                Decoration,
+                Parent(entity),
+                Position::new(0.0, -20.0, pos.width - 24.0, 20.0),
+                Text::new("Hello"),
+            ));
+
+            world.spawn((
+                Button,
+                Decoration,
+                Parent(entity),
+                Position::new(pos.width - 22.0, -20.0, 18.0, 18.0),
+                Text::new("X"),
+                OnClick::new(move |world, _entity| {
+                    world.despawn(entity).unwrap();
+                    Ok(())
+                }),
+            ));
+
+            world.insert_one(entity, HasDecoration).unwrap();
+        }
+
+        Ok(())
+    }
+}
 
 pub struct ClientPortalSystem {
     pub pipe: ClientPipe,
@@ -179,7 +227,34 @@ impl ClientPortalSystem {
 
         {
             let cr = frame_buffer.as_surface_mut(CAIRO_FORMAT_RGB24, size).into_cairo();
-            cr.save().set_source_rgb(0.95, 0.95, 1.0).paint().restore();
+            cr.set_source_rgb(0.98, 0.64, 0.066).paint().translate(2.0, 22.0);
+
+            for (child, (&Parent(parent), &Position(pos), on_paint)) in world
+                .query::<(&Parent, &Position, Option<&OnPaint>)>()
+                .with::<Decoration>()
+                .iter()
+            {
+                if parent != entity {
+                    continue;
+                }
+
+                cr.save()
+                    .rectangle(pos.x, pos.y, pos.width, pos.height)
+                    .clip()
+                    .translate(pos.x, pos.y);
+
+                render_tree(world, child, on_paint, &cr);
+
+                cr.restore();
+            }
+
+            cr.rectangle(0.0, 0.0, width - 4.0, height - 24.0)
+                .clip()
+                .save()
+                .set_source_rgb(0.95, 0.95, 1.0)
+                .paint()
+                .restore();
+
             render_tree(world, entity, on_paint, &cr);
         }
 
@@ -227,6 +302,7 @@ impl System for ClientPortalSystem {
             let id = client::alloc_id();
             let (size, frame_buffer_id, shared_mem_handle) =
                 self.render_portal(world, entity, pos, on_paint.as_ref())?;
+
             self.pipe.send_command(&Command::CreatePortal {
                 id,
                 pos,

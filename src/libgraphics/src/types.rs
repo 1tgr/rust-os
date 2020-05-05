@@ -1,3 +1,25 @@
+use core::ops::Mul;
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Color {
+    pub r: f64,
+    pub g: f64,
+    pub b: f64,
+}
+
+impl Mul<f64> for Color {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self {
+        let Self { r, g, b } = self;
+        Self {
+            r: r * rhs,
+            g: g * rhs,
+            b: b * rhs,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Rect {
     pub x: f64,

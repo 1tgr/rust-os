@@ -1,8 +1,8 @@
 use crate::{ErrNum, Result};
+use core::convert::TryFrom;
 use core::mem;
 use core::slice;
 use core::str;
-use core::convert::TryFrom;
 
 pub struct TupleDeque6<T> {
     tuple: (T, T, T, T, T, T),
@@ -362,7 +362,7 @@ impl<T: SyscallResult> SyscallResult for Result<T> {
             Err(num) => {
                 let num: usize = num.into();
                 -(num as isize)
-            },
+            }
         }
     }
 

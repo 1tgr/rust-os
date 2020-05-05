@@ -54,4 +54,4 @@ pub use client::App;
 
 pub use compat::{Error, Result};
 pub use system::System;
-pub use types::{Event, EventInput, MouseButton, MouseInput, Rect};
+pub use types::{Color, Event, EventInput, MouseButton, MouseInput, Rect};

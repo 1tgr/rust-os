@@ -1,5 +1,7 @@
-use crate::components::{CapturesMouseInput, NeedsPaint, OnClick, OnInput, OnPaint, Position, Text};
-use crate::types::{EventInput, MouseButton, MouseInput, Rect};
+use crate::components::{
+    BackColor, CapturesMouseInput, NeedsPaint, OnClick, OnInput, OnPaint, Position, Text, TextColor,
+};
+use crate::types::{Color, EventInput, MouseButton, MouseInput, Rect};
 use crate::widgets::WidgetSystem;
 use crate::Result;
 use cairo::cairo::Cairo;
@@ -9,7 +11,7 @@ pub struct Button;
 
 struct ButtonPressed;
 
-pub(super) struct ButtonSystem {
+pub struct ButtonSystem {
     on_paint: OnPaint,
     on_input: OnInput,
 }
@@ -24,21 +26,27 @@ impl ButtonSystem {
 
     fn on_paint(world: &World, entity: Entity, cr: &Cairo) {
         let mut query = world
-            .query_one::<(Option<&ButtonPressed>, Option<(&Position, Option<&Text>)>)>(entity)
+            .query_one::<(
+                Option<&ButtonPressed>,
+                Option<&BackColor>,
+                Option<(&Position, Option<&TextColor>, Option<&Text>)>,
+            )>(entity)
             .unwrap();
 
-        let (button_pressed, position_text) = query.get().unwrap();
+        let (button_pressed, back_color, position_text) = query.get().unwrap();
+        let BackColor(back_color) = back_color.cloned().unwrap_or_else(|| BackColor::new(0.76, 0.74, 0.96));
 
-        if button_pressed.is_some() {
-            cr.set_source_rgb(0.8, 0.0, 0.0);
+        let Color { r, g, b } = if button_pressed.is_some() {
+            back_color * 0.8
         } else {
-            cr.set_source_rgb(1.0, 0.0, 0.0);
-        }
+            back_color
+        };
 
-        cr.paint();
+        cr.set_source_rgb(r, g, b).paint();
 
-        if let Some((&Position(pos), text)) = position_text {
-            cr.set_source_rgb(0.0, 0.0, 0.0)
+        if let Some((&Position(pos), text_color, text)) = position_text {
+            let TextColor(Color { r, g, b }) = text_color.cloned().unwrap_or_else(|| TextColor::new(0.0, 0.0, 0.2));
+            cr.set_source_rgb(r, g, b)
                 .rectangle(0.0, 0.0, pos.width, pos.height)
                 .stroke();
 

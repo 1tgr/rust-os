@@ -1,8 +1,17 @@
-use crate::types::{EventInput, Rect};
+use crate::types::{Color, EventInput, Rect};
 use crate::Result;
 use alloc::rc::Rc;
 use cairo::cairo::Cairo;
 use hecs::{Entity, World};
+
+#[derive(Clone)]
+pub struct BackColor(pub Color);
+
+impl BackColor {
+    pub fn new(r: f64, g: f64, b: f64) -> Self {
+        Self(Color { r, g, b })
+    }
+}
 
 #[derive(Clone)]
 pub struct CapturesMouseInput;
@@ -69,5 +78,14 @@ impl Text {
         S: Into<String>,
     {
         Self(s.into())
+    }
+}
+
+#[derive(Clone)]
+pub struct TextColor(pub Color);
+
+impl TextColor {
+    pub fn new(r: f64, g: f64, b: f64) -> Self {
+        Self(Color { r, g, b })
     }
 }
