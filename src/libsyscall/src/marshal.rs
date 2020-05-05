@@ -1,7 +1,8 @@
-use super::{ErrNum, Result};
+use crate::{ErrNum, Result};
 use core::mem;
 use core::slice;
 use core::str;
+use core::convert::TryFrom;
 
 pub struct TupleDeque6<T> {
     tuple: (T, T, T, T, T, T),
@@ -83,8 +84,63 @@ impl<T> TupleDeque6<T> {
         }
     }
 
-    pub fn unwrap(self) -> ((T, T, T, T, T, T), u8) {
-        (self.tuple, self.len)
+    #[cfg(all(target_arch = "x86_64", not(feature = "kernel")))]
+    pub unsafe fn syscall(self, num: u32) -> isize {
+        let result: isize;
+        match self.len {
+            0 => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num)
+                : "rcx", "r11", "cc",      // syscall/sysret clobbers rcx, r11, rflags
+                    "memory"
+                : "volatile");
+            }
+            1 => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num), "{rdi}"(self.tuple.0)
+                : "rcx", "r11", "cc", "memory"
+                : "volatile");
+            }
+            2 => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num), "{rdi}"(self.tuple.0), "{rsi}"(self.tuple.1)
+                : "rcx", "r11", "cc", "memory"
+                : "volatile");
+            }
+            3 => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num), "{rdi}"(self.tuple.0), "{rsi}"(self.tuple.1), "{rdx}"(self.tuple.2)
+                : "rcx", "r11", "cc", "memory"
+                : "volatile");
+            }
+            4 => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num), "{rdi}"(self.tuple.0), "{rsi}"(self.tuple.1), "{rdx}"(self.tuple.2), "{r8}"(self.tuple.3)
+                : "rcx", "r11", "cc", "memory"
+                : "volatile");
+            }
+            5 => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num), "{rdi}"(self.tuple.0), "{rsi}"(self.tuple.1), "{rdx}"(self.tuple.2), "{r8}"(self.tuple.3), "{r9}"(self.tuple.4)
+                : "rcx", "r11", "cc", "memory"
+                : "volatile");
+            }
+            _ => {
+                asm!("syscall"
+                : "={rax}"(result)
+                : "{rax}"(num), "{rdi}"(self.tuple.0), "{rsi}"(self.tuple.1), "{rdx}"(self.tuple.2), "{r8}"(self.tuple.3), "{r9}"(self.tuple.4), "{r10}"(self.tuple.5)
+                : "rcx", "r11", "cc",      // syscall/sysret clobbers rcx, r11, rflags
+                    "memory"
+                : "volatile");
+            }
+        }
+        result
     }
 }
 
@@ -93,6 +149,12 @@ pub type PackedArgs = TupleDeque6<usize>;
 pub trait SyscallArgs: Sized {
     fn as_args(self, args: &mut PackedArgs);
     fn from_args(args: &mut PackedArgs) -> Result<Self>;
+
+    fn into_args(self) -> PackedArgs {
+        let mut args = PackedArgs::new();
+        self.as_args(&mut args);
+        args
+    }
 }
 
 pub trait SyscallResult {
@@ -297,13 +359,16 @@ impl<T: SyscallResult> SyscallResult for Result<T> {
     fn as_result(self) -> isize {
         match self {
             Ok(x) => x.as_result(),
-            Err(num) => -(num as isize),
+            Err(num) => {
+                let num: usize = num.into();
+                -(num as isize)
+            },
         }
     }
 
     fn from_result(value: isize) -> Result<T> {
         if value < 0 {
-            Err(unsafe { mem::transmute(-value) })
+            Err(ErrNum::try_from(-value as usize).unwrap_or(ErrNum::NotSupported))
         } else {
             Ok(SyscallResult::from_result(value))
         }

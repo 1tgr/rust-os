@@ -7,6 +7,7 @@ macro_rules! syscalls {
         ),+
     ) => {
         use $crate::ErrNum;
+        use crate::marshal::{SyscallArgs, SyscallResult};
 
         #[allow(non_camel_case_types)]
         enum Num {
@@ -18,7 +19,10 @@ macro_rules! syscalls {
         $(
             $(#[$attrs])*
             pub fn $name<'a>($($arg_name: $arg_ty),*) -> Result<$result, ErrNum> {
-                unsafe { $crate::user::syscall(Num::$name as u32, ($($arg_name,)*)) }
+                let args = SyscallArgs::into_args(($($arg_name,)*));
+                let num = Num::$name as u32;
+                let result = unsafe { args.syscall(num) };
+                SyscallResult::from_result(result)
             }
         )+
     }
