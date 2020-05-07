@@ -10,4 +10,4 @@ edition = "2018"
 cratesio_libc = { version = "0.2", package = "libc" }
 
 [target.'cfg(target_os = "rust_os")'.dependencies]
-libc = { path = "../liblibc" }
+libc = { path = "../libc" }

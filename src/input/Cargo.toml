@@ -1,0 +1,12 @@
+[package]
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+name = "input"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+alloc_system = { path = "../alloc_system" }
+os = { path = "../os" }
+rt = { path = "../rt" }
+std = { path = "../std" }
+syscall = { path = "../syscall" }

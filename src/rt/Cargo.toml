@@ -1,11 +1,9 @@
 [package]
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
-name = "syscall"
+name = "rt"
 version = "0.0.0"
 edition = "2018"
 
 [dependencies]
-libc = { path = "../liblibc" }
-
-[features]
-kernel = []
+libc = { path = "../libc" }
+syscall = { path = "../syscall" }

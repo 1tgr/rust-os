@@ -1,0 +1,14 @@
+[package]
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+name = "cairo_demo"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+alloc_system = { path = "../alloc_system" }
+cairo = { path = "../cairo" }
+libc = { path = "../libc" }
+os = { path = "../os" }
+rt = { path = "../rt" }
+std = { path = "../std" }
+syscall = { path = "../syscall" }

@@ -1,6 +1,6 @@
 include config.txt
 
-RUSTUP_RUN = RUST_TARGET_PATH=${CURDIR}/libsyscall/arch RUSTFLAGS=-Dwarnings
+RUSTUP_RUN = RUST_TARGET_PATH=${CURDIR}/syscall/arch RUSTFLAGS=-Dwarnings
 
 DIRS_SRC += kernel
 

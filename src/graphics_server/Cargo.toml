@@ -1,0 +1,15 @@
+[package]
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+name = "graphics_server"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+alloc_system = { path = "../alloc_system" }
+cairo = { path = "../cairo" }
+graphics = { path = "../graphics", default-features = false, features = ["server"] }
+os = { path = "../os" }
+rt = { path = "../rt" }
+serde = { version = "1", default-features = false, features = ["alloc"] }
+std = { path = "../std" }
+syscall = { path = "../syscall" }

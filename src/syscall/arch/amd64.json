@@ -17,7 +17,7 @@
     "pre-link-args": {
         "ld": [
             "-z", "max-page-size=0x1000",
-            "-T", "libsyscall/arch/amd64/link.ld",
+            "-T", "syscall/arch/amd64/link.ld",
             "--require-defined", "main"
         ]
     },

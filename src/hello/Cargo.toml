@@ -1,9 +1,10 @@
 [package]
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
-name = "rt"
+name = "hello"
 version = "0.0.0"
 edition = "2018"
 
 [dependencies]
-libc = { path = "../liblibc" }
-syscall = { path = "../libsyscall" }
+alloc_system = { path = "../alloc_system" }
+rt = { path = "../rt" }
+std = { path = "../std" }

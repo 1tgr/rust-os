@@ -9,6 +9,6 @@ path = "lib.rs"
 test = false
 
 [dependencies]
-libc = { path = "../liblibc" }
-os = { path = "../libos" }
-syscall = { path = "../libsyscall" }
+libc = { path = "../libc" }
+os = { path = "../os" }
+syscall = { path = "../syscall" }
