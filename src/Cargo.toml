@@ -4,6 +4,7 @@ members = [
     "cairo",
     "cairo_demo",
     "graphics",
+    "graphics_base",
     "graphics_client",
     "graphics_server",
     "hello",

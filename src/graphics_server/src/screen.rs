@@ -1,11 +1,12 @@
-use crate::frame_buffer::{AsSurface, AsSurfaceMut, FrameBuffer};
-use crate::server::portal::PortalRef;
-use crate::types::{EventInput, MouseButton, MouseInput, Rect};
-use crate::Result;
+use crate::portal::PortalRef;
 use alloc::sync::Weak;
-use cairo::bindings::{CAIRO_FORMAT_ARGB32, CAIRO_FORMAT_RGB24};
+use cairo::bindings::{CAIRO_FORMAT_A8, CAIRO_FORMAT_ARGB32, CAIRO_FORMAT_RGB24};
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use graphics_base::frame_buffer::{AsSurface, AsSurfaceMut, FrameBuffer};
+use graphics_base::types::{EventInput, MouseButton, MouseInput, Rect};
+use graphics_base::{Error, Result};
+use jpeg_decoder::{Decoder, ImageInfo, PixelFormat};
 
 const CURSOR_WIDTH: f64 = 32.0;
 const CURSOR_HEIGHT: f64 = 32.0;
@@ -23,6 +24,33 @@ fn to_sprite(hotspot: (u16, u16)) -> (f64, f64) {
     (hotspot.0 as f64 - CURSOR_HOTSPOT_X, hotspot.1 as f64 - CURSOR_HOTSPOT_Y)
 }
 
+fn surface_from_jpeg_slice(data: &[u8]) -> Result<CairoSurface<'static>> {
+    let mut decoder = Decoder::new(data);
+    let data = decoder.decode().map_err(|_| Error::NotSupported)?;
+
+    let ImageInfo {
+        width,
+        height,
+        pixel_format,
+    } = decoder.info().unwrap();
+
+    let (data, format) = match pixel_format {
+        PixelFormat::L8 => (data, CAIRO_FORMAT_A8),
+        PixelFormat::RGB24 => {
+            let mut data32 = Vec::with_capacity(width as usize * height as usize * 4);
+            for chunk in data.chunks_exact(3) {
+                data32.extend(chunk.iter().rev());
+                data32.push(0);
+            }
+
+            (data32, CAIRO_FORMAT_RGB24)
+        }
+        PixelFormat::CMYK32 => panic!("CMYK not supported"),
+    };
+
+    Ok(CairoSurface::from_vec(data, format, width, height))
+}
+
 pub struct Screen<S> {
     cursor_hotspot: (u16, u16),
     cursor_sprite: (f64, f64),
@@ -30,6 +58,7 @@ pub struct Screen<S> {
     screen_size: (u16, u16),
     lfb: S,
     cursor: CairoSurface<'static>,
+    wallpaper: CairoSurface<'static>,
     pub buffers: Vec<ScreenBuffer>,
 }
 
@@ -41,9 +70,11 @@ where
 {
     pub fn new(screen_size: (u16, u16), lfb: S) -> Self {
         static CURSOR_BYTES: &'static [u8] = include_bytes!("icons8-cursor-32.png");
+        static WALLPAPER_BYTES: &'static [u8] = include_bytes!("wallpaper.jpg");
 
         let cursor = CairoSurface::from_png_slice(CURSOR_BYTES).unwrap();
         let cursor_hotspot = (screen_size.0 / 2, screen_size.1 / 2);
+        let wallpaper = surface_from_jpeg_slice(WALLPAPER_BYTES).unwrap();
 
         Self {
             cursor_hotspot,
@@ -52,11 +83,12 @@ where
             screen_size,
             lfb,
             cursor,
+            wallpaper,
             buffers: Vec::new(),
         }
     }
 
-    fn draw_buffers(cr: &Cairo, screen_size: (u16, u16), buffers: &[ScreenBuffer]) {
+    fn draw_buffers(cr: &Cairo, screen_size: (u16, u16), wallpaper: &CairoSurface, buffers: &[ScreenBuffer]) {
         cr.new_path()
             .move_to(0.0, 0.0)
             .rel_line_to(0.0, screen_size.1 as f64)
@@ -83,7 +115,7 @@ where
                 .clip_preserve();
         }
 
-        cr.set_source_rgb(0.0, 0.0, 0.5).paint();
+        cr.set_source_surface(wallpaper, 0.0, 0.0).paint();
     }
 
     fn find_portal(buffers: &[ScreenBuffer], pos: (u16, u16)) -> Option<(f64, f64, &PortalRef)> {
@@ -149,7 +181,7 @@ where
         cr.rectangle(prev_cursor_sprite.0, prev_cursor_sprite.1, CURSOR_WIDTH, CURSOR_HEIGHT)
             .clip();
 
-        Self::draw_buffers(&cr, self.screen_size, &self.buffers);
+        Self::draw_buffers(&cr, self.screen_size, &self.wallpaper, &self.buffers);
 
         cr.reset_clip()
             .set_source_surface(&self.cursor, self.cursor_sprite.0, self.cursor_sprite.1)
@@ -170,7 +202,7 @@ where
             .as_surface_mut(CAIRO_FORMAT_ARGB32, self.screen_size)
             .into_cairo();
 
-        Self::draw_buffers(&cr, self.screen_size, &self.buffers);
+        Self::draw_buffers(&cr, self.screen_size, &self.wallpaper, &self.buffers);
 
         cr.reset_clip()
             .set_source_surface(&self.cursor, self.cursor_sprite.0, self.cursor_sprite.1)

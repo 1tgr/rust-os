@@ -1,10 +1,10 @@
-use crate::frame_buffer::FrameBuffer;
-use crate::ipc;
-use crate::server::portal::{PortalRef, ServerPortal};
-use crate::system::System;
-use crate::types::{Command, Event};
-use crate::Result;
+use crate::portal::{PortalRef, ServerPortal};
 use alloc::sync::Arc;
+use graphics_base::frame_buffer::FrameBuffer;
+use graphics_base::ipc;
+use graphics_base::system::System;
+use graphics_base::types::{Command, Event};
+use graphics_base::Result;
 use hashbrown::HashMap;
 use hecs::{Entity, World};
 use os::{File, Mutex, Process};

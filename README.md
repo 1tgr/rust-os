@@ -38,3 +38,5 @@ Todo:
  - Window system
  - File system
  - Networking
+
+Wallpaper credit: [by Dollar Gill on Unsplash](https://unsplash.com/photos/aXw8_Mk0LXU)

@@ -1,33 +1,30 @@
-use crate::system::System;
-use crate::Result;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
 use core::marker::PhantomData;
+use graphics_base::system::System;
+use graphics_base::Result;
 use hecs::{DynamicBundle, World};
 
 pub trait WidgetSystem {
-    type Widget;
+    type Widget: 'static;
     type Components: Clone + DynamicBundle;
 
     fn components(&self) -> Self::Components;
-}
 
-impl<T> System for T
-where
-    T: WidgetSystem + 'static,
-{
     fn run(&mut self, world: &mut World) -> Result<()> {
         struct WidgetRegistered<U>(PhantomData<U>);
 
         let entities = world
             .query::<()>()
-            .with::<T::Widget>()
-            .without::<WidgetRegistered<T::Widget>>()
+            .with::<Self::Widget>()
+            .without::<WidgetRegistered<Self::Widget>>()
             .iter()
             .collect::<Vec<_>>();
 
         if !entities.is_empty() {
             let components = self.components();
             for (entity, ()) in entities {
-                let r: WidgetRegistered<T::Widget> = WidgetRegistered(PhantomData);
+                let r: WidgetRegistered<Self::Widget> = WidgetRegistered(PhantomData);
                 world.insert(entity, components.clone()).unwrap();
                 world.insert_one(entity, r).unwrap();
             }

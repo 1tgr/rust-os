@@ -1,7 +1,9 @@
 use crate::components::{BackColor, OnPaint, Position, Text, TextColor};
-use crate::types::Color;
 use crate::widgets::WidgetSystem;
 use cairo::cairo::Cairo;
+use graphics_base::system::System;
+use graphics_base::types::Color;
+use graphics_base::Result;
 use hecs::{Entity, World};
 
 pub struct Label;
@@ -47,5 +49,11 @@ impl WidgetSystem for LabelSystem {
 
     fn components(&self) -> Self::Components {
         (self.on_paint.clone(),)
+    }
+}
+
+impl System for LabelSystem {
+    fn run(&mut self, world: &mut World) -> Result<()> {
+        WidgetSystem::run(self, world)
     }
 }

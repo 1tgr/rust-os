@@ -6,9 +6,9 @@ use alloc::sync::Arc;
 use cairo::bindings::*;
 use core::mem;
 use core::str;
-use graphics::frame_buffer::AsSurfaceMut;
-use graphics::server::{PortalRef, Screen, ServerApp, ServerPipe, ServerPortalSystem};
-use graphics::EventInput;
+use graphics_base::frame_buffer::AsSurfaceMut;
+use graphics_base::types::EventInput;
+use graphics_server::{PortalRef, Screen, ServerApp, ServerPipe, ServerPortalSystem};
 use os::{File, Mutex, OSMem, Result, Thread};
 use std::io::Read;
 

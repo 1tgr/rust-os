@@ -1,44 +1,19 @@
-use crate::client;
 use crate::compat::Mutex;
-use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
-use crate::server::screen::{Screen, ScreenBuffer};
-use crate::system::{DeletedIndex, System};
-use crate::types::Rect;
-use crate::Result;
+use crate::screen::{Screen, ScreenBuffer};
 use alloc::sync::Arc;
 use core::mem;
+use graphics_base::frame_buffer::{AsSurfaceMut, FrameBuffer};
+use graphics_base::system::{DeletedIndex, System};
+use graphics_base::types::Rect;
+use graphics_base::Result;
 use hecs::World;
-
-#[derive(Ord, PartialOrd, Eq, PartialEq)]
-pub struct ZIndex {
-    index: isize,
-    version: usize,
-}
-
-impl ZIndex {
-    pub fn new() -> Self {
-        Self {
-            index: 0,
-            version: client::alloc_id(),
-        }
-    }
-}
-
-impl Clone for ZIndex {
-    fn clone(&self) -> Self {
-        Self {
-            index: self.index,
-            version: client::alloc_id(),
-        }
-    }
-}
 
 #[cfg(target_os = "rust_os")]
 mod rust_os {
-    use crate::ipc;
-    use crate::types::{Event, EventInput};
-    use crate::Result;
     use alloc::sync::Arc;
+    use graphics_base::ipc;
+    use graphics_base::types::{Event, EventInput};
+    use graphics_base::Result;
     use os::{File, Mutex};
 
     #[derive(Clone)]
@@ -63,8 +38,8 @@ mod rust_os {
 
 #[cfg(not(target_os = "rust_os"))]
 mod posix {
-    use crate::types::{Event, EventInput};
-    use crate::Result;
+    use graphics_base::types::{Event, EventInput};
+    use graphics_base::Result;
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::rc::Rc;
@@ -98,7 +73,7 @@ pub struct ServerPortal {
     portal_ref: PortalRef,
     pos: Rect,
     prev_pos: Rect,
-    z_index: ZIndex,
+    z_index: usize,
     frame_buffer_id: usize,
     frame_buffer_size: (u16, u16),
     frame_buffer: Arc<FrameBuffer>,
@@ -120,7 +95,7 @@ impl ServerPortal {
             .map(|(_, portal)| &portal.z_index)
             .max()
             .cloned()
-            .unwrap_or_else(|| ZIndex::new());
+            .unwrap_or(0);
 
         Self {
             portal_ref,

@@ -1,8 +1,9 @@
 use crate::components::{Focus, NeedsPaint, OnInput, OnPaint, Parent, Position, Text};
-use crate::types::{EventInput, MouseButton, MouseInput};
 use crate::widgets::WidgetSystem;
-use crate::Result;
 use cairo::cairo::Cairo;
+use graphics_base::system::System;
+use graphics_base::types::{EventInput, MouseButton, MouseInput};
+use graphics_base::Result;
 use hecs::{Component, Entity, RefMut, World};
 
 /* fn find_parent<Q>(world: &World, entity: Entity) -> Option<Ref<Q>> where Q: Component {
@@ -103,5 +104,11 @@ impl WidgetSystem for TextBoxSystem {
 
     fn components(&self) -> Self::Components {
         (self.on_paint.clone(), self.on_input.clone())
+    }
+}
+
+impl System for TextBoxSystem {
+    fn run(&mut self, world: &mut World) -> Result<()> {
+        WidgetSystem::run(self, world)
     }
 }

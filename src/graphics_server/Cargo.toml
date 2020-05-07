@@ -1,15 +1,22 @@
 [package]
-authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 name = "graphics_server"
-version = "0.0.0"
+version = "0.1.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-alloc_system = { path = "../alloc_system" }
 cairo = { path = "../cairo" }
-graphics = { path = "../graphics", default-features = false, features = ["server"] }
+graphics_base = { path = "../graphics_base" }
+hashbrown = { version = "0.7", default-features = false }
+hecs = { version = "0.2", default-features = false, features = ["single_threaded"], git = "https://github.com/1tgr/hecs.git", rev = "e719aeae2234995a1403b5fb59587a8e2a2bb951" }
+jpeg-decoder = { version = "0.1", default-features = false, git = "https://github.com/1tgr/jpeg-decoder.git", rev = "f63a32c5154485e1d22e01384a9f78c6b1c4225b" }
+serde = { version = "1", default-features = false, features = ["alloc"] }
+serde_derive = "1"
+
+[target.'cfg(target_os="rust_os")'.dependencies]
+alloc_system = { path = "../alloc_system" }
+corepack = { version = "0.4", default-features = false, features = ["alloc"] }
 os = { path = "../os" }
 rt = { path = "../rt" }
-serde = { version = "1", default-features = false, features = ["alloc"] }
 std = { path = "../std" }
 syscall = { path = "../syscall" }

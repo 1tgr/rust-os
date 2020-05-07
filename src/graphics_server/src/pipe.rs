@@ -1,9 +1,9 @@
-use crate::ipc;
-use crate::server::app::ServerApp;
-use crate::Result;
+use crate::app::ServerApp;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::sync::Arc;
 use core::str;
+use graphics_base::ipc;
+use graphics_base::Result;
 use os::{File, Mutex, Process};
 use syscall::libc_helpers;
 

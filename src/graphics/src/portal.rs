@@ -1,13 +1,13 @@
-use crate::client;
-use crate::client::pipe::ClientPipe;
 use crate::components::{CapturesMouseInput, Focus, NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text};
-use crate::frame_buffer::{AsSurfaceMut, FrameBuffer};
-use crate::system::{ChangedIndex, DeletedIndex, System};
-use crate::types::{Command, Event, EventInput, Rect};
+use crate::pipe::{self, ClientPipe};
 use crate::widgets::{Button, ClientPortal, Label};
-use crate::Result;
+use alloc::vec::Vec;
 use cairo::bindings::CAIRO_FORMAT_RGB24;
 use cairo::cairo::Cairo;
+use graphics_base::frame_buffer::{AsSurfaceMut, FrameBuffer};
+use graphics_base::system::{ChangedIndex, DeletedIndex, System};
+use graphics_base::types::{Command, Event, EventInput, Rect};
+use graphics_base::Result;
 use hashbrown::{HashMap, HashSet};
 use hecs::{Entity, World};
 
@@ -258,7 +258,7 @@ impl ClientPortalSystem {
             render_tree(world, entity, on_paint, &cr);
         }
 
-        let frame_buffer_id = client::alloc_id();
+        let frame_buffer_id = pipe::alloc_id();
         let shared_mem_handle = frame_buffer.as_raw();
         self.busy_frame_buffers.insert(frame_buffer_id, frame_buffer);
         Ok((size, frame_buffer_id, shared_mem_handle))
@@ -299,7 +299,7 @@ impl System for ClientPortalSystem {
             .collect::<Vec<_>>();
 
         for (entity, pos, on_paint) in new_portals {
-            let id = client::alloc_id();
+            let id = pipe::alloc_id();
             let (size, frame_buffer_id, shared_mem_handle) =
                 self.render_portal(world, entity, pos, on_paint.as_ref())?;
 

@@ -1,7 +1,8 @@
-use crate::types::{Color, EventInput, Rect};
-use crate::Result;
 use alloc::rc::Rc;
+use alloc::string::String;
 use cairo::cairo::Cairo;
+use graphics_base::types::{Color, EventInput, Rect};
+use graphics_base::Result;
 use hecs::{Entity, World};
 
 #[derive(Clone)]

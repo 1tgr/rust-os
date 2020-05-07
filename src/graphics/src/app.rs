@@ -1,8 +1,10 @@
-use crate::client::portal::{ClientPortalSystem, ClientPortalSystemPre};
-use crate::system::System;
-use crate::types::Event;
+use crate::portal::{ClientPortalSystem, ClientPortalSystemPre};
 use crate::widgets;
-use crate::Result;
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+use graphics_base::system::System;
+use graphics_base::types::Event;
+use graphics_base::Result;
 use hecs::World;
 
 pub struct App {

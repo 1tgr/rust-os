@@ -1,13 +1,14 @@
 use crate::bindings::*;
 use crate::cairo::Cairo;
 use crate::{CairoFunc, CairoObj, Error, Result};
-use core::marker::PhantomData;
+use alloc::borrow::Cow;
+use alloc::vec::Vec;
 use core::ops::Deref;
 use core::ptr::{self, NonNull};
 use libc::{c_int, c_uchar};
 
-pub struct CairoSurface<'a>(CairoObj<cairo_surface_t>, PhantomData<&'a [u8]>);
-pub struct CairoSurfaceMut<'a>(CairoObj<cairo_surface_t>, PhantomData<&'a mut [u8]>);
+pub struct CairoSurface<'a>(CairoObj<cairo_surface_t>, Cow<'a, [u8]>);
+pub struct CairoSurfaceMut<'a>(CairoObj<cairo_surface_t>, Cow<'a, [u8]>);
 
 impl<'a> CairoSurface<'a> {
     pub fn from_slice(data: &'a [u8], format: cairo_format_t, width: u16, height: u16) -> Self {
@@ -24,7 +25,7 @@ impl<'a> CairoSurface<'a> {
             )
         };
 
-        Self(CairoObj::wrap(ptr), PhantomData)
+        Self(CairoObj::wrap(ptr), Cow::Borrowed(data))
     }
 }
 
@@ -43,7 +44,7 @@ impl<'a> CairoSurfaceMut<'a> {
             )
         };
 
-        Self(CairoObj::wrap(ptr), PhantomData)
+        Self(CairoObj::wrap(ptr), Cow::Borrowed(data))
     }
 
     pub fn into_cairo(self) -> Cairo<'a> {
@@ -53,8 +54,13 @@ impl<'a> CairoSurfaceMut<'a> {
 
 impl CairoSurface<'static> {
     pub fn from_png_slice(slice: &[u8]) -> Result<Self> {
-        let CairoSurfaceMut(ptr, _) = CairoSurfaceMut::from_png_slice(slice)?;
-        Ok(Self(ptr, PhantomData))
+        let CairoSurfaceMut(ptr, data) = CairoSurfaceMut::from_png_slice(slice)?;
+        Ok(Self(ptr, data))
+    }
+
+    pub fn from_vec(data: Vec<u8>, format: cairo_format_t, width: u16, height: u16) -> Self {
+        let CairoSurfaceMut(ptr, data) = CairoSurfaceMut::from_vec(data, format, width, height);
+        Self(ptr, data)
     }
 }
 
@@ -87,7 +93,24 @@ impl CairoSurfaceMut<'static> {
             ptr
         };
 
-        Ok(Self(CairoObj::wrap(ptr), PhantomData))
+        Ok(Self(CairoObj::wrap(ptr), Cow::Borrowed(&[])))
+    }
+
+    pub fn from_vec(data: Vec<u8>, format: cairo_format_t, width: u16, height: u16) -> Self {
+        let stride = crate::stride_for_width(format, width);
+        assert_eq!(data.len(), stride * height as usize);
+
+        let ptr = unsafe {
+            cairo_image_surface_create_for_data(
+                data.as_ptr() as *mut c_uchar,
+                format,
+                width as c_int,
+                height as c_int,
+                stride as c_int,
+            )
+        };
+
+        Self(CairoObj::wrap(ptr), Cow::Owned(data))
     }
 }
 

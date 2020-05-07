@@ -1,8 +1,8 @@
-use crate::client::pipe;
-use crate::ipc;
-use crate::types::{Command, Event};
-use crate::Result;
+use crate::pipe;
 use alloc::collections::vec_deque::VecDeque;
+use graphics_base::ipc;
+use graphics_base::types::{Command, Event};
+use graphics_base::Result;
 use os::{File, OSHandle};
 
 pub struct ClientPipe {

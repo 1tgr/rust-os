@@ -1,10 +1,11 @@
 use crate::components::{
     BackColor, CapturesMouseInput, NeedsPaint, OnClick, OnInput, OnPaint, Position, Text, TextColor,
 };
-use crate::types::{Color, EventInput, MouseButton, MouseInput, Rect};
 use crate::widgets::WidgetSystem;
-use crate::Result;
 use cairo::cairo::Cairo;
+use graphics_base::system::System;
+use graphics_base::types::{Color, EventInput, MouseButton, MouseInput, Rect};
+use graphics_base::Result;
 use hecs::{Entity, World};
 
 pub struct Button;
@@ -137,5 +138,11 @@ impl WidgetSystem for ButtonSystem {
 
     fn components(&self) -> Self::Components {
         (self.on_paint.clone(), self.on_input.clone())
+    }
+}
+
+impl System for ButtonSystem {
+    fn run(&mut self, world: &mut World) -> Result<()> {
+        WidgetSystem::run(self, world)
     }
 }

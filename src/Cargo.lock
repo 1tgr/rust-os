@@ -134,14 +134,25 @@ dependencies = [
 name = "graphics"
 version = "0.0.0"
 dependencies = [
- "alloc_system",
  "cairo",
- "corepack",
+ "graphics_base",
+ "graphics_server",
  "hashbrown",
  "hecs",
  "minifb",
  "os",
- "rt",
+ "syscall",
+]
+
+[[package]]
+name = "graphics_base"
+version = "0.1.0"
+dependencies = [
+ "cairo",
+ "corepack",
+ "hashbrown",
+ "hecs",
+ "os",
  "serde",
  "serde_derive",
  "std",
@@ -165,14 +176,19 @@ dependencies = [
 
 [[package]]
 name = "graphics_server"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "alloc_system",
  "cairo",
- "graphics",
+ "corepack",
+ "graphics_base",
+ "hashbrown",
+ "hecs",
+ "jpeg-decoder",
  "os",
  "rt",
  "serde",
+ "serde_derive",
  "std",
  "syscall",
 ]
@@ -216,6 +232,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "jpeg-decoder"
+version = "0.1.19"
+source = "git+https://github.com/1tgr/jpeg-decoder.git?rev=f63a32c5154485e1d22e01384a9f78c6b1c4225b#f63a32c5154485e1d22e01384a9f78c6b1c4225b"
+dependencies = [
+ "byteorder",
+ "libm",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -240,6 +265,12 @@ dependencies = [
  "cc",
  "winapi",
 ]
+
+[[package]]
+name = "libm"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 
 [[package]]
 name = "maybe-uninit"
