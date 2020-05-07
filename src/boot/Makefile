@@ -10,11 +10,11 @@ ISO_LAYOUT += initrd.tar.gz
 ISO_LAYOUT += boot/grub/menu.lst=menu.lst
 ISO_LAYOUT += boot/grub/stage2_eltorito=stage2_eltorito_temp
 
-INITRD += ../target/$(CONFIG_TARGET)/release/cairo_demo
-INITRD += ../target/$(CONFIG_TARGET)/release/graphics_client
-INITRD += ../target/$(CONFIG_TARGET)/release/graphics_server
-INITRD += ../target/$(CONFIG_TARGET)/release/hello
-INITRD += ../target/$(CONFIG_TARGET)/release/input
+INITRD += ../target/$(CONFIG_TARGET)/stripped/cairo_demo
+INITRD += ../target/$(CONFIG_TARGET)/stripped/graphics_client
+INITRD += ../target/$(CONFIG_TARGET)/stripped/graphics_server
+INITRD += ../target/$(CONFIG_TARGET)/stripped/hello
+INITRD += ../target/$(CONFIG_TARGET)/stripped/input
 
 ifeq ($(shell uname),Darwin)
 TARFLAGS += -s ',.*/,,g'
@@ -23,6 +23,12 @@ else
 TARFLAGS = --transform 's/.*\///g'
 all: bootable.iso
 endif
+
+../target/$(CONFIG_TARGET)/stripped:
+	mkdir $@
+
+../target/$(CONFIG_TARGET)/stripped/%: ../target/$(CONFIG_TARGET)/release/% | ../target/$(CONFIG_TARGET)/stripped
+	x86_64-elf-strip -o $@ $<
 
 initrd.tar: $(INITRD)
 	tar $(TARFLAGS) -cf $@ $(INITRD)

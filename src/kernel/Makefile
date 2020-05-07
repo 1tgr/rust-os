@@ -14,7 +14,7 @@ CFLAGS += -g -I ../newlib/$(TARGET)/include
 all: $(OBJS)
 	$(RUSTUP_RUN) xargo build --target $(CONFIG_TARGET)-kernel --release
 	$(OBJCOPY) -SF elf32-i386 target/$(CONFIG_TARGET)-kernel/release/kernel kernel
-	$(OBJDUMP) -d target/$(CONFIG_TARGET)-kernel/release/kernel > kernel.txt
+	$(OBJDUMP) -S target/$(CONFIG_TARGET)-kernel/release/kernel > kernel.txt
 
 clean:
 	$(RUSTUP_RUN) xargo clean
