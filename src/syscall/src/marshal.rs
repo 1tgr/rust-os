@@ -4,57 +4,60 @@ use core::mem;
 use core::slice;
 use core::str;
 
-pub struct TupleDeque6<T> {
-    tuple: (T, T, T, T, T, T),
+pub struct PackedArgs {
+    tuple: (usize, usize, usize, usize, usize, usize),
     len: u8,
 }
 
-impl<T: Default> TupleDeque6<T> {
-    pub fn new() -> Self {
-        TupleDeque6 {
-            tuple: <_>::default(),
+impl Default for PackedArgs {
+    fn default() -> Self {
+        Self {
+            tuple: (0, 0, 0, 0, 0, 0),
             len: 0,
-        }
-    }
-
-    pub fn pop_front(&mut self) -> Option<T> {
-        match self.len {
-            6 => {
-                self.len = 5;
-                Some(mem::replace(&mut self.tuple.0, T::default()))
-            }
-            5 => {
-                self.len = 4;
-                Some(mem::replace(&mut self.tuple.1, T::default()))
-            }
-            4 => {
-                self.len = 3;
-                Some(mem::replace(&mut self.tuple.2, T::default()))
-            }
-            3 => {
-                self.len = 2;
-                Some(mem::replace(&mut self.tuple.3, T::default()))
-            }
-            2 => {
-                self.len = 1;
-                Some(mem::replace(&mut self.tuple.4, T::default()))
-            }
-            1 => {
-                self.len = 0;
-                Some(mem::replace(&mut self.tuple.5, T::default()))
-            }
-            _ => None,
         }
     }
 }
 
-impl<T> TupleDeque6<T> {
-    #[allow(dead_code)]
-    pub fn from_tuple(tuple: (T, T, T, T, T, T)) -> Self {
-        TupleDeque6 { tuple, len: 6 }
+impl PackedArgs {
+    #[cfg(feature = "kernel")]
+    pub fn new(arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg5: usize, arg6: usize) -> Self {
+        Self {
+            tuple: (arg1, arg2, arg3, arg4, arg5, arg6),
+            len: 6,
+        }
     }
 
-    pub fn push_back(&mut self, item: T) {
+    pub fn pop_front(&mut self) -> usize {
+        match self.len {
+            6 => {
+                self.len = 5;
+                self.tuple.0
+            }
+            5 => {
+                self.len = 4;
+                self.tuple.1
+            }
+            4 => {
+                self.len = 3;
+                self.tuple.2
+            }
+            3 => {
+                self.len = 2;
+                self.tuple.3
+            }
+            2 => {
+                self.len = 1;
+                self.tuple.4
+            }
+            1 => {
+                self.len = 0;
+                self.tuple.5
+            }
+            _ => panic!(),
+        }
+    }
+
+    pub fn push_back(&mut self, item: usize) {
         match self.len {
             0 => {
                 self.tuple.0 = item;
@@ -135,8 +138,7 @@ impl<T> TupleDeque6<T> {
                 asm!("syscall"
                 : "={rax}"(result)
                 : "{rax}"(num), "{rdi}"(self.tuple.0), "{rsi}"(self.tuple.1), "{rdx}"(self.tuple.2), "{r8}"(self.tuple.3), "{r9}"(self.tuple.4), "{r10}"(self.tuple.5)
-                : "rcx", "r11", "cc",      // syscall/sysret clobbers rcx, r11, rflags
-                    "memory"
+                : "rcx", "r11", "cc", "memory"
                 : "volatile");
             }
         }
@@ -144,14 +146,12 @@ impl<T> TupleDeque6<T> {
     }
 }
 
-pub type PackedArgs = TupleDeque6<usize>;
-
 pub trait SyscallArgs: Sized {
     fn as_args(self, args: &mut PackedArgs);
     fn from_args(args: &mut PackedArgs) -> Result<Self>;
 
     fn into_args(self) -> PackedArgs {
-        let mut args = PackedArgs::new();
+        let mut args = PackedArgs::default();
         self.as_args(&mut args);
         args
     }
@@ -176,7 +176,7 @@ impl SyscallArgs for bool {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() != 0)
+        Ok(args.pop_front() != 0)
     }
 }
 
@@ -186,7 +186,7 @@ impl SyscallArgs for u8 {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -196,7 +196,7 @@ impl SyscallArgs for u16 {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -206,7 +206,7 @@ impl SyscallArgs for u32 {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -216,7 +216,7 @@ impl SyscallArgs for i8 {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -226,7 +226,7 @@ impl SyscallArgs for i16 {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -236,7 +236,7 @@ impl SyscallArgs for i32 {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -246,7 +246,7 @@ impl SyscallArgs for usize {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap())
+        Ok(args.pop_front())
     }
 }
 
@@ -256,7 +256,7 @@ impl<T> SyscallArgs for *const T {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 
@@ -266,7 +266,7 @@ impl<T> SyscallArgs for *mut T {
     }
 
     fn from_args(args: &mut PackedArgs) -> Result<Self> {
-        Ok(args.pop_front().unwrap() as Self)
+        Ok(args.pop_front() as Self)
     }
 }
 

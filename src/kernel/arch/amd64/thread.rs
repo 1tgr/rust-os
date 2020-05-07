@@ -16,14 +16,14 @@ pub type RegsHandler = dyn Fn(&Regs) -> usize;
 
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> isize {
-    let args = PackedArgs::from_tuple((
+    let args = PackedArgs::new(
         regs.rdi as usize,
         regs.rsi as usize,
         regs.rdx as usize,
         regs.r8 as usize,
         regs.r9 as usize,
         regs.r10 as usize,
-    ));
+    );
     ksyscall::dispatch(regs.rax as usize, args)
 }
 
