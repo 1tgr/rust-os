@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(target_os = "rust_os", no_std)]
 
 extern crate alloc;
 
