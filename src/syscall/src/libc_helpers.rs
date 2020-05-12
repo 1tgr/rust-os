@@ -1,6 +1,7 @@
 use crate::table as syscall;
 use crate::{Handle, Result};
 use core::fmt;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use libc::{c_char, c_int, c_void, mode_t, off_t, size_t, ssize_t};
 
 static mut ERRNO: u32 = 0;
@@ -56,6 +57,43 @@ pub extern "C" fn sbrk(len: usize) -> *mut u8 {
             }
             0 as *mut u8
         }
+    }
+}
+
+static MALLOC_OWNER: AtomicUsize = AtomicUsize::new(0);
+static mut MALLOC_LOCK_COUNT: usize = 0;
+static mut MALLOC_LOCK: Handle = 0;
+
+#[no_mangle]
+pub extern "C" fn __malloc_lock(_reent: *mut c_void) {
+    let current_thread_id = syscall::current_thread_id().unwrap();
+    assert_ne!(current_thread_id, 0);
+
+    if MALLOC_OWNER.load(Ordering::SeqCst) != current_thread_id {
+        syscall::lock_mutex(unsafe { MALLOC_LOCK }).unwrap();
+        while MALLOC_OWNER.compare_and_swap(0, current_thread_id, Ordering::SeqCst) != 0 {
+            syscall::unlock_mutex(unsafe { MALLOC_LOCK }).unwrap();
+            syscall::lock_mutex(unsafe { MALLOC_LOCK }).unwrap();
+        }
+    }
+
+    unsafe {
+        MALLOC_LOCK_COUNT += 1;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __malloc_unlock(_reent: *mut c_void) {
+    let prev_count;
+    unsafe {
+        prev_count = MALLOC_LOCK_COUNT;
+        MALLOC_LOCK_COUNT -= 1;
+    }
+
+    if prev_count == 1 {
+        let current_thread_id = syscall::current_thread_id().unwrap();
+        assert_eq!(MALLOC_OWNER.swap(0, Ordering::SeqCst), current_thread_id);
+        syscall::unlock_mutex(unsafe { MALLOC_LOCK }).unwrap();
     }
 }
 
@@ -136,6 +174,8 @@ pub unsafe extern "C" fn unlink(_c: *const c_char) -> c_int {
 }
 
 pub unsafe fn init() -> Result<()> {
+    MALLOC_LOCK = syscall::create_mutex()?;
+
     let mut ptr = &init_array_start as *const _;
     while ptr < &init_array_end {
         (*ptr)();
@@ -150,6 +190,7 @@ pub unsafe fn init() -> Result<()> {
 pub unsafe fn shutdown(code: i32) -> ! {
     let _ = syscall::close(stdin);
     let _ = syscall::close(stdout);
+    let _ = syscall::close(MALLOC_LOCK);
     let _ = syscall::exit_thread(code);
     unreachable!()
 }

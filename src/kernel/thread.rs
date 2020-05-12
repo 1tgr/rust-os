@@ -42,7 +42,7 @@ impl HWToken {
 }
 
 struct Thread {
-    _id: usize,
+    id: usize,
     stack: &'static mut [u8],
     process: Arc<Process>,
     exited: Deferred<i32>,
@@ -52,7 +52,7 @@ impl Thread {
     pub fn new(process: Arc<Process>, stack: &'static mut [u8]) -> Thread {
         static NEXT_THREAD_ID: AtomicUsize = AtomicUsize::new(0);
         Thread {
-            _id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
+            id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             stack,
             process,
             exited: Deferred::new(),
@@ -177,6 +177,10 @@ pub fn exit(code: i32) -> ! {
     });
 
     panic!("exit: no more threads")
+}
+
+pub fn current_thread_id() -> usize {
+    lock_sched!().current.id
 }
 
 fn spawn_inner<'a>(process: Arc<Process>, start: Box<dyn FnOnce() + 'a>) -> Deferred<i32> {

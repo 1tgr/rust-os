@@ -1,3 +1,4 @@
+use crate::arch;
 use crate::multiboot::{multiboot_info_t, multiboot_memory_map_t, multiboot_module_t, multiboot_uint32_t};
 use crate::ptr::{self, Align, PointerInSlice};
 use crate::spin::Mutex;
@@ -6,6 +7,7 @@ use core::cmp;
 use core::intrinsics;
 use core::mem;
 use core::slice;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use libc::{c_int, c_void};
 use syscall::{ErrNum, Result};
 
@@ -25,6 +27,29 @@ pub unsafe extern "C" fn sbrk(incr: c_int) -> *mut c_void {
     assert!((begin as *const u8) < (&heap_end as *const u8), "out of heap space");
     BRK += incr as usize;
     begin as *mut c_void
+}
+
+static MALLOC_LOCK: AtomicUsize = AtomicUsize::new(0);
+static mut MALLOC_LOCK_TOKEN: usize = 0;
+
+#[no_mangle]
+pub extern "C" fn __malloc_lock(_reent: *mut c_void) {
+    let token = arch::disable_interrupts();
+    // TODO: multi CPU
+    if MALLOC_LOCK.fetch_add(1, Ordering::SeqCst) == 0 {
+        unsafe {
+            MALLOC_LOCK_TOKEN = token;
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn __malloc_unlock(_reent: *mut c_void) {
+    // TODO: multi CPU
+    if MALLOC_LOCK.fetch_sub(1, Ordering::SeqCst) == 1 {
+        let token = mem::replace(unsafe { &mut MALLOC_LOCK_TOKEN }, 0);
+        arch::restore_interrupts(token);
+    }
 }
 
 pub const PAGE_SIZE: usize = 4096;

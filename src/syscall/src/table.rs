@@ -33,5 +33,6 @@ syscalls! {
     fn lock_mutex(mutex: Handle) -> () => 15,
     fn unlock_mutex(mutex: Handle) -> () => 16,
     fn spawn_thread(entry: extern fn(usize), context: usize) -> Handle => 17,
-    fn schedule() -> () => 18
+    fn schedule() -> () => 18,
+    fn current_thread_id() -> usize => 19
 }

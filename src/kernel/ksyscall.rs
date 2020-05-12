@@ -185,4 +185,8 @@ impl HandleSyscall for SyscallHandler {
         thread::schedule();
         Ok(())
     }
+
+    fn current_thread_id(&self) -> Result<usize> {
+        Ok(thread::current_thread_id())
+    }
 }
