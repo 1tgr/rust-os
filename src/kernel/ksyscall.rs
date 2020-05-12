@@ -12,6 +12,8 @@ use crate::singleton::{DropSingleton, Singleton};
 use crate::thread;
 use alloc::sync::Arc;
 use syscall::{self, ErrNum, Handle, HandleSyscall, PackedArgs, Result};
+use core::result;
+use core::str::Utf8Error;
 
 pub struct SyscallHandler {
     console: Arc<Console>,
@@ -65,7 +67,7 @@ impl HandleSyscall for SyscallHandler {
     }
     */
 
-    fn exit_thread(&self, code: i32) -> Result<()> {
+    fn exit_thread(&self, code: i32) -> ! {
         thread::exit(code)
     }
 
@@ -86,12 +88,12 @@ impl HandleSyscall for SyscallHandler {
         }
     }
 
-    fn free_pages(&self, p: *mut u8) -> Result<bool> {
-        Ok(process::free(p))
+    fn free_pages(&self, p: *mut u8) -> bool {
+        process::free(p)
     }
 
-    fn open(&self, filename: &str) -> Result<Handle> {
-        let file: Arc<dyn KObj> = match filename {
+    fn open(&self, filename: result::Result<&str, Utf8Error>) -> Result<Handle> {
+        let file: Arc<dyn KObj> = match filename? {
             "stdin" => self.console.clone(),
             "stdout" => self.console.clone(),
             "ps2_mouse" => self.mouse.clone(),
@@ -114,9 +116,9 @@ impl HandleSyscall for SyscallHandler {
         Ok(slice.as_mut_ptr())
     }
 
-    fn spawn_process(&self, executable: &str, inherit: &[Handle]) -> Result<Handle> {
+    fn spawn_process(&self, executable: result::Result<&str, Utf8Error>, inherit: &[Handle]) -> Result<Handle> {
         let inherit = inherit.iter().map(|handle| *handle);
-        let process = process::spawn(String::from(executable), inherit)?;
+        let process = process::spawn(String::from(executable?), inherit)?;
         Ok(process::make_handle(process))
     }
 
@@ -125,8 +127,8 @@ impl HandleSyscall for SyscallHandler {
         Ok(deferred.get())
     }
 
-    fn create_shared_mem(&self) -> Result<Handle> {
-        Ok(process::make_handle(Arc::new(SharedMemBlock::new())))
+    fn create_shared_mem(&self) -> Handle {
+        process::make_handle(Arc::new(SharedMemBlock::new()))
     }
 
     fn map_shared_mem(&self, block: Handle, len: usize, writable: bool) -> Result<*mut u8> {
@@ -135,8 +137,8 @@ impl HandleSyscall for SyscallHandler {
         Ok(slice.as_mut_ptr())
     }
 
-    fn create_pipe(&self) -> Result<Handle> {
-        Ok(process::make_handle(Arc::new(Pipe::new())))
+    fn create_pipe(&self) -> Handle {
+        process::make_handle(Arc::new(Pipe::new()))
     }
 
     fn open_handle(&self, from_process: Handle, from_handle: usize) -> Result<Handle> {
@@ -145,8 +147,8 @@ impl HandleSyscall for SyscallHandler {
         Ok(process::make_handle(from_handle.get().clone()))
     }
 
-    fn create_mutex(&self) -> Result<Handle> {
-        Ok(process::make_handle(Arc::new(UntypedMutex::new())))
+    fn create_mutex(&self) -> Handle {
+        process::make_handle(Arc::new(UntypedMutex::new()))
     }
 
     fn lock_mutex(&self, mutex: Handle) -> Result<()> {
@@ -159,7 +161,7 @@ impl HandleSyscall for SyscallHandler {
         unsafe { mutex.unlock_unsafe() }
     }
 
-    fn spawn_thread(&self, entry: extern "C" fn(usize), context: usize) -> Result<Handle> {
+    fn spawn_thread(&self, entry: extern "C" fn(usize), context: usize) -> Handle {
         let kernel_entry = move || {
             let stack_slice = process::alloc::<u8>(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
             log!(
@@ -178,15 +180,14 @@ impl HandleSyscall for SyscallHandler {
         };
 
         let thread = thread::spawn(kernel_entry);
-        Ok(process::make_handle(Arc::new(thread)))
+        process::make_handle(Arc::new(thread))
     }
 
-    fn schedule(&self) -> Result<()> {
+    fn schedule(&self) {
         thread::schedule();
-        Ok(())
     }
 
-    fn current_thread_id(&self) -> Result<usize> {
-        Ok(thread::current_thread_id())
+    fn current_thread_id(&self) -> usize {
+        thread::current_thread_id()
     }
 }

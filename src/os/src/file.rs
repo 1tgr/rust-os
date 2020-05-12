@@ -12,8 +12,8 @@ impl File {
         Ok(File(OSHandle::from_raw(syscall::open(filename)?)))
     }
 
-    pub fn create_pipe() -> Result<Self> {
-        Ok(File(OSHandle::from_raw(syscall::create_pipe()?)))
+    pub fn create_pipe() -> Self {
+        File(OSHandle::from_raw(syscall::create_pipe()))
     }
 
     pub fn handle(&self) -> &OSHandle {

@@ -17,8 +17,8 @@ pub struct ServerPipe {
 impl ServerPipe {
     pub fn new(server: ServerApp, filename: &str) -> Result<Self> {
         let (stdin, stdout) = unsafe { (libc_helpers::stdin, libc_helpers::stdout) };
-        let client2server = File::create_pipe()?;
-        let server2client = File::create_pipe()?;
+        let client2server = File::create_pipe();
+        let server2client = File::create_pipe();
         let inherit = [
             stdin,
             stdout,
@@ -30,7 +30,7 @@ impl ServerPipe {
             server,
             process: Process::spawn(filename, &inherit)?,
             client2server,
-            server2client: Arc::new(Mutex::new(server2client)?),
+            server2client: Arc::new(Mutex::new(server2client)),
         })
     }
 

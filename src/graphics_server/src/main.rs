@@ -64,18 +64,18 @@ fn main() -> Result<()> {
     let lfb_ptr = syscall::init_video_mode(800, 600, 32)?;
     let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
     let lfb = unsafe { OSMem::from_raw(lfb_ptr, stride * 600) };
-    let screen = Arc::new(Mutex::new(Screen::new((800, 600), lfb))?);
-    let keyboard_focus = Arc::new(Mutex::new(None)?);
+    let screen = Arc::new(Mutex::new(Screen::new((800, 600), lfb)));
+    let keyboard_focus = Arc::new(Mutex::new(None));
     let mut app = ServerApp::new();
     app.add_system(ServerPortalSystem::new(screen.clone(), keyboard_focus.clone()));
 
-    Thread::spawn(move || mouse_thread(screen).map(|()| 0).unwrap_or_else(|num| -(num as i32)))?;
+    Thread::spawn(move || mouse_thread(screen).map(|()| 0).unwrap_or_else(|num| -(num as i32)));
 
     Thread::spawn(move || {
         keyboard_thread(keyboard_focus)
             .map(|()| 0)
             .unwrap_or_else(|num| -(num as i32))
-    })?;
+    });
 
     ServerPipe::new(app, "graphics_client")?.run()
 }

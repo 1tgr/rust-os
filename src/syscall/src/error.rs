@@ -1,5 +1,6 @@
 use core::convert::TryFrom;
 use core::result;
+use core::str::Utf8Error;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ErrNum {
@@ -37,6 +38,12 @@ impl Into<usize> for ErrNum {
             Self::FileNotFound => 5,
             Self::InvalidArgument => 6,
         }
+    }
+}
+
+impl From<Utf8Error> for ErrNum {
+    fn from(_value: Utf8Error) -> Self {
+        Self::Utf8Error
     }
 }
 

@@ -66,7 +66,7 @@ static mut MALLOC_LOCK: Handle = 0;
 
 #[no_mangle]
 pub extern "C" fn __malloc_lock(_reent: *mut c_void) {
-    let current_thread_id = syscall::current_thread_id().unwrap();
+    let current_thread_id = syscall::current_thread_id();
     assert_ne!(current_thread_id, 0);
 
     if MALLOC_OWNER.load(Ordering::SeqCst) != current_thread_id {
@@ -91,7 +91,7 @@ pub extern "C" fn __malloc_unlock(_reent: *mut c_void) {
     }
 
     if prev_count == 1 {
-        let current_thread_id = syscall::current_thread_id().unwrap();
+        let current_thread_id = syscall::current_thread_id();
         assert_eq!(MALLOC_OWNER.swap(0, Ordering::SeqCst), current_thread_id);
         syscall::unlock_mutex(unsafe { MALLOC_LOCK }).unwrap();
     }
@@ -104,8 +104,7 @@ pub unsafe extern "C" fn __assert_fail(
     _line: c_int,
     _function: *const c_char,
 ) -> ! {
-    let _ = syscall::exit_thread(-1);
-    unreachable!()
+    syscall::exit_thread(-1)
 }
 
 #[no_mangle]
@@ -174,7 +173,7 @@ pub unsafe extern "C" fn unlink(_c: *const c_char) -> c_int {
 }
 
 pub unsafe fn init() -> Result<()> {
-    MALLOC_LOCK = syscall::create_mutex()?;
+    MALLOC_LOCK = syscall::create_mutex();
 
     let mut ptr = &init_array_start as *const _;
     while ptr < &init_array_end {
@@ -191,6 +190,5 @@ pub unsafe fn shutdown(code: i32) -> ! {
     let _ = syscall::close(stdin);
     let _ = syscall::close(stdout);
     let _ = syscall::close(MALLOC_LOCK);
-    let _ = syscall::exit_thread(code);
-    unreachable!()
+    syscall::exit_thread(code)
 }

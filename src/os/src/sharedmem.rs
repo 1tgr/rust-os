@@ -24,7 +24,7 @@ impl SharedMem {
     }
 
     pub fn new(len: usize, writable: bool) -> Result<Self> {
-        let handle = OSHandle::from_raw(syscall::create_shared_mem()?);
+        let handle = OSHandle::from_raw(syscall::create_shared_mem());
         Self::from_raw(handle, len, writable)
     }
 

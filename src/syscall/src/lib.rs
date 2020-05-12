@@ -1,4 +1,5 @@
 #![feature(asm)]
+#![feature(never_type)]
 #![no_std]
 
 pub type Handle = usize;

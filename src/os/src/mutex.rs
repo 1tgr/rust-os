@@ -13,11 +13,11 @@ unsafe impl<T: ?Sized + Send> Send for Mutex<T> {}
 unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}
 
 impl<T> Mutex<T> {
-    pub fn new(data: T) -> Result<Self> {
-        Ok(Mutex {
-            handle: OSHandle::from_raw(syscall::create_mutex()?),
+    pub fn new(data: T) -> Self {
+        Self {
+            handle: OSHandle::from_raw(syscall::create_mutex()),
             data: UnsafeCell::new(data),
-        })
+        }
     }
 }
 

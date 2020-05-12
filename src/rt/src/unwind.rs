@@ -12,6 +12,5 @@ fn panic(info: &PanicInfo) -> ! {
         writeln!(&mut StdoutWriter, "Panic at {}({})", file, line)
     };
 
-    let _ = syscall::exit_thread(-(line as i32));
-    unreachable!()
+    syscall::exit_thread(-(line as i32))
 }
