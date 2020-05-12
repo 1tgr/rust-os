@@ -6,12 +6,16 @@ use cairo::bindings::CAIRO_FORMAT_RGB24;
 use cairo::cairo::Cairo;
 use graphics_base::frame_buffer::{AsSurfaceMut, FrameBuffer};
 use graphics_base::system::{ChangedIndex, DeletedIndex, System};
-use graphics_base::types::{Command, Event, EventInput, Rect};
+use graphics_base::types::{Command, Event, EventInput, MouseButton, MouseInput, Rect};
 use graphics_base::Result;
 use hashbrown::{HashMap, HashSet};
 use hecs::{Entity, World};
 
 struct Decoration;
+
+struct DragDropState {
+    origin: (f64, f64),
+}
 
 fn find_needs_paint_children(world: &World, entity: Entity, entities: &mut HashSet<Entity>) -> bool {
     let mut any = false;
@@ -91,57 +95,125 @@ fn hit_test(world: &World, entity: Entity, x: f64, y: f64) -> Option<(Entity, Op
     None
 }
 
-fn find_input_entity(
-    world: &World,
-    portal_id: usize,
-    input: EventInput,
-) -> Option<(Entity, Option<OnInput>, EventInput)> {
-    for (entity, (&ClientPortalId(id), &Focus(focus), on_input)) in
+fn find_input_portal(world: &World, portal_id: usize) -> Option<(Entity, Focus, Option<OnInput>)> {
+    for (entity, (&ClientPortalId(id), focus, on_input)) in
         world.query::<(&ClientPortalId, &Focus, Option<&OnInput>)>().iter()
     {
-        if portal_id != id {
-            continue;
+        if portal_id == id {
+            return Some((entity, focus.clone(), on_input.cloned()));
         }
-
-        let tuple = match input {
-            EventInput::KeyPress { .. } => {
-                if let Some(entity) = focus {
-                    let mut query = world.query_one::<Option<&OnInput>>(entity).unwrap();
-                    let on_input = query.get().unwrap();
-                    (entity, on_input.cloned(), input)
-                } else {
-                    (entity, on_input.cloned(), input)
-                }
-            }
-
-            EventInput::Mouse { x, y, input } => {
-                let x = x - 2.0;
-                let y = y - 22.0;
-                if let Some((entity, (on_input, parent, &Position(pos)))) = world
-                    .query::<(Option<&OnInput>, Option<&Parent>, &Position)>()
-                    .with::<CapturesMouseInput>()
-                    .iter()
-                    .next()
-                {
-                    let (x, y) = if let Some(&Parent(parent)) = parent {
-                        portal_to_child(world, parent, pos, x, y)
-                    } else {
-                        (x, y)
-                    };
-
-                    (entity, on_input.cloned(), EventInput::Mouse { x, y, input })
-                } else if let Some((entity, on_input, x, y)) = hit_test(world, entity, x, y) {
-                    (entity, on_input, EventInput::Mouse { x, y, input })
-                } else {
-                    (entity, on_input.cloned(), EventInput::Mouse { x, y, input })
-                }
-            }
-        };
-
-        return Some(tuple);
     }
 
     None
+}
+
+fn find_input_entity(
+    world: &mut World,
+    portal_id: usize,
+    input: EventInput,
+) -> Option<(Entity, Option<OnInput>, EventInput)> {
+    let (entity, focus, on_input) = find_input_portal(world, portal_id)?;
+
+    let tuple = match input {
+        EventInput::KeyPress { .. } => {
+            if let Focus(Some(focus)) = focus {
+                if let Ok(mut query) = world.query_one::<Option<&OnInput>>(focus) {
+                    let on_input = query.get().unwrap();
+                    (entity, on_input.cloned(), input)
+                } else {
+                    (entity, on_input, input)
+                }
+            } else {
+                (entity, on_input, input)
+            }
+        }
+
+        EventInput::Mouse {
+            x,
+            y,
+            screen_x,
+            screen_y,
+            input,
+        } => {
+            let input_capture = world
+                .query::<(Option<&OnInput>, Option<&Parent>, &Position, &CapturesMouseInput)>()
+                .iter()
+                .next()
+                .map(|(entity, (on_input, parent, position, captures_mouse_input))| {
+                    (
+                        entity,
+                        (
+                            on_input.cloned(),
+                            parent.cloned(),
+                            position.clone(),
+                            captures_mouse_input.clone(),
+                        ),
+                    )
+                });
+
+            let x = x - 2.0;
+            let y = y - 22.0;
+            if let Some((entity, (on_input, parent, Position(pos), CapturesMouseInput { button: prev_button }))) =
+                input_capture
+            {
+                if let MouseInput::ButtonUp { button } = input {
+                    if prev_button == button {
+                        world.remove_one::<CapturesMouseInput>(entity).unwrap();
+                    }
+                }
+
+                let (x, y) = if let Some(Parent(parent)) = parent {
+                    portal_to_child(world, parent, pos, x, y)
+                } else {
+                    (x, y)
+                };
+
+                (
+                    entity,
+                    on_input,
+                    EventInput::Mouse {
+                        x,
+                        y,
+                        screen_x,
+                        screen_y,
+                        input,
+                    },
+                )
+            } else if let Some((entity, on_input, x, y)) = hit_test(world, entity, x, y) {
+                if let MouseInput::ButtonDown { button } = input {
+                    if input_capture.is_none() {
+                        world.insert_one(entity, CapturesMouseInput { button }).unwrap();
+                    }
+                }
+
+                (
+                    entity,
+                    on_input,
+                    EventInput::Mouse {
+                        x,
+                        y,
+                        screen_x,
+                        screen_y,
+                        input,
+                    },
+                )
+            } else {
+                (
+                    entity,
+                    on_input,
+                    EventInput::Mouse {
+                        x,
+                        y,
+                        screen_x,
+                        screen_y,
+                        input,
+                    },
+                )
+            }
+        }
+    };
+
+    Some(tuple)
 }
 
 #[derive(Copy, Clone)]
@@ -161,28 +233,75 @@ impl System for ClientPortalSystemPre {
             .map(|(entity, &Position(pos))| (entity, pos))
             .collect::<Vec<_>>();
 
-        for (entity, pos) in new_portals {
+        for (portal_entity, pos) in new_portals {
             world.spawn((
                 Label,
                 Decoration,
-                Parent(entity),
+                Parent(portal_entity),
                 Position::new(0.0, -20.0, pos.width - 24.0, 20.0),
                 Text::new("Hello"),
+                OnInput::new(move |world, _entity, input| {
+                    if let EventInput::Mouse {
+                        screen_x,
+                        screen_y,
+                        input,
+                        ..
+                    } = input
+                    {
+                        match input {
+                            MouseInput::ButtonDown {
+                                button: MouseButton::Left,
+                            } => {
+                                world
+                                    .insert_one(
+                                        portal_entity,
+                                        DragDropState {
+                                            origin: (screen_x, screen_y),
+                                        },
+                                    )
+                                    .unwrap();
+                            }
+
+                            MouseInput::Move => {
+                                if let Some((Position(ref mut pos), ref mut state)) = world
+                                    .query_one::<(&mut Position, &mut DragDropState)>(portal_entity)
+                                    .unwrap()
+                                    .get()
+                                {
+                                    let origin = (screen_x, screen_y);
+                                    pos.x += origin.0 - state.origin.0;
+                                    pos.y += origin.1 - state.origin.1;
+                                    state.origin = origin;
+                                }
+                            }
+
+                            MouseInput::ButtonUp {
+                                button: MouseButton::Left,
+                            } => {
+                                let _ = world.remove_one::<DragDropState>(portal_entity);
+                            }
+
+                            _ => (),
+                        }
+                    }
+
+                    Ok(())
+                }),
             ));
 
             world.spawn((
                 Button,
                 Decoration,
-                Parent(entity),
+                Parent(portal_entity),
                 Position::new(pos.width - 22.0, -20.0, 18.0, 18.0),
                 Text::new("X"),
                 OnClick::new(move |world, _entity| {
-                    world.despawn(entity).unwrap();
+                    world.despawn(portal_entity).unwrap();
                     Ok(())
                 }),
             ));
 
-            world.insert_one(entity, HasDecoration).unwrap();
+            world.insert_one(portal_entity, HasDecoration).unwrap();
         }
 
         Ok(())

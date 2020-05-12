@@ -3,6 +3,7 @@ use alloc::sync::Weak;
 use cairo::bindings::{CAIRO_FORMAT_A8, CAIRO_FORMAT_ARGB32, CAIRO_FORMAT_RGB24};
 use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
+use core::mem;
 use graphics_base::frame_buffer::{AsSurface, AsSurfaceMut, FrameBuffer};
 use graphics_base::types::{EventInput, MouseButton, MouseInput, Rect};
 use graphics_base::{Error, Result};
@@ -17,6 +18,12 @@ pub struct ScreenBuffer {
     pub pos: Rect,
     pub frame_buffer_size: (u16, u16),
     pub frame_buffer: Weak<FrameBuffer>,
+    pub portal_ref: PortalRef,
+}
+
+pub struct InputCapture {
+    button: MouseButton,
+    pub pos: Rect,
     pub portal_ref: PortalRef,
 }
 
@@ -60,6 +67,7 @@ pub struct Screen<S> {
     cursor: CairoSurface<'static>,
     wallpaper: CairoSurface<'static>,
     pub buffers: Vec<ScreenBuffer>,
+    pub input_capture: Option<InputCapture>,
 }
 
 unsafe impl<S> Send for Screen<S> {}
@@ -85,6 +93,7 @@ where
             cursor,
             wallpaper,
             buffers: Vec::new(),
+            input_capture: None,
         }
     }
 
@@ -118,20 +127,28 @@ where
         cr.set_source_surface(wallpaper, 0.0, 0.0).paint();
     }
 
-    fn find_portal(buffers: &[ScreenBuffer], pos: (u16, u16)) -> Option<(f64, f64, &PortalRef)> {
+    fn find_portal(&self) -> Option<(Rect, PortalRef)> {
+        let pos = self.cursor_hotspot;
         let x = pos.0 as f64;
         let y = pos.1 as f64;
-        for buffer in buffers {
-            let ScreenBuffer {
-                pos, ref portal_ref, ..
-            } = *buffer;
+        if let Some(InputCapture {
+            pos, ref portal_ref, ..
+        }) = self.input_capture
+        {
+            Some((pos, portal_ref.clone()))
+        } else {
+            for buffer in self.buffers.iter() {
+                let ScreenBuffer {
+                    pos, ref portal_ref, ..
+                } = *buffer;
 
-            if pos.contains(x, y) {
-                return Some((x - pos.x, y - pos.y, portal_ref));
+                if pos.contains(x, y) {
+                    return Some((pos, portal_ref.clone()));
+                }
             }
-        }
 
-        None
+            None
+        }
     }
 
     #[cfg(target_os = "rust_os")]
@@ -150,7 +167,11 @@ where
         self.cursor_sprite = to_sprite(self.cursor_hotspot);
         self.buttons = buttons;
 
-        if let Some((x, y, portal_ref)) = Self::find_portal(&self.buffers, self.cursor_hotspot) {
+        if let Some((pos, portal_ref)) = self.find_portal() {
+            let screen_x = x as f64;
+            let screen_y = y as f64;
+            let x = screen_x - pos.x;
+            let y = screen_y - pos.y;
             let mut inputs = Vec::new();
             if prev_cursor_hotspot != self.cursor_hotspot {
                 inputs.push(MouseInput::Move);
@@ -163,13 +184,36 @@ where
             {
                 if !prev_down && down {
                     inputs.push(MouseInput::ButtonDown { button });
+
+                    if self.input_capture.is_none() {
+                        self.input_capture = Some(InputCapture {
+                            button,
+                            pos,
+                            portal_ref: portal_ref.clone(),
+                        });
+                    }
                 } else if prev_down && !down {
                     inputs.push(MouseInput::ButtonUp { button });
+
+                    if let Some(InputCapture {
+                        button: prev_button, ..
+                    }) = self.input_capture
+                    {
+                        if prev_button == button {
+                            self.input_capture = None;
+                        }
+                    }
                 }
             }
 
             for input in inputs {
-                portal_ref.send_input(EventInput::Mouse { x, y, input })?;
+                portal_ref.send_input(EventInput::Mouse {
+                    x,
+                    y,
+                    screen_x,
+                    screen_y,
+                    input,
+                })?;
             }
         }
 
@@ -194,8 +238,29 @@ where
     where
         I: IntoIterator<Item = ScreenBuffer>,
     {
+        let mut prev_input_capture = mem::replace(&mut self.input_capture, None);
         self.buffers.clear();
-        self.buffers.extend(buffers);
+
+        let buffers = buffers.into_iter();
+        if let (_, Some(capacity)) = buffers.size_hint() {
+            self.buffers.reserve(capacity);
+        }
+
+        for buffer in buffers {
+            prev_input_capture = prev_input_capture.and_then(|prev_input_capture| {
+                if prev_input_capture.portal_ref == buffer.portal_ref {
+                    self.input_capture = Some(InputCapture {
+                        pos: buffer.pos,
+                        ..prev_input_capture
+                    });
+                    None
+                } else {
+                    Some(prev_input_capture)
+                }
+            });
+
+            self.buffers.push(buffer);
+        }
 
         let cr = self
             .lfb

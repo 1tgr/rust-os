@@ -65,7 +65,7 @@ pub enum Command {
     },
 }
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
     Middle,
@@ -81,8 +81,16 @@ pub enum MouseInput {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum EventInput {
-    KeyPress { code: char },
-    Mouse { x: f64, y: f64, input: MouseInput },
+    KeyPress {
+        code: char,
+    },
+    Mouse {
+        x: f64,
+        y: f64,
+        screen_x: f64,
+        screen_y: f64,
+        input: MouseInput,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

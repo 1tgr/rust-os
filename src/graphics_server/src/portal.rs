@@ -22,6 +22,12 @@ mod rust_os {
         pub portal_id: usize,
     }
 
+    impl PartialEq for PortalRef {
+        fn eq(&self, other: &Self) -> bool {
+            self.portal_id == other.portal_id && Arc::ptr_eq(&self.server2client, &other.server2client)
+        }
+    }
+
     impl PortalRef {
         pub fn send_input(&self, input: EventInput) -> Result<()> {
             let mut server2client = self.server2client.lock().unwrap();
@@ -48,6 +54,12 @@ mod posix {
     pub struct PortalRef {
         pub portal_id: usize,
         pub events: Rc<RefCell<VecDeque<Event>>>,
+    }
+
+    impl PartialEq for PortalRef {
+        fn eq(&self, other: &Self) -> bool {
+            self.portal_id == other.portal_id && Rc::ptr_eq(&self.events, &other.events)
+        }
     }
 
     impl PortalRef {

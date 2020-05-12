@@ -1,7 +1,7 @@
 use alloc::rc::Rc;
 use alloc::string::String;
 use cairo::cairo::Cairo;
-use graphics_base::types::{Color, EventInput, Rect};
+use graphics_base::types::{Color, EventInput, MouseButton, Rect};
 use graphics_base::Result;
 use hecs::{Entity, World};
 
@@ -15,8 +15,11 @@ impl BackColor {
 }
 
 #[derive(Clone)]
-pub struct CapturesMouseInput;
+pub struct CapturesMouseInput {
+    pub button: MouseButton,
+}
 
+#[derive(Clone)]
 pub struct Focus(pub Option<Entity>);
 
 #[derive(Clone)]

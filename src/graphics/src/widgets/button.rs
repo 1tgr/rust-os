@@ -69,13 +69,11 @@ impl ButtonSystem {
 
     fn on_input(world: &mut World, entity: Entity, input: EventInput) -> Result<()> {
         match input {
-            EventInput::Mouse { input, x, y } => match input {
+            EventInput::Mouse { input, x, y, .. } => match input {
                 MouseInput::ButtonDown {
                     button: MouseButton::Left,
                 } => {
-                    world
-                        .insert(entity, (ButtonPressed, CapturesMouseInput, NeedsPaint))
-                        .unwrap();
+                    world.insert(entity, (ButtonPressed, NeedsPaint)).unwrap();
                 }
 
                 MouseInput::Move => {
@@ -109,16 +107,13 @@ impl ButtonSystem {
                 MouseInput::ButtonUp {
                     button: MouseButton::Left,
                 } => {
-                    if world.entity(entity).unwrap().get::<ButtonPressed>().is_some() {
-                        world.remove::<(ButtonPressed, CapturesMouseInput)>(entity).unwrap();
+                    if let Ok(ButtonPressed) = world.remove_one(entity) {
                         world.insert_one(entity, NeedsPaint).unwrap();
 
                         let on_click = world.query_one::<&OnClick>(entity).unwrap().get().cloned();
                         if let Some(OnClick(on_click)) = on_click {
                             (on_click)(world, entity)?;
                         }
-                    } else {
-                        world.remove_one::<CapturesMouseInput>(entity).unwrap();
                     }
                 }
 
