@@ -1,6 +1,6 @@
 use crate::arch::cpu;
 use crate::arch::isr::{self, DropIrqHandler};
-use crate::io::{AsyncRead, Pipe, Write};
+use crate::io::{AsyncRead, Pipe, Read, Write};
 use crate::kobj::KObj;
 use crate::spin::Mutex;
 use alloc::sync::Arc;
@@ -304,6 +304,10 @@ impl Keyboard {
 
 impl KObj for Keyboard {
     fn async_read(&self) -> Option<&dyn AsyncRead> {
+        Some(&*self.device)
+    }
+
+    fn read(&self) -> Option<&dyn Read> {
         Some(&*self.device)
     }
 }

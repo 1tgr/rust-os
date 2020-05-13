@@ -1,37 +1,33 @@
-#![feature(start)]
-
 extern crate alloc_system;
-extern crate os;
 extern crate rt;
-extern crate syscall;
 
 use os::Process;
 use syscall::libc_helpers::{stdin, stdout};
 use syscall::{ErrNum, Result};
 
-fn read_line() -> Result<String> {
-    let mut v = Vec::new();
+fn read_line(buf: &mut Vec<u8>) -> Result<String> {
     loop {
-        let mut buf = vec![0; 100];
-        let bytes = syscall::read(unsafe { stdin }, &mut buf[..])?;
-        if bytes < buf.len() {
-            buf.truncate(bytes);
-            v.extend(buf);
-            break;
+        if let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+            let line = buf.drain(..pos + 1).collect();
+            return String::from_utf8(line).map_err(|_| ErrNum::Utf8Error);
         }
 
-        v.extend(buf);
-    }
+        let index = buf.len();
+        buf.resize(index + 100, 0);
 
-    String::from_utf8(v).map_err(|_| ErrNum::Utf8Error)
+        let len = syscall::read(stdin, &mut buf[index..])?;
+        buf.truncate(index + len);
+    }
 }
 
-fn run() -> Result<()> {
-    let inherit = unsafe { [stdin, stdout] };
+fn main() -> Result<()> {
+    let inherit = [stdin, stdout];
+    let mut buf = Vec::new();
     loop {
         print!("> ");
 
-        let line = read_line()?;
+        let mut line = read_line(&mut buf)?;
+        assert_eq!(line.pop(), Some('\n'));
         if line == "exit" {
             return Ok(());
         }
@@ -47,10 +43,4 @@ fn run() -> Result<()> {
             }
         }
     }
-}
-
-#[start]
-#[no_mangle]
-pub fn start(_: isize, _: *const *const u8) -> isize {
-    run().map(|()| 0).unwrap_or_else(|num| -(num as isize))
 }

@@ -16,12 +16,11 @@ pub struct ServerPipe {
 
 impl ServerPipe {
     pub fn new(server: ServerApp, filename: &str) -> Result<Self> {
-        let (stdin, stdout) = unsafe { (libc_helpers::stdin, libc_helpers::stdout) };
         let client2server = File::create_pipe();
         let server2client = File::create_pipe();
         let inherit = [
-            stdin,
-            stdout,
+            libc_helpers::stdin,
+            libc_helpers::stdout,
             client2server.handle().get(),
             server2client.handle().get(),
         ];

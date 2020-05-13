@@ -15,16 +15,16 @@ extern "C" {
 static mut errno: c_int = 0;
 
 #[allow(non_upper_case_globals)]
-pub static mut stdin: Handle = 0;
+pub static stdin: Handle = 0;
 
 #[allow(non_upper_case_globals)]
-pub static mut stdout: Handle = 0;
+pub static stdout: Handle = 1;
 
 pub struct StdoutWriter;
 
 impl fmt::Write for StdoutWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        match syscall::write(unsafe { stdout }, s.as_bytes()) {
+        match syscall::write(stdout, s.as_bytes()) {
             Ok(_) => Ok(()),
             Err(_) => Err(fmt::Error),
         }
@@ -35,7 +35,7 @@ pub struct StderrWriter;
 
 impl fmt::Write for StderrWriter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        match syscall::write(unsafe { stdout }, s.as_bytes()) {
+        match syscall::write(stdout, s.as_bytes()) {
             Ok(_) => Ok(()),
             Err(_) => Err(fmt::Error),
         }
@@ -181,14 +181,10 @@ pub unsafe fn init() -> Result<()> {
         ptr = ptr.offset(1);
     }
 
-    stdin = syscall::open("stdin")?;
-    stdout = syscall::open("stdout")?;
     Ok(())
 }
 
 pub unsafe fn shutdown(code: i32) -> ! {
-    let _ = syscall::close(stdin);
-    let _ = syscall::close(stdout);
     let _ = syscall::close(MALLOC_LOCK);
     syscall::exit_thread(code)
 }

@@ -70,7 +70,7 @@ impl ProcessState {
         handle
     }
 
-    fn resolve_handle_ref(&self, handle: Handle) -> Result<Arc<dyn KObj>> {
+    fn resolve_handle_obj(&self, handle: Handle) -> Result<Arc<dyn KObj>> {
         self.handles
             .get(handle)
             .map(|ref o| (*o).clone())
@@ -201,13 +201,7 @@ impl Process {
         self.name.as_str()
     }
 
-    pub fn spawn<I: IntoIterator<Item = Handle>>(&self, name: String, inherit: I) -> Result<Self> {
-        let mut handles = Vec::new();
-        let state = lock!(self.state);
-        for handle in inherit {
-            handles.push(Some(state.resolve_handle_ref(handle)?));
-        }
-
+    pub fn spawn(&self, name: String, handles: Vec<Option<Arc<dyn KObj>>>) -> Result<Self> {
         Process::new(name, self.phys.clone(), self.kernel_virt.clone(), handles)
     }
 
@@ -255,13 +249,17 @@ impl Process {
         handle: Handle,
         f: F,
     ) -> Result<KObjRef<T>> {
-        let kobj = lock!(self.state).resolve_handle_ref(handle)?;
+        let kobj = lock!(self.state).resolve_handle_obj(handle)?;
         KObjRef::new(kobj, f)
     }
 
     pub fn resolve_handle<T: Clone, F: FnOnce(&dyn KObj) -> Option<T>>(&self, handle: Handle, f: F) -> Result<T> {
-        let kobj = lock!(self.state).resolve_handle_ref(handle)?;
+        let kobj = lock!(self.state).resolve_handle_obj(handle)?;
         f(&*kobj).ok_or(ErrNum::NotSupported)
+    }
+
+    pub fn resolve_handle_obj(&self, handle: Handle) -> Result<Arc<dyn KObj>> {
+        lock!(self.state).resolve_handle_obj(handle)
     }
 
     pub fn exit_code(&self) -> Deferred<i32> {
@@ -283,9 +281,9 @@ impl KObj for Process {
     }
 }
 
-pub fn spawn<I: IntoIterator<Item = Handle>>(executable: String, inherit: I) -> Result<Arc<Process>> {
+pub fn spawn(executable: String, handles: Vec<Option<Arc<dyn KObj>>>) -> Result<Arc<Process>> {
     let current = thread::current_process();
-    let process = Arc::new(current.spawn(executable.clone(), inherit)?);
+    let process = Arc::new(current.spawn(executable.clone(), handles)?);
 
     let init_in_new_process = move || {
         let image_slice = unsafe {
@@ -315,8 +313,6 @@ pub fn spawn<I: IntoIterator<Item = Handle>>(executable: String, inherit: I) -> 
         assert!(ehdr.e_entry != 0);
 
         let entry = ehdr.e_entry as *const u8;
-        log!("entry point is {:p}", entry);
-
         let mut slices = Vec::new();
         for i in 0..ehdr.e_phnum {
             let phdr_offset = ehdr.e_phoff as isize + (i as isize) * (ehdr.e_phentsize as isize);
@@ -325,14 +321,6 @@ pub fn spawn<I: IntoIterator<Item = Handle>>(executable: String, inherit: I) -> 
                 continue;
             }
 
-            log!(
-                "segment {}: {:x} bytes @ {:p} (file: {:x} bytes @ {:x})",
-                i,
-                phdr.p_memsz,
-                phdr.p_vaddr as *mut u8,
-                phdr.p_filesz,
-                phdr.p_offset
-            );
             assert!(phdr.p_memsz >= phdr.p_filesz);
             let slice =
                 unsafe { process::alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
@@ -344,11 +332,6 @@ pub fn spawn<I: IntoIterator<Item = Handle>>(executable: String, inherit: I) -> 
         assert!(slices.iter().any(|slice| slice.contains_ptr(entry)));
 
         let stack_slice = process::alloc::<u8>(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
-        log!(
-            "stack_slice = 0x{:x} bytes @ {:p}",
-            stack_slice.len(),
-            stack_slice.as_ptr()
-        );
         Ok((entry, stack_slice))
     };
 
@@ -522,6 +505,10 @@ pub fn resolve_handle_ref<'a, T: 'a + ?Sized, F: FnOnce(&'a dyn KObj) -> Option<
 
 pub fn resolve_handle<T: Clone, F: FnOnce(&dyn KObj) -> Option<T>>(handle: Handle, f: F) -> Result<T> {
     thread::current_process().resolve_handle(handle, f)
+}
+
+pub fn resolve_handle_obj(handle: Handle) -> Result<Arc<dyn KObj>> {
+    thread::current_process().resolve_handle_obj(handle)
 }
 
 pub fn close_handle(handle: Handle) -> bool {

@@ -5,18 +5,22 @@ pub struct File(OSHandle);
 
 impl File {
     pub fn from_raw(handle: OSHandle) -> Self {
-        File(handle)
+        Self(handle)
     }
 
     pub fn open(filename: &str) -> Result<Self> {
-        Ok(File(OSHandle::from_raw(syscall::open(filename)?)))
+        Ok(Self(OSHandle::from_raw(syscall::open(filename)?)))
     }
 
     pub fn create_pipe() -> Self {
-        File(OSHandle::from_raw(syscall::create_pipe()))
+        Self(OSHandle::from_raw(syscall::create_pipe()))
     }
 
     pub fn handle(&self) -> &OSHandle {
         &self.0
+    }
+
+    pub fn duplicate(&self) -> Result<Self> {
+        Ok(Self(self.0.duplicate()?))
     }
 }

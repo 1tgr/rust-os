@@ -18,22 +18,6 @@ pub fn deferred<A>(d: Deferred<A>) -> DeferredNode<A> {
     DeferredNode(d)
 }
 
-pub fn resolved<A>(value: A) -> ResolvedNode<A> {
-    ResolvedNode(value)
-}
-
-impl<A: 'static> dyn PromiseNode<A> {
-    pub fn map<B, F: FnOnce(A) -> B + 'static>(self: Box<Self>, f: F) -> MapNode<A, F> {
-        MapNode(self, f)
-    }
-}
-
-impl<A: 'static> dyn PromiseNode<Promise<A>> {
-    pub fn unwrap(self: Box<Self>) -> UnwrapNode<A> {
-        UnwrapNode(self)
-    }
-}
-
 impl<A: 'static> PromiseNode<A> for DeferredNode<A> {
     fn get(self: Box<Self>) -> A {
         self.0.get()

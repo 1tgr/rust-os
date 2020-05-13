@@ -168,9 +168,7 @@ impl SyscallArgs for () {
 
     fn as_args(self, _args: &mut PackedArgs) {}
 
-    fn from_args(_args: &mut PackedArgs) -> Self {
-
-    }
+    fn from_args(_args: &mut PackedArgs) -> Self {}
 }
 
 impl SyscallArgs for bool {

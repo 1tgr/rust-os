@@ -1,3 +1,4 @@
+use crate::pipe::AppSync;
 use crate::portal::{ClientPortalSystem, ClientPortalSystemPre};
 use crate::widgets;
 use alloc::boxed::Box;
@@ -44,10 +45,20 @@ impl App {
         }
 
         self.system.run(&mut self.world)?;
-        self.system.pipe.wait_for_event()
+
+        let (event, callbacks) = self.system.pipe.wait_for_event()?;
+        for callback in callbacks {
+            callback(&mut self.world)?;
+        }
+
+        Ok(event)
     }
 
     pub fn dispatch_event(&mut self, event: Event) -> Result<()> {
         self.system.dispatch_event(&mut self.world, event)
+    }
+
+    pub fn sync(&self) -> AppSync {
+        self.system.pipe.sync()
     }
 }

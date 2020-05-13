@@ -12,7 +12,7 @@ mod rust_os;
 mod posix;
 
 #[cfg(target_os = "rust_os")]
-pub use rust_os::ClientPipe;
+pub use rust_os::{AppSync, ClientPipe};
 
 #[cfg(not(target_os = "rust_os"))]
-pub use posix::ClientPipe;
+pub use posix::{AppSync, ClientPipe};

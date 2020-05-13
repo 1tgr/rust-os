@@ -138,6 +138,12 @@ impl<'a> Cairo<'a> {
         unsafe { cairo_show_text(self.0.as_ptr(), text.as_ptr() as *const c_char) };
         self
     }
+
+    pub fn select_font_face(&self, family: &str, slant: cairo_font_slant_t, weight: cairo_font_weight_t) -> &Self {
+        let family = to_cstr(family);
+        unsafe { cairo_select_font_face(self.0.as_ptr(), family.as_ptr() as *const c_char, slant, weight) };
+        self
+    }
 }
 
 impl<'a> Deref for Cairo<'a> {

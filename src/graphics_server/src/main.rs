@@ -4,24 +4,25 @@ extern crate rt;
 
 use alloc::sync::Arc;
 use cairo::bindings::*;
+use core::char;
 use core::mem;
-use core::str;
 use graphics_base::frame_buffer::AsSurfaceMut;
 use graphics_base::types::EventInput;
 use graphics_server::{PortalRef, Screen, ServerApp, ServerPipe, ServerPortalSystem};
-use os::{File, Mutex, OSMem, Result, Thread};
+use os::{File, Mutex, OSHandle, OSMem, Result, Thread};
 use std::io::Read;
+use syscall::libc_helpers;
 
 fn keyboard_thread(keyboard_focus: Arc<Mutex<Option<PortalRef>>>) -> Result<()> {
-    let mut stdin = File::open("stdin")?;
+    let mut stdin = File::from_raw(OSHandle::from_raw(libc_helpers::stdin));
     let mut buf = [0; 4];
     loop {
-        let len = stdin.read(&mut buf)?;
-        if let Ok(s) = str::from_utf8(&buf[..len]) {
-            if let Some(code) = s.chars().next() {
-                if let Some(ref portal_ref) = *keyboard_focus.lock().unwrap() {
-                    portal_ref.send_input(EventInput::KeyPress { code })?;
-                }
+        stdin.read_exact(&mut buf)?;
+
+        let code = unsafe { mem::transmute::<[u8; 4], u32>(buf) } & !0x08000000;
+        if let Some(code) = char::from_u32(code) {
+            if let Some(ref portal_ref) = *keyboard_focus.lock().unwrap() {
+                portal_ref.send_input(EventInput::KeyPress { code })?;
             }
         }
     }
@@ -77,5 +78,5 @@ fn main() -> Result<()> {
             .unwrap_or_else(|num| -(num as i32))
     });
 
-    ServerPipe::new(app, "graphics_client")?.run()
+    ServerPipe::new(app, "terminal")?.run()
 }

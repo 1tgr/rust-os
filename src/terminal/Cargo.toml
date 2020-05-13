@@ -1,6 +1,6 @@
 [package]
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
-name = "graphics_client"
+name = "terminal"
 version = "0.0.0"
 edition = "2018"
 

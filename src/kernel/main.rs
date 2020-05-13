@@ -49,7 +49,6 @@ pub mod libc_helpers;
 pub mod phys_mem;
 pub mod unwind;
 
-mod console;
 mod deferred;
 mod elf;
 mod io;

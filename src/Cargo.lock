@@ -169,7 +169,6 @@ dependencies = [
  "hecs",
  "os",
  "rt",
- "serde",
  "std",
  "syscall",
 ]
@@ -711,6 +710,20 @@ dependencies = [
  "redox_syscall",
  "remove_dir_all",
  "winapi",
+]
+
+[[package]]
+name = "terminal"
+version = "0.0.0"
+dependencies = [
+ "alloc_system",
+ "cairo",
+ "graphics",
+ "hecs",
+ "os",
+ "rt",
+ "std",
+ "syscall",
 ]
 
 [[package]]

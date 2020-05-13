@@ -1,14 +1,18 @@
-use syscall::{self, Handle};
+use syscall::{self, Handle, Result};
 
 pub struct OSHandle(Handle);
 
 impl OSHandle {
     pub fn from_raw(handle: Handle) -> Self {
-        OSHandle(handle)
+        Self(handle)
     }
 
     pub fn get(&self) -> Handle {
         self.0
+    }
+
+    pub fn duplicate(&self) -> Result<Self> {
+        Ok(Self(syscall::duplicate_handle(self.0)?))
     }
 }
 

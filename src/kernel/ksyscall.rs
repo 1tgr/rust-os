@@ -1,7 +1,6 @@
 use crate::arch::ps2_mouse::Ps2Mouse;
 use crate::arch::thread as arch_thread;
 use crate::arch::vga_bochs;
-use crate::console::Console;
 use crate::io::Pipe;
 use crate::kobj::KObj;
 use crate::mutex::UntypedMutex;
@@ -11,12 +10,11 @@ use crate::process::{self, SharedMemBlock};
 use crate::singleton::{DropSingleton, Singleton};
 use crate::thread;
 use alloc::sync::Arc;
-use syscall::{self, ErrNum, Handle, HandleSyscall, PackedArgs, Result};
 use core::result;
 use core::str::Utf8Error;
+use syscall::{self, ErrNum, Handle, HandleSyscall, PackedArgs, Result};
 
 pub struct SyscallHandler {
-    console: Arc<Console>,
     mouse: Arc<Ps2Mouse>,
 }
 
@@ -37,8 +35,8 @@ pub fn dispatch(num: usize, args: PackedArgs) -> isize {
 }
 
 impl SyscallHandler {
-    pub fn new(console: Arc<Console>, mouse: Arc<Ps2Mouse>) -> Self {
-        SyscallHandler { console, mouse }
+    pub fn new(mouse: Arc<Ps2Mouse>) -> Self {
+        SyscallHandler { mouse }
     }
 }
 
@@ -94,8 +92,6 @@ impl HandleSyscall for SyscallHandler {
 
     fn open(&self, filename: result::Result<&str, Utf8Error>) -> Result<Handle> {
         let file: Arc<dyn KObj> = match filename? {
-            "stdin" => self.console.clone(),
-            "stdout" => self.console.clone(),
             "ps2_mouse" => self.mouse.clone(),
             _ => return Err(ErrNum::FileNotFound),
         };
@@ -117,8 +113,12 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn spawn_process(&self, executable: result::Result<&str, Utf8Error>, inherit: &[Handle]) -> Result<Handle> {
-        let inherit = inherit.iter().map(|handle| *handle);
-        let process = process::spawn(String::from(executable?), inherit)?;
+        let handles = inherit
+            .iter()
+            .map(|&handle| Ok(Some(process::resolve_handle_obj(handle)?)))
+            .collect::<Result<Vec<_>>>()?;
+
+        let process = process::spawn(String::from(executable?), handles)?;
         Ok(process::make_handle(process))
     }
 
@@ -164,11 +164,6 @@ impl HandleSyscall for SyscallHandler {
     fn spawn_thread(&self, entry: extern "C" fn(usize), context: usize) -> Handle {
         let kernel_entry = move || {
             let stack_slice = process::alloc::<u8>(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
-            log!(
-                "stack_slice = 0x{:x} bytes @ {:p}",
-                stack_slice.len(),
-                stack_slice.as_ptr()
-            );
             unsafe {
                 arch_thread::jmp_user_mode(
                     entry as *const u8,
@@ -189,5 +184,10 @@ impl HandleSyscall for SyscallHandler {
 
     fn current_thread_id(&self) -> usize {
         thread::current_thread_id()
+    }
+
+    fn duplicate_handle(&self, handle: Handle) -> Result<Handle> {
+        let kobj = process::resolve_handle_obj(handle)?;
+        Ok(process::make_handle(kobj))
     }
 }

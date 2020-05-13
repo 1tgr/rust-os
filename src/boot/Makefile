@@ -15,6 +15,7 @@ INITRD += ../target/$(CONFIG_TARGET)/stripped/graphics_client
 INITRD += ../target/$(CONFIG_TARGET)/stripped/graphics_server
 INITRD += ../target/$(CONFIG_TARGET)/stripped/hello
 INITRD += ../target/$(CONFIG_TARGET)/stripped/input
+INITRD += ../target/$(CONFIG_TARGET)/stripped/terminal
 
 ifeq ($(shell uname),Darwin)
 TARFLAGS += -s ',.*/,,g'

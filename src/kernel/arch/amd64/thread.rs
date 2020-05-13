@@ -74,6 +74,5 @@ pub unsafe fn jmp_user_mode(rip: *const u8, rsp: *mut u8, rdi: usize) -> ! {
         cpu::wrmsr(cpu::IA32_SFMASK, RFLAGS_IF);
     });
 
-    log!("jmp_user_mode({:p}, {:p}, {:x})", rip, rsp, rdi);
     cpu::sysret(rip, rsp, rdi, 1 << 9)
 }

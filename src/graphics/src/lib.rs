@@ -12,3 +12,4 @@ pub mod widgets;
 pub use app::App;
 pub use graphics_base::types::*;
 pub use graphics_base::Result;
+pub use pipe::AppSync;

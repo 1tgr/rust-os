@@ -226,20 +226,20 @@ impl System for ClientPortalSystemPre {
         struct HasDecoration;
 
         let new_portals = world
-            .query::<&Position>()
+            .query::<(&Position, &Text)>()
             .with::<ClientPortal>()
             .without::<HasDecoration>()
             .iter()
-            .map(|(entity, &Position(pos))| (entity, pos))
+            .map(|(entity, (&Position(pos), text))| (entity, pos, text.clone()))
             .collect::<Vec<_>>();
 
-        for (portal_entity, pos) in new_portals {
+        for (portal_entity, pos, text) in new_portals {
             world.spawn((
                 Label,
                 Decoration,
                 Parent(portal_entity),
                 Position::new(0.0, -20.0, pos.width - 24.0, 20.0),
-                Text::new("Hello"),
+                text,
                 OnInput::new(move |world, _entity, input| {
                     if let EventInput::Mouse {
                         screen_x,
@@ -346,7 +346,11 @@ impl ClientPortalSystem {
 
         {
             let cr = frame_buffer.as_surface_mut(CAIRO_FORMAT_RGB24, size).into_cairo();
-            cr.set_source_rgb(0.98, 0.64, 0.066).paint().translate(2.0, 22.0);
+            cr.save()
+                .set_source_rgb(0.98, 0.64, 0.066)
+                .paint()
+                .restore()
+                .translate(2.0, 22.0);
 
             for (child, (&Parent(parent), &Position(pos), on_paint)) in world
                 .query::<(&Parent, &Position, Option<&OnPaint>)>()
