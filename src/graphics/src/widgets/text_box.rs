@@ -2,7 +2,7 @@ use crate::components::{Focus, NeedsPaint, OnInput, OnPaint, Parent, Position, T
 use crate::widgets::WidgetSystem;
 use cairo::cairo::Cairo;
 use graphics_base::system::System;
-use graphics_base::types::{EventInput, MouseButton, MouseInput};
+use graphics_base::types::{EventInput, MouseButton};
 use graphics_base::Result;
 use hecs::{Component, Entity, RefMut, World};
 
@@ -60,10 +60,8 @@ impl TextBoxSystem {
 
     fn on_input(world: &mut World, entity: Entity, input: EventInput) -> Result<()> {
         match input {
-            EventInput::Mouse {
-                input: MouseInput::ButtonDown {
-                    button: MouseButton::Left,
-                },
+            EventInput::MouseButtonDown {
+                button: MouseButton::Left,
                 ..
             } => {
                 let Focus(ref mut focus) = *find_parent_mut(world, entity).unwrap();

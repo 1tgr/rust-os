@@ -73,24 +73,19 @@ pub enum MouseButton {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum MouseInput {
-    ButtonDown { button: MouseButton },
-    ButtonUp { button: MouseButton },
-    Move,
+pub struct MouseInputInfo {
+    pub x: f64,
+    pub y: f64,
+    pub screen_x: f64,
+    pub screen_y: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum EventInput {
-    KeyPress {
-        code: char,
-    },
-    Mouse {
-        x: f64,
-        y: f64,
-        screen_x: f64,
-        screen_y: f64,
-        input: MouseInput,
-    },
+    KeyPress { code: char },
+    MouseButtonDown { info: MouseInputInfo, button: MouseButton },
+    MouseButtonUp { info: MouseInputInfo, button: MouseButton },
+    MouseMove { info: MouseInputInfo },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

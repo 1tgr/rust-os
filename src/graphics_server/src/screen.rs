@@ -5,7 +5,7 @@ use cairo::cairo::Cairo;
 use cairo::surface::CairoSurface;
 use core::mem;
 use graphics_base::frame_buffer::{AsSurface, AsSurfaceMut, FrameBuffer};
-use graphics_base::types::{EventInput, MouseButton, MouseInput, Rect};
+use graphics_base::types::{EventInput, MouseButton, MouseInputInfo, Rect};
 use graphics_base::{Error, Result};
 use jpeg_decoder::{Decoder, ImageInfo, PixelFormat};
 
@@ -172,9 +172,16 @@ where
             let screen_y = y as f64;
             let x = screen_x - pos.x;
             let y = screen_y - pos.y;
+            let info = MouseInputInfo {
+                x,
+                y,
+                screen_x,
+                screen_y,
+            };
+
             let mut inputs = Vec::new();
             if prev_cursor_hotspot != self.cursor_hotspot {
-                inputs.push(MouseInput::Move);
+                inputs.push(EventInput::MouseMove { info: info.clone() });
             }
 
             for ((&prev_down, &down), &button) in prev_buttons
@@ -183,7 +190,10 @@ where
                 .zip([MouseButton::Left, MouseButton::Middle, MouseButton::Right].iter())
             {
                 if !prev_down && down {
-                    inputs.push(MouseInput::ButtonDown { button });
+                    inputs.push(EventInput::MouseButtonDown {
+                        info: info.clone(),
+                        button,
+                    });
 
                     if self.input_capture.is_none() {
                         self.input_capture = Some(InputCapture {
@@ -193,7 +203,10 @@ where
                         });
                     }
                 } else if prev_down && !down {
-                    inputs.push(MouseInput::ButtonUp { button });
+                    inputs.push(EventInput::MouseButtonUp {
+                        info: info.clone(),
+                        button,
+                    });
 
                     if let Some(InputCapture {
                         button: prev_button, ..
@@ -207,13 +220,7 @@ where
             }
 
             for input in inputs {
-                portal_ref.send_input(EventInput::Mouse {
-                    x,
-                    y,
-                    screen_x,
-                    screen_y,
-                    input,
-                })?;
+                portal_ref.send_input(input)?;
             }
         }
 

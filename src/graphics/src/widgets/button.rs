@@ -4,7 +4,7 @@ use crate::components::{
 use crate::widgets::WidgetSystem;
 use cairo::cairo::Cairo;
 use graphics_base::system::System;
-use graphics_base::types::{Color, EventInput, MouseButton, MouseInput, Rect};
+use graphics_base::types::{Color, EventInput, MouseButton, Rect};
 use graphics_base::Result;
 use hecs::{Entity, World};
 
@@ -69,56 +69,54 @@ impl ButtonSystem {
 
     fn on_input(world: &mut World, entity: Entity, input: EventInput) -> Result<()> {
         match input {
-            EventInput::Mouse { input, x, y, .. } => match input {
-                MouseInput::ButtonDown {
-                    button: MouseButton::Left,
-                } => {
-                    world.insert(entity, (ButtonPressed, NeedsPaint)).unwrap();
-                }
+            EventInput::MouseButtonDown {
+                button: MouseButton::Left,
+                ..
+            } => {
+                world.insert(entity, (ButtonPressed, NeedsPaint)).unwrap();
+            }
 
-                MouseInput::Move => {
-                    let pressed = || {
-                        let mut query = world
-                            .query_one::<(&Position, Option<&ButtonPressed>, Option<&CapturesMouseInput>)>(entity)
-                            .unwrap();
+            EventInput::MouseMove { info } => {
+                let pressed = || {
+                    let mut query = world
+                        .query_one::<(&Position, Option<&ButtonPressed>, Option<&CapturesMouseInput>)>(entity)
+                        .unwrap();
 
-                        let (&Position(pos), button_pressed, captures_mouse_input) = query.get()?;
-                        captures_mouse_input?;
+                    let (&Position(pos), button_pressed, captures_mouse_input) = query.get()?;
+                    captures_mouse_input?;
 
-                        let prev_pressed = button_pressed.is_some();
-                        let pressed = Rect { x: 0.0, y: 0.0, ..pos }.contains(x, y);
-                        if prev_pressed != pressed {
-                            Some(pressed)
-                        } else {
-                            None
-                        }
-                    };
-
-                    if let Some(pressed) = pressed() {
-                        if pressed {
-                            world.insert(entity, (ButtonPressed, NeedsPaint)).unwrap();
-                        } else {
-                            world.remove_one::<ButtonPressed>(entity).unwrap();
-                            world.insert_one(entity, NeedsPaint).unwrap();
-                        }
+                    let prev_pressed = button_pressed.is_some();
+                    let pressed = Rect { x: 0.0, y: 0.0, ..pos }.contains(info.x, info.y);
+                    if prev_pressed != pressed {
+                        Some(pressed)
+                    } else {
+                        None
                     }
-                }
+                };
 
-                MouseInput::ButtonUp {
-                    button: MouseButton::Left,
-                } => {
-                    if let Ok(ButtonPressed) = world.remove_one(entity) {
+                if let Some(pressed) = pressed() {
+                    if pressed {
+                        world.insert(entity, (ButtonPressed, NeedsPaint)).unwrap();
+                    } else {
+                        world.remove_one::<ButtonPressed>(entity).unwrap();
                         world.insert_one(entity, NeedsPaint).unwrap();
-
-                        let on_click = world.query_one::<&OnClick>(entity).unwrap().get().cloned();
-                        if let Some(OnClick(on_click)) = on_click {
-                            (on_click)(world, entity)?;
-                        }
                     }
                 }
+            }
 
-                _ => (),
-            },
+            EventInput::MouseButtonUp {
+                button: MouseButton::Left,
+                ..
+            } => {
+                if let Ok(ButtonPressed) = world.remove_one(entity) {
+                    world.insert_one(entity, NeedsPaint).unwrap();
+
+                    let on_click = world.query_one::<&OnClick>(entity).unwrap().get().cloned();
+                    if let Some(OnClick(on_click)) = on_click {
+                        (on_click)(world, entity)?;
+                    }
+                }
+            }
 
             _ => (),
         }
