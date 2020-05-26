@@ -1,3 +1,5 @@
+// Colour palette:
+// https://coolors.co/a09ebb-a8aec1-b5d2cb-bfffbc-a6ffa1
 use crate::components::{CapturesMouseInput, Focus, NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text};
 use crate::pipe::{self, ClientPipe};
 use crate::widgets::{Button, ClientPortal, Label};
