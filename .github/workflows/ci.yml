@@ -1,0 +1,34 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Cache 3rdparty
+      uses: actions/cache@v2
+      env:
+        cache-name: cache-3rdparty
+      with:
+        path: 3rdparty
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+    - name: apt-get install
+      run: >-
+        sudo apt-get update && sudo apt-get install
+        genisoimage
+        libfdt-dev
+        libglib2.0-dev
+        libpixman-1-dev
+        python3-pip
+        python3-setuptools
+        zlib1g-dev
+    - name: make setup
+      run: make -j setup
+    - name: make src
+      run: make src
+
