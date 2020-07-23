@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 cairo = { path = "../cairo" }
 graphics = { path = "../graphics" }
-hecs = { version = "0.2", default-features = false, git = "https://github.com/1tgr/hecs.git", rev = "e719aeae2234995a1403b5fb59587a8e2a2bb951" }
+hecs = { version = "0.2", default-features = false, git = "https://github.com/1tgr/hecs.git", rev = "c87707007be7d13d4a727c1531cce535ee8a80cf" }
 
 [target.amd64.dependencies]
 alloc_system = { path = "../alloc_system" }

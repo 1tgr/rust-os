@@ -137,7 +137,7 @@ dependencies = [
  "cairo",
  "graphics_base",
  "graphics_server",
- "hashbrown 0.8.1",
+ "hashbrown",
  "hecs",
  "minifb",
  "os",
@@ -150,7 +150,7 @@ version = "0.1.0"
 dependencies = [
  "cairo",
  "corepack",
- "hashbrown 0.8.1",
+ "hashbrown",
  "hecs",
  "os",
  "serde",
@@ -181,7 +181,7 @@ dependencies = [
  "cairo",
  "corepack",
  "graphics_base",
- "hashbrown 0.8.1",
+ "hashbrown",
  "hecs",
  "jpeg-decoder",
  "os",
@@ -190,16 +190,6 @@ dependencies = [
  "serde_derive",
  "std",
  "syscall",
-]
-
-[[package]]
-name = "hashbrown"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96282e96bfcd3da0d3aa9938bedf1e50df3269b6db08b4876d2da0bb1a0841cf"
-dependencies = [
- "ahash",
- "autocfg 1.0.0",
 ]
 
 [[package]]
@@ -215,9 +205,9 @@ dependencies = [
 [[package]]
 name = "hecs"
 version = "0.2.12"
-source = "git+https://github.com/1tgr/hecs.git?rev=e719aeae2234995a1403b5fb59587a8e2a2bb951#e719aeae2234995a1403b5fb59587a8e2a2bb951"
+source = "git+https://github.com/1tgr/hecs.git?rev=c87707007be7d13d4a727c1531cce535ee8a80cf#c87707007be7d13d4a727c1531cce535ee8a80cf"
 dependencies = [
- "hashbrown 0.7.2",
+ "hashbrown",
 ]
 
 [[package]]
