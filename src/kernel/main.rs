@@ -16,6 +16,8 @@
 #![feature(panic_info_message)]
 #![feature(start)]
 #![no_std]
+#![cfg_attr(target_arch = "arm", allow(dead_code))]
+#![cfg_attr(target_arch = "arm", allow(unused_imports))]
 
 /// Macros, need to be loaded before everything else due to how rust parses
 #[macro_use]
@@ -33,40 +35,36 @@ mod spin;
 mod test;
 
 extern crate alloc_system;
-extern crate bit_vec;
-extern crate libc;
-extern crate syscall;
 
-// Achitecture-specific modules
-#[cfg(target_arch = "x86_64")]
-#[path = "arch/amd64/mod.rs"]
-pub mod arch;
-#[cfg(target_arch = "x86")]
-#[path = "arch/x86/mod.rs"]
-pub mod arch;
-
-pub mod libc_helpers;
-pub mod phys_mem;
-pub mod unwind;
-
+mod arch;
+#[cfg(not(target_arch = "arm"))]
 mod deferred;
 mod elf;
+#[cfg(not(target_arch = "arm"))]
 mod io;
+#[cfg(not(target_arch = "arm"))]
 mod kobj;
+#[cfg(not(target_arch = "arm"))]
 mod ksyscall;
+mod libc_helpers;
 mod logging;
-mod multiboot;
+#[cfg(not(target_arch = "arm"))]
 mod mutex;
 mod once;
+mod phys_mem;
 mod prelude;
+#[cfg(not(target_arch = "arm"))]
 mod process;
 mod ptr;
 mod singleton;
 mod tar;
+#[cfg(not(target_arch = "arm"))]
 mod thread;
+mod unwind;
 mod virt_mem;
 
 #[cfg(feature = "test")]
+#[cfg(not(target_arch = "arm"))]
 mod demo;
 
 #[cfg(feature = "test")]
@@ -75,14 +73,23 @@ fn run_tests() {
 
     const TEST_FIXTURES: &'static [Fixture] = &[
         ptr::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         arch::isr::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         arch::mmu::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
+        arch::phys_mem::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         io::pipe::test::TESTS,
         phys_mem::test::TESTS,
         virt_mem::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         thread::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         mutex::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         process::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
         demo::TESTS,
     ];
 
@@ -105,6 +112,7 @@ fn run_tests() {}
 // Kernel entrypoint
 #[no_mangle]
 pub unsafe fn kmain() -> ! {
+    #[cfg(not(target_arch = "arm"))]
     arch::isr::init_once();
     libc_helpers::init();
     run_tests();

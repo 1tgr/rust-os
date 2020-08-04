@@ -3,7 +3,6 @@ use crate::arch::thread as arch_thread;
 use crate::deferred::Deferred;
 use crate::elf::*;
 use crate::kobj::{KObj, KObjRef};
-use crate::multiboot::multiboot_module_t;
 use crate::phys_mem::{self, PhysicalBitmap};
 use crate::prelude::*;
 use crate::process;
@@ -173,7 +172,7 @@ impl Process {
     }
 
     pub fn for_kernel() -> Result<Self> {
-        let phys = Arc::new(PhysicalBitmap::parse_multiboot());
+        let phys = Arc::new(PhysicalBitmap::machine());
         let kernel_virt = Arc::new(VirtualTree::new());
         let identity = phys_mem::identity_range();
 
@@ -281,13 +280,17 @@ impl KObj for Process {
     }
 }
 
+#[cfg(not(target_arch = "arm"))]
 pub fn spawn(executable: String, handles: Vec<Option<Arc<dyn KObj>>>) -> Result<Arc<Process>> {
     let current = thread::current_process();
     let process = Arc::new(current.spawn(executable.clone(), handles)?);
 
     let init_in_new_process = move || {
         let image_slice = unsafe {
-            let info = phys_mem::multiboot_info();
+            use crate::arch::multiboot::multiboot_module_t;
+            use crate::arch::phys_mem::multiboot_info;
+
+            let info = multiboot_info();
 
             let mods: &[multiboot_module_t] =
                 slice::from_raw_parts(phys_mem::phys2virt(info.mods_addr as usize), info.mods_count as usize);
@@ -404,7 +407,7 @@ impl<T> Allocation<T> {
     pub fn allocate(self) -> Result<&'static mut [T]> {
         let process = thread::current_process();
         let base = self.base.map(|ptr| ptr as *mut u8);
-        let len = self.len * mem::size_of::<T>();
+        let len = (self.len * mem::size_of::<T>()).max(phys_mem::PAGE_SIZE);
         unsafe {
             let ptr = process.alloc_inner(base, len, self.user, self.writable, self.pager)?;
             Ok(slice::from_raw_parts_mut(ptr as *mut T, self.len))

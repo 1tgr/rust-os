@@ -12,8 +12,6 @@ extern "C" {
     static syscall_entry_asm: u8;
 }
 
-pub type RegsHandler = dyn Fn(&Regs) -> usize;
-
 #[no_mangle]
 pub unsafe fn syscall_entry(regs: &Regs) -> isize {
     let args = PackedArgs::new(

@@ -5,30 +5,44 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch:
+          - arm32
+          - amd64
     steps:
     - uses: actions/checkout@v2
-    - name: Cache 3rdparty
+    - name: Cache 3rdparty-${{ matrix.arch }}
       uses: actions/cache@v2
       env:
-        cache-name: cache-3rdparty
+        cache-name: cache-3rdparty-${{ matrix.arch }}
       with:
         path: 3rdparty
-        key: ${{ runner.os }}-build-${{ env.cache-name }}
+        key: ${{ runner.os }}-${{ matrix.arch }}-${{ env.cache-name }}
         restore-keys: |
-          ${{ runner.os }}-build-
+          ${{ runner.os }}-${{ matrix.arch }}-
           ${{ runner.os }}-
     - name: apt-get install
       run: >-
         sudo apt-get update && sudo apt-get install
+        bison
+        curl
+        flex
         genisoimage
+        git
         libfdt-dev
         libglib2.0-dev
+        libgmp3-dev
+        libmpc-dev
+        libmpfr-dev
         libpixman-1-dev
+        libwayland-cursor0
+        libwayland-dev
+        libxkbcommon-dev
         python3-pip
         python3-setuptools
         zlib1g-dev
-    - name: make setup
-      run: make -j setup
-    - name: make src
-      run: make src
-
+    - name: make setup-${{ matrix.arch }}
+      run: make -s setup-${{ matrix.arch }}
+    - name: make src-${{ matrix.arch }}
+      run: env PATH=${PATH}:$(pwd)/3rdparty/target/bin make src-${{ matrix.arch }}

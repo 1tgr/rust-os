@@ -1,14 +1,15 @@
 use crate::table as syscall;
 use crate::{Handle, Result};
 use core::fmt;
+use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use libc::{c_char, c_int, c_void, mode_t, off_t, size_t, ssize_t};
 
 static mut ERRNO: u32 = 0;
 
 extern "C" {
-    static init_array_start: extern "C" fn();
-    static init_array_end: extern "C" fn();
+    static ctors_start: extern "C" fn();
+    static ctors_end: extern "C" fn();
 }
 
 #[allow(non_upper_case_globals)]
@@ -133,8 +134,13 @@ pub extern "C" fn getpid() -> c_int {
 }
 
 #[no_mangle]
-pub extern "C" fn write(_fd: c_int, _buf: *const c_void, _count: size_t) -> ssize_t {
-    panic!("write was called")
+pub unsafe extern "C" fn write(fd: c_int, buf: *const c_void, count: size_t) -> ssize_t {
+    if fd != 2 {
+        panic!("write({}, {:?}, {})", fd, buf, count);
+    }
+
+    let buf = slice::from_raw_parts(buf as *const u8, count as usize);
+    syscall::write(stdout, buf).map(|n| n as ssize_t).unwrap_or(-1)
 }
 
 #[no_mangle]
@@ -175,8 +181,8 @@ pub unsafe extern "C" fn unlink(_c: *const c_char) -> c_int {
 pub unsafe fn init() -> Result<()> {
     MALLOC_LOCK = syscall::create_mutex();
 
-    let mut ptr = &init_array_start as *const _;
-    while ptr < &init_array_end {
+    let mut ptr = &ctors_start as *const _;
+    while ptr < &ctors_end {
         (*ptr)();
         ptr = ptr.offset(1);
     }

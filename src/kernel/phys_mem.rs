@@ -1,5 +1,5 @@
 use crate::arch;
-use crate::multiboot::{multiboot_info_t, multiboot_memory_map_t, multiboot_module_t, multiboot_uint32_t};
+use crate::arch::phys_mem;
 use crate::ptr::{self, Align, PointerInSlice};
 use crate::spin::Mutex;
 use bit_vec::BitVec;
@@ -8,25 +8,22 @@ use core::intrinsics;
 use core::mem;
 use core::slice;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use libc::{c_int, c_void};
+use libc::c_void;
 use syscall::{ErrNum, Result};
 
 extern "C" {
     static mut KERNEL_BASE: u8;
-    static kernel_start: u8;
     static kernel_end: u8;
     static mut heap_start: u8;
     static heap_end: u8;
-    static mboot_ptr: multiboot_uint32_t;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn sbrk(incr: c_int) -> *mut c_void {
+pub unsafe fn resize_kernel_heap(delta: isize) -> *mut u8 {
     static mut BRK: usize = 0;
     let begin = (&mut heap_start as *mut u8).offset(BRK as isize);
     assert!((begin as *const u8) < (&heap_end as *const u8), "out of heap space");
-    BRK += incr as usize;
-    begin as *mut c_void
+    BRK += delta as usize;
+    begin
 }
 
 static MALLOC_LOCK: AtomicUsize = AtomicUsize::new(0);
@@ -64,43 +61,8 @@ impl PhysicalBitmap {
         PhysicalBitmap { free: Mutex::new(free) }
     }
 
-    pub fn parse_multiboot() -> PhysicalBitmap {
-        let info = multiboot_info();
-        let kernel_len = ptr::bytes_between(unsafe { &kernel_start }, unsafe { &kernel_end });
-        let lower_bytes = info.mem_lower as usize * 1024;
-        let total_bytes = cmp::min(lower_bytes, 1024 * 1024) + (info.mem_upper as usize * 1024);
-        let bitmap = PhysicalBitmap::new(total_bytes);
-        bitmap.reserve_pages(0, 1);
-        bitmap.reserve_ptr(unsafe { &kernel_start }, kernel_len as usize);
-        bitmap.reserve_addr(lower_bytes, cmp::max(0, 1024 * 1024 - lower_bytes));
-        bitmap.reserve_addr(unsafe { mboot_ptr } as usize, mem::size_of::<multiboot_info_t>());
-        bitmap.reserve_addr(
-            info.mods_addr as usize,
-            info.mods_count as usize * mem::size_of::<multiboot_module_t>(),
-        );
-
-        {
-            let mut mmap_offset = 0;
-            while mmap_offset < info.mmap_length {
-                let mmap: &multiboot_memory_map_t = unsafe { phys2virt((info.mmap_addr + mmap_offset) as usize) };
-                if mmap._type != 1 {
-                    bitmap.reserve_addr(mmap.addr as usize, mmap.len as usize);
-                }
-
-                mmap_offset += mmap.size + 4;
-            }
-        }
-
-        let mods: &[multiboot_module_t] =
-            unsafe { slice::from_raw_parts(phys2virt(info.mods_addr as usize), info.mods_count as usize) };
-
-        for module in mods {
-            let addr = module.mod_start;
-            let len = module.mod_end - module.mod_start;
-            bitmap.reserve_addr(addr as usize, len as usize);
-        }
-
-        bitmap
+    pub fn machine() -> PhysicalBitmap {
+        phys_mem::machine()
     }
 
     pub fn reserve_pages(&self, start_page: usize, page_count: usize) {
@@ -202,10 +164,6 @@ pub fn virt2phys<T>(ptr: *const T) -> usize {
     addr
 }
 
-pub fn multiboot_info() -> &'static multiboot_info_t {
-    unsafe { phys2virt(mboot_ptr as usize) }
-}
-
 #[cfg(feature = "test")]
 pub mod test {
     use super::*;
@@ -235,22 +193,6 @@ pub mod test {
 
             let err = bitmap.alloc_page().unwrap_err();
             assert_eq!(err, ErrNum::OutOfMemory);
-        }
-
-        fn can_parse_multiboot() {
-            let bitmap = PhysicalBitmap::parse_multiboot();
-            let total_bytes = bitmap.total_bytes();
-            let free_bytes = bitmap.free_bytes();
-            assert!(total_bytes > 0);
-            assert!(free_bytes > 0);
-            assert!(free_bytes < total_bytes);
-        }
-
-        fn can_alloc_zeroed_memory() {
-            let bitmap = PhysicalBitmap::parse_multiboot();
-            let addr = bitmap.alloc_zeroed_page().unwrap();
-            let ptr: &[u8; PAGE_SIZE] = unsafe { phys2virt(addr) };
-            assert!(ptr.iter().all(|&b| b == 0));
         }
     }
 }

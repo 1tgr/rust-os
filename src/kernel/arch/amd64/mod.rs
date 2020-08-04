@@ -10,10 +10,7 @@
  * its use, and the author takes no liability.
  */
 
-#[path = "../x86_common/mod.rs"]
-mod x86_common;
-
-pub use self::x86_common::*;
+pub use crate::arch::x86_common::*;
 
 pub mod cpu;
 pub mod isr;

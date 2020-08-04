@@ -1,5 +1,6 @@
 use crate::arch::debug;
 use crate::logging::Writer;
+use crate::phys_mem;
 use core::fmt::Write;
 use core::mem;
 use libc::{c_char, c_int, c_void, off_t, size_t, ssize_t};
@@ -7,6 +8,18 @@ use libc::{c_char, c_int, c_void, off_t, size_t, ssize_t};
 extern "C" {
     static init_array_start: extern "C" fn();
     static init_array_end: extern "C" fn();
+}
+
+#[no_mangle]
+#[cfg(not(target_arch = "arm"))]
+pub unsafe extern "C" fn sbrk(incr: c_int) -> *mut c_void {
+    phys_mem::resize_kernel_heap(incr as isize) as *mut c_void
+}
+
+#[no_mangle]
+#[cfg(target_arch = "arm")]
+pub unsafe extern "C" fn _sbrk(incr: c_int) -> *mut c_void {
+    phys_mem::resize_kernel_heap(incr as isize) as *mut c_void
 }
 
 #[allow(non_upper_case_globals)]

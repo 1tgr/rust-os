@@ -320,13 +320,13 @@ pub mod test {
         }
 
         fn can_switch() {
-            let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+            let bitmap = Arc::new(PhysicalBitmap::machine());
             let address_space = AddressSpace::new(bitmap).unwrap();
             unsafe { address_space.switch() };
         }
 
         fn can_map_user() {
-            let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+            let bitmap = Arc::new(PhysicalBitmap::machine());
             let ptr1 = 0x1000 as *mut u16;
             let addr = bitmap.alloc_page().unwrap();
             let address_space = AddressSpace::new(bitmap).unwrap();
@@ -342,7 +342,7 @@ pub mod test {
         }
 
         fn can_map_kernel() {
-            let bitmap = Arc::new(PhysicalBitmap::parse_multiboot());
+            let bitmap = Arc::new(PhysicalBitmap::machine());
             let two_meg = 2 * 1024 * 1024;
 
             let ptr1: *mut u16 =

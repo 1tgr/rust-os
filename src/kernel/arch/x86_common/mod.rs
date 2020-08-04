@@ -1,6 +1,8 @@
 pub mod debug;
 pub mod keyboard;
+pub mod multiboot;
 pub mod pci;
+pub mod phys_mem;
 pub mod ps2_mouse;
 pub mod serial;
 pub mod vga;

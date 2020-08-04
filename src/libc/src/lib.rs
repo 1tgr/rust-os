@@ -381,6 +381,13 @@ pub mod types {
                 pub type time_t = i32;
                 pub type suseconds_t = i32;
                 pub type wchar_t = i32;
+
+                #[repr(C)]
+                #[derive(Copy, Clone)]
+                pub enum jmp_buf {
+                    __no1,
+                    __no2,
+                }
             }
             pub mod c99 {
                 pub type c_longlong = i64;
@@ -428,10 +435,10 @@ pub mod types {
                 target_arch = "powerpc"
             ))]
             pub mod posix01 {
-                use types::os::arch::c95::{c_long, c_short, time_t};
-                use types::os::arch::posix88::uid_t;
-                use types::os::arch::posix88::{dev_t, gid_t, ino_t};
-                use types::os::arch::posix88::{mode_t, off_t};
+                use crate::types::os::arch::c95::{c_long, c_short, time_t};
+                use crate::types::os::arch::posix88::uid_t;
+                use crate::types::os::arch::posix88::{dev_t, gid_t, ino_t};
+                use crate::types::os::arch::posix88::{mode_t, off_t};
 
                 pub type nlink_t = u32;
                 pub type blksize_t = i32;
@@ -576,7 +583,7 @@ pub mod types {
             pub mod posix08 {}
             pub mod bsd44 {}
             pub mod extra {
-                use types::os::arch::c95::{c_int, c_uchar, c_ushort};
+                use crate::types::os::arch::c95::{c_int, c_uchar, c_ushort};
                 #[repr(C)]
                 #[derive(Copy, Clone)]
                 pub struct sockaddr_ll {

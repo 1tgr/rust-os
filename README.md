@@ -33,9 +33,9 @@ Features:
 
 Works in progress:
  - Window system
+ - 32-bit ARM target (Raspberry Pi)
 
 Todo:
- - Window system
  - File system
  - Networking
 

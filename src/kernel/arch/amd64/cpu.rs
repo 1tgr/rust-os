@@ -157,12 +157,6 @@ pub unsafe fn outw(port: u16, val: u16) {
     asm!("outw %ax, %dx" : : "{dx}" (port), "{ax}" (val) : : "volatile");
 }
 
-pub unsafe fn inw(port: u16) -> u16 {
-    let ret;
-    asm!("inw %dx, %ax" : "={ax}" (ret) : "{dx}" (port) : : "volatile");
-    ret
-}
-
 pub unsafe fn inl(port: u16) -> u32 {
     let ret;
     asm!("inl %dx, %eax" : "={eax}" (ret) : "{dx}" (port) : : "volatile");

@@ -11,9 +11,9 @@ SECTIONS
   .data ALIGN(0x1000) : AT(ADDR(.data))
   {
     data = .;
-    init_array_start = .;
-    KEEP( *(.init_array) )
-    init_array_end = .;
+    ctors_start = .;
+    KEEP( *(.ctors) )
+    ctors_end = .;
     *(.data .data.*)
   }
   .bss ALIGN(0x1000) : AT(ADDR(.bss))

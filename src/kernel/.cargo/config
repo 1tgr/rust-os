@@ -1,5 +1,8 @@
 [build]
 target = "amd64-kernel"
 
+[target.arm32.libc]
+rustc-link-search = ["../../3rdparty/target/arm-none-eabi/lib"]
+
 [target.amd64-kernel.libc]
-rustc-link-search = ["../newlib/x86_64-elf/lib"]
+rustc-link-search = ["../../3rdparty/target/x86_64-elf/lib"]
