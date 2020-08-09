@@ -1,9 +1,9 @@
-BINUTILS=binutils-2.27
-CAIRO=cairo-1.14.2
+BINUTILS=binutils-2.35
+CAIRO=cairo-1.16.0
 GCC=gcc-10.2.0
-LIBPNG=libpng-1.6.18
+LIBPNG=libpng-1.6.37
 NEWLIB=newlib-3.3.0
-PIXMAN=pixman-0.32.8
+PIXMAN=pixman-0.40.0
 QEMU=qemu
 ZLIB=zlib-1.2.11
 
@@ -36,70 +36,70 @@ download: $(DOWNLOADS)
 
 src/$(BINUTILS).tar.gz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ https://ftp.gnu.org/gnu/binutils/$(@F)
+	curl --silent --fail -Lo $@ https://ftp.gnu.org/gnu/binutils/$(@F)
 
 src/$(CAIRO).tar.xz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ http://cairographics.org/releases/$(@F)
+	curl --silent --fail -Lo $@ http://cairographics.org/releases/$(@F)
 
 src/$(GCC).tar.xz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ http://ftp.gnu.org/gnu/gcc/gcc-10.2.0/$(@F)
+	curl --silent --fail -Lo $@ http://ftp.gnu.org/gnu/gcc/gcc-10.2.0/$(@F)
 
 src/$(LIBPNG).tar.xz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ http://prdownloads.sourceforge.net/libpng/$(@F)?download
+	curl --silent --fail -Lo $@ http://prdownloads.sourceforge.net/libpng/$(@F)?download
 
 src/$(NEWLIB).tar.gz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ ftp://sourceware.org/pub/newlib/$(@F)
+	curl --silent --fail -Lo $@ ftp://sourceware.org/pub/newlib/$(@F)
 
 src/$(PIXMAN).tar.gz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ http://cairographics.org/releases/$(@F)
+	curl --silent --fail -Lo $@ http://cairographics.org/releases/$(@F)
 
 src/$(ZLIB).tar.gz:
 	mkdir -p $(@D)
-	curl --fail -Lo $@ http://zlib.net/$(@F)
+	curl --silent --fail -Lo $@ http://zlib.net/$(@F)
 
-src/$(BINUTILS)/: src/$(BINUTILS).tar.gz
-	tar -C $(<D) -zxf $<
+src/$(BINUTILS)/configure: src/$(BINUTILS).tar.gz
+	tar -C $(<D) --touch -zxf $<
 
-src/$(CAIRO)/: src/$(CAIRO).tar.xz
-	tar -C $(<D) -Jxf $<
+src/$(CAIRO)/configure: src/$(CAIRO).tar.xz
+	tar -C $(<D) --touch -Jxf $<
 
-src/$(GCC)/: src/$(GCC).tar.xz
-	tar -C $(<D) -Jxf $<
+src/$(GCC)/configure: src/$(GCC).tar.xz
+	tar -C $(<D) --touch -Jxf $<
 
-src/$(PIXMAN)/: src/$(PIXMAN).tar.gz
-	tar -C $(<D) -zxf $<
+src/$(PIXMAN)/configure: src/$(PIXMAN).tar.gz
+	tar -C $(<D) --touch -zxf $<
 
-src/$(QEMU)/:
-	git clone git://git.qemu-project.org/qemu.git $@
-	cd $@ && git submodule update --init dtc
+src/$(QEMU)/configure:
+	git clone git://git.qemu-project.org/qemu.git $(@D)
+	cd $(@D) && git submodule update --init dtc
 
-src/$(LIBPNG)/: src/$(LIBPNG).tar.xz
-	tar -C $(<D) -Jxf $<
+src/$(LIBPNG)/configure: src/$(LIBPNG).tar.xz
+	tar -C $(<D) --touch -Jxf $<
 
-src/$(NEWLIB)/: src/$(NEWLIB).tar.gz
-	tar -C $(<D) -zxf $<
+src/$(NEWLIB)/configure: src/$(NEWLIB).tar.gz
+	tar -C $(<D) --touch -zxf $<
 
-src/$(ZLIB)/: src/$(ZLIB).tar.gz
-	tar -C $(<D) -zxf $<
+src/$(ZLIB)/configure: src/$(ZLIB).tar.gz
+	tar -C $(<D) --touch -zxf $<
 
-build/arm32/$(BINUTILS)/Makefile: src/$(BINUTILS)/
+build/arm32/$(BINUTILS)/Makefile: src/$(BINUTILS)/configure
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --target=arm-none-eabi
 
-build/amd64/$(BINUTILS)/Makefile: src/$(BINUTILS)/
+build/amd64/$(BINUTILS)/Makefile: src/$(BINUTILS)/configure
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --target=x86_64-elf
 
-build/amd64/$(CAIRO)/Makefile: src/$(CAIRO)/ target/x86_64-elf/lib/libc.a target/lib/libpixman-1.a target/lib/libpng16.a target/lib/libz.a
+build/amd64/$(CAIRO)/Makefile: src/$(CAIRO)/configure target/x86_64-elf/lib/libc.a target/lib/libpixman-1.a target/lib/libpng16.a target/lib/libz.a
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --host=x86_64-elf --target=x86_64-elf \
 		--enable-ps=no --enable-ft=no --enable-pdf=no --enable-svg=no --enable-script=no --enable-interpreter=no --enable-pthread=no --enable-gobject=no --enable-xlib=no --enable-xlib-xrender=no --enable-xcb=no --enable-xlib-xcb=no --enable-xcb-shm=no \
 		CC=$(CURDIR)/target/bin/x86_64-elf-gcc \
@@ -107,24 +107,24 @@ build/amd64/$(CAIRO)/Makefile: src/$(CAIRO)/ target/x86_64-elf/lib/libc.a target
         CFLAGS="-O -g -mcmodel=kernel -fno-pie -ffreestanding -nostartfiles -I $(CURDIR)/target/x86_64-elf/include -I $(CURDIR)/target/include -DCAIRO_NO_MUTEX=1" \
 		PKG_CONFIG_PATH=$(CURDIR)/target/lib/pkgconfig
 
-build/arm32/$(GCC)/Makefile: src/$(GCC)/
+build/arm32/$(GCC)/Makefile: src/$(GCC)/configure
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --target=arm-none-eabi --disable-nls --enable-languages=c,c++ --without-headers
 
-build/amd64/$(GCC)/Makefile: src/$(GCC)/
+build/amd64/$(GCC)/Makefile: src/$(GCC)/configure
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --target=x86_64-elf --disable-nls --enable-languages=c,c++ --without-headers
 
-build/$(QEMU)/Makefile: src/$(QEMU)/
+build/$(QEMU)/Makefile: src/$(QEMU)/configure
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--target-list=arm-softmmu,x86_64-softmmu --prefix=$(CURDIR)/target
 
-build/amd64/$(LIBPNG)/Makefile: src/$(LIBPNG)/ target/x86_64-elf/lib/libc.a target/lib/libz.a target/x86_64-elf/lib/libgloss.a
+build/amd64/$(LIBPNG)/Makefile: src/$(LIBPNG)/configure target/x86_64-elf/lib/libc.a target/lib/libz.a target/x86_64-elf/lib/libgloss.a
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --host=x86_64-elf --target=x86_64-elf \
 		CC=$(CURDIR)/target/bin/x86_64-elf-gcc \
 		CFLAGS="-O -g -mcmodel=kernel -fno-pie -ffreestanding -nostartfiles -I $(CURDIR)/target/x86_64-elf/include -I $(CURDIR)/target/include" \
@@ -132,36 +132,36 @@ build/amd64/$(LIBPNG)/Makefile: src/$(LIBPNG)/ target/x86_64-elf/lib/libc.a targ
 		LDFLAGS="-L$(CURDIR)/target/lib" \
 		LIBS="-lc -lnosys"
 
-build/arm32/$(NEWLIB)/newlib/Makefile: src/$(NEWLIB)/ target/bin/arm-none-eabi-gcc
+build/arm32/$(NEWLIB)/newlib/Makefile: src/$(NEWLIB)/configure target/bin/arm-none-eabi-gcc
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$</newlib/configure \
+	cd $(@D) && $(CURDIR)/$(<D)/newlib/configure \
 		--silent --prefix=$(CURDIR)/target --host=arm-none-eabi --target=arm-none-eabi --enable-newlib-hw-fp --enable-multilib=no \
 		CC=$(CURDIR)/target/bin/arm-none-eabi-gcc \
 		CFLAGS="-O -g -I $(CURDIR)/src/$(NEWLIB)/newlib/libc/include -marm -mcpu=arm1176jzf-s -mfloat-abi=hard -mfpu=vfp"
 
-build/amd64/$(NEWLIB)/libgloss/Makefile: src/$(NEWLIB)/ target/bin/x86_64-elf-gcc
+build/amd64/$(NEWLIB)/libgloss/Makefile: src/$(NEWLIB)/configure target/bin/x86_64-elf-gcc
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$</libgloss/configure \
+	cd $(@D) && $(CURDIR)/$(<D)/libgloss/configure \
 		--silent --prefix=$(CURDIR)/target --host=x86_64-elf --target=x86_64-elf \
 		CC=$(CURDIR)/target/bin/x86_64-elf-gcc \
     	CFLAGS="-O -g -mcmodel=kernel -fno-pie"
 
-build/amd64/$(NEWLIB)/newlib/Makefile: src/$(NEWLIB)/ target/bin/x86_64-elf-gcc
+build/amd64/$(NEWLIB)/newlib/Makefile: src/$(NEWLIB)/configure target/bin/x86_64-elf-gcc
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$</newlib/configure \
+	cd $(@D) && $(CURDIR)/$(<D)/newlib/configure \
 		--silent --prefix=$(CURDIR)/target --host=x86_64-elf --target=x86_64-elf \
 		CC=$(CURDIR)/target/bin/x86_64-elf-gcc \
     	CFLAGS="-O -g -I $(CURDIR)/src/$(NEWLIB)/newlib/libc/include -mcmodel=kernel -fno-pie"
 
-build/amd64/$(PIXMAN)/Makefile: src/$(PIXMAN)/ target/x86_64-elf/lib/libc.a
+build/amd64/$(PIXMAN)/Makefile: src/$(PIXMAN)/configure target/x86_64-elf/lib/libc.a
 	mkdir -p $(@D)
-	cd $(@D) && $(CURDIR)/$<configure \
+	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(CURDIR)/target --host=x86_64-elf --target=x86_64-elf \
 		CC=$(CURDIR)/target/bin/x86_64-elf-gcc \
       	CFLAGS="-O -g -mcmodel=kernel -fno-pie -ffreestanding -nostartfiles -I $(CURDIR)/target/x86_64-elf/include -I $(CURDIR)/target/include -DPIXMAN_NO_TLS" \
       	LDFLAGS="-L$(CURDIR)/target/lib"
 
-build/amd64/$(ZLIB)/Makefile: src/$(ZLIB)/ target/x86_64-elf/lib/libc.a
+build/amd64/$(ZLIB)/Makefile: src/$(ZLIB)/configure target/x86_64-elf/lib/libc.a
 	mkdir -p $(@D)
 	cd $(@D) && \
 	env AR=$(CURDIR)/target/bin/x86_64-elf-ar \
@@ -169,7 +169,7 @@ build/amd64/$(ZLIB)/Makefile: src/$(ZLIB)/ target/x86_64-elf/lib/libc.a
 		CROSS_PREFIX=$(CURDIR)/target/bin/x86_64-elf \
         CFLAGS="-O -g -mcmodel=kernel -fno-pie -ffreestanding -I $(CURDIR)/target/x86_64-elf/include" \
         RANLIB=$(CURDIR)/target/bin/x86_64-elf-ranlib \
-        $(CURDIR)/$<configure \
+        $(CURDIR)/$< \
 		--prefix=$(CURDIR)/target --64 --static
 
 target/bin/arm-none-eabi-gcc: build/arm32/$(GCC)/Makefile target/bin/arm-none-eabi-ld

@@ -18,6 +18,7 @@ RUN apt-get update -qq && apt-get install -qq -y \
     libxkbcommon-dev \
     python3-pip \
     python3-setuptools \
+    texinfo \
     zlib1g-dev
 
 ENV PATH=$PATH:/root/.cargo/bin

@@ -41,6 +41,7 @@ jobs:
         libxkbcommon-dev
         python3-pip
         python3-setuptools
+        texinfo
         zlib1g-dev
     - name: make setup-${{ matrix.arch }}
       run: make -s setup-${{ matrix.arch }}
