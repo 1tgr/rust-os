@@ -23,19 +23,36 @@ RUN apt-get update -qq && apt-get install -qq -y \
 ENV PATH=$PATH:/root/.cargo/bin
 WORKDIR /build
 
-COPY 3rdparty 3rdparty
-
-RUN make -j -C 3rdparty download
-
-RUN make -s -C 3rdparty tools-arm32 && rm -rf 3rdparty/build/arm32
+COPY 3rdparty/binutils 3rdparty/binutils
+RUN make -s -C 3rdparty/binutils && rm -rf 3rdparty/binutils/{src,build}
 RUN 3rdparty/target/bin/arm-none-eabi-ld --version
-RUN 3rdparty/target/bin/arm-none-eabi-gcc --version
-
-RUN make -s -C 3rdparty tools-amd64 && rm -rf 3rdparty/build/amd64
 RUN 3rdparty/target/bin/x86_64-elf-ld --version
+
+COPY 3rdparty/gcc 3rdparty/gcc
+RUN make -s -C 3rdparty/gcc && rm -rf 3rdparty/gcc/{src,build}
+RUN 3rdparty/target/bin/arm-none-eabi-gcc --version
 RUN 3rdparty/target/bin/x86_64-elf-gcc --version
 
-RUN make -s -C 3rdparty target/bin/qemu-system-arm target/bin/qemu-system-x86_64 && rm -rf 3rdparty/build/qemu
+COPY 3rdparty/newlib 3rdparty/newlib
+RUN make -s -C 3rdparty/newlib && rm -rf 3rdparty/newlib/{src,build}
+
+COPY 3rdparty/zlib 3rdparty/zlib
+RUN make -s -C 3rdparty/zlib && rm -rf 3rdparty/zlib/{src,build}
+
+COPY 3rdparty/libpng 3rdparty/libpng
+RUN make -s -C 3rdparty/libpng && rm -rf 3rdparty/libpng/{src,build}
+
+COPY 3rdparty/freetype 3rdparty/freetype
+RUN make -s -C 3rdparty/freetype && rm -rf 3rdparty/freetype/{src,build}
+
+COPY 3rdparty/pixman 3rdparty/pixman
+RUN make -s -C 3rdparty/pixman && rm -rf 3rdparty/pixman/{src,build}
+
+COPY 3rdparty/cairo 3rdparty/cairo
+RUN make -s -C 3rdparty/cairo && rm -rf 3rdparty/cairo/{src,build}
+
+COPY 3rdparty/qemu 3rdparty/qemu
+RUN make -s -C 3rdparty/qemu && rm -rf 3rdparty/qemu/{src,build}
 RUN 3rdparty/target/bin/qemu-system-arm --version
 RUN 3rdparty/target/bin/qemu-system-x86_64 --version
 
