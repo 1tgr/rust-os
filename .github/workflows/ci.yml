@@ -17,7 +17,10 @@ jobs:
       env:
         cache-name: cache-3rdparty-${{ matrix.arch }}
       with:
-        path: 3rdparty
+        path: |
+          3rdparty/*/build
+          3rdparty/*/src
+          3rdparty/target
         key: ${{ runner.os }}-${{ matrix.arch }}-${{ env.cache-name }}
         restore-keys: |
           ${{ runner.os }}-${{ matrix.arch }}-
@@ -41,7 +44,6 @@ jobs:
         libxkbcommon-dev
         python3-pip
         python3-setuptools
-        texinfo
         zlib1g-dev
     - name: make setup-${{ matrix.arch }}
       run: make -s setup-${{ matrix.arch }}
