@@ -2,8 +2,7 @@ extern crate alloc_system;
 extern crate rt;
 
 use cairo::bindings::*;
-use cairo::surface::CairoSurfaceMut;
-use cairo::{CairoFunc, CairoObj};
+use cairo::{CairoFunc, CairoObj, SurfaceMut};
 use os::OSMem;
 use std::f64::consts;
 use std::mem::MaybeUninit;
@@ -15,7 +14,7 @@ fn main() -> Result<()> {
         let lfb_ptr = syscall::init_video_mode(800, 600, 32)?;
         let stride = cairo::stride_for_width(CAIRO_FORMAT_ARGB32, 800);
         let mut lfb = OSMem::from_raw(lfb_ptr, stride * 600);
-        let cr = CairoSurfaceMut::from_slice(&mut lfb, CAIRO_FORMAT_ARGB32, 800, 600).into_cairo();
+        let cr = SurfaceMut::from_slice(&mut lfb, CAIRO_FORMAT_ARGB32, 800, 600).into_cairo();
 
         let pat = CairoObj::wrap(cairo_pattern_create_linear(0.0, 0.0, 0.0, 256.0));
         cairo_pattern_add_color_stop_rgba(pat.as_ptr(), 1.0, 0.0, 0.0, 0.0, 1.0);

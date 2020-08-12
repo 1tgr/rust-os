@@ -1,8 +1,8 @@
 use crate::components::{
-    BackColor, CapturesMouseInput, NeedsPaint, OnClick, OnInput, OnPaint, Position, Text, TextColor,
+    BackColor, CapturesMouseInput, FontFace, NeedsPaint, OnClick, OnInput, OnPaint, Position, Text, TextColor,
 };
 use crate::widgets::WidgetSystem;
-use cairo::cairo::Cairo;
+use cairo::Cairo;
 use graphics_base::system::System;
 use graphics_base::types::{Color, EventInput, MouseButton, Rect};
 use graphics_base::Result;
@@ -30,7 +30,7 @@ impl ButtonSystem {
             .query_one::<(
                 Option<&ButtonPressed>,
                 Option<&BackColor>,
-                Option<(&Position, Option<&TextColor>, Option<&Text>)>,
+                Option<(&Position, Option<&FontFace>, Option<&TextColor>, Option<&Text>)>,
             )>(entity)
             .unwrap();
 
@@ -45,7 +45,7 @@ impl ButtonSystem {
 
         cr.set_source_rgb(r, g, b).paint();
 
-        if let Some((&Position(pos), text_color, text)) = position_text {
+        if let Some((&Position(pos), font_face, text_color, text)) = position_text {
             let TextColor(Color { r, g, b }) = text_color.cloned().unwrap_or_else(|| TextColor::new(0.0, 0.0, 0.2));
             cr.set_source_rgb(r, g, b)
                 .rectangle(0.0, 0.0, pos.width, pos.height)
@@ -56,6 +56,10 @@ impl ButtonSystem {
             }
 
             if let Some(Text(ref text)) = text {
+                if let Some(FontFace(font_face)) = font_face {
+                    cr.set_font_face(&font_face);
+                }
+
                 let font_extents = cr.font_extents();
                 let text_extents = cr.text_extents(text);
                 cr.move_to(

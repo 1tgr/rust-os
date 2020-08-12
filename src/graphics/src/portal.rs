@@ -1,17 +1,23 @@
 // Colour palette:
 // https://coolors.co/a09ebb-a8aec1-b5d2cb-bfffbc-a6ffa1
-use crate::components::{CapturesMouseInput, Focus, NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text};
+use crate::components::{
+    CapturesMouseInput, Focus, FontFace, NeedsPaint, OnClick, OnInput, OnPaint, Parent, Position, Text,
+};
 use crate::pipe::{self, ClientPipe};
 use crate::widgets::{Button, ClientPortal, Label};
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 use cairo::bindings::CAIRO_FORMAT_RGB24;
-use cairo::cairo::Cairo;
+use cairo::Cairo;
+use freetype::FreeType;
 use graphics_base::frame_buffer::{AsSurfaceMut, FrameBuffer};
 use graphics_base::system::{ChangedIndex, DeletedIndex, System};
 use graphics_base::types::{Command, Event, EventInput, MouseButton, MouseInputInfo, Rect};
 use graphics_base::Result;
 use hashbrown::{HashMap, HashSet};
 use hecs::{Entity, World};
+
+static FONT_BYTES: &[u8] = include_bytes!("Vera.ttf");
 
 struct Decoration;
 
@@ -231,7 +237,23 @@ fn handle_portal_input(init_direction: Rect, world: &mut World, portal_entity: E
 #[derive(Copy, Clone)]
 struct ClientPortalId(pub usize);
 
-pub struct ClientPortalSystemPre;
+pub struct ClientPortalSystemPre {
+    _ft: FreeType,
+    font_face: Rc<cairo::FontFace<'static>>,
+}
+
+impl ClientPortalSystemPre {
+    pub fn new() -> Self {
+        let mut ft = FreeType::new();
+        let mut ft_face = freetype::Face::from_slice(&mut ft, FONT_BYTES, 0);
+        ft_face.set_char_size(0.0, 16.0, 72, 72);
+
+        Self {
+            _ft: ft,
+            font_face: Rc::new(cairo::FontFace::from_freetype(&ft_face)),
+        }
+    }
+}
 
 impl System for ClientPortalSystemPre {
     fn run(&mut self, world: &mut World) -> Result<()> {
@@ -252,6 +274,7 @@ impl System for ClientPortalSystemPre {
                 Parent(portal_entity),
                 Position::new(0.0, -20.0, pos.width - 24.0, 20.0),
                 text,
+                FontFace(self.font_face.clone()),
                 OnInput::new(move |world, _entity, input| {
                     handle_portal_input(
                         Rect {
@@ -274,6 +297,7 @@ impl System for ClientPortalSystemPre {
                 Parent(portal_entity),
                 Position::new(pos.width - 22.0, -20.0, 18.0, 18.0),
                 Text::new("X"),
+                FontFace(self.font_face.clone()),
                 OnClick::new(move |world, _entity| {
                     world.despawn(portal_entity).unwrap();
                     Ok(())

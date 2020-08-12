@@ -5,9 +5,9 @@ extern crate alloc_system;
 extern crate rt;
 
 use crate::state::TerminalState;
-use cairo::bindings::{CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL};
 use core::cell::RefCell;
 use core::str;
+use freetype::FreeType;
 use graphics::components::{NeedsPaint, OnInput, OnPaint, Position, Text};
 use graphics::widgets::ClientPortal;
 use graphics::{App, Event, EventInput, Result};
@@ -16,21 +16,28 @@ use std::io::{Read, Write};
 
 mod state;
 
+static FONT_BYTES: &[u8] = include_bytes!("VeraMono.ttf");
+
 fn main() -> Result<()> {
     let mut app = App::new();
     let stdin = File::create_pipe();
     let mut stdout = File::create_pipe();
     Process::spawn("input", &[stdin.handle().get(), stdout.handle().get()])?;
 
+    let mut ft = FreeType::new();
+    let mut ft_face = freetype::Face::from_slice(&mut ft, FONT_BYTES, 0);
+    ft_face.set_char_size(0.0, 16.0, 72, 72);
+
+    let cr_face = cairo::FontFace::from_freetype(&ft_face);
     let entity = app.world_mut().spawn((
         ClientPortal,
         Text::new("Terminal"),
         Position::new(50.0, 50.0, 700.0, 500.0),
         TerminalState::new(80),
-        OnPaint::new(|world, entity, cr| {
+        OnPaint::new(move |world, entity, cr| {
             let mut query = world.query_one::<&TerminalState>(entity).unwrap();
             let state = query.get().unwrap();
-            cr.select_font_face("monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+            cr.set_font_face(&cr_face);
 
             let extents = cr.font_extents();
             for (index, line) in state.lines().enumerate() {

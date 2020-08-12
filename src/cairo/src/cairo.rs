@@ -1,5 +1,6 @@
 use crate::bindings::*;
-use crate::surface::{CairoSurface, CairoSurfaceMut};
+use crate::font_face::FontFace;
+use crate::surface::{Surface, SurfaceMut};
 use crate::CairoObj;
 use alloc::borrow::Cow;
 use alloc::string::ToString;
@@ -19,10 +20,10 @@ fn to_cstr(s: &str) -> Cow<str> {
     }
 }
 
-pub struct Cairo<'a>(CairoObj<cairo_t>, PhantomData<CairoSurfaceMut<'a>>);
+pub struct Cairo<'a>(CairoObj<cairo_t>, PhantomData<SurfaceMut<'a>>);
 
 impl<'a> Cairo<'a> {
-    pub fn new(surface: CairoSurfaceMut) -> Self {
+    pub fn new(surface: SurfaceMut) -> Self {
         Cairo(CairoObj::wrap(unsafe { cairo_create(surface.as_ptr()) }), PhantomData)
     }
 
@@ -111,7 +112,7 @@ impl<'a> Cairo<'a> {
         self
     }
 
-    pub fn set_source_surface(&self, surface: &CairoSurface, x: f64, y: f64) -> &Self {
+    pub fn set_source_surface(&self, surface: &Surface, x: f64, y: f64) -> &Self {
         unsafe { cairo_set_source_surface(self.0.as_ptr(), surface.as_ptr(), x, y) };
         self
     }
@@ -139,9 +140,10 @@ impl<'a> Cairo<'a> {
         self
     }
 
-    pub fn select_font_face(&self, family: &str, slant: cairo_font_slant_t, weight: cairo_font_weight_t) -> &Self {
-        let family = to_cstr(family);
-        unsafe { cairo_select_font_face(self.0.as_ptr(), family.as_ptr() as *const c_char, slant, weight) };
+    pub fn set_font_face(&self, face: &FontFace) -> &Self {
+        unsafe {
+            cairo_set_font_face(self.0.as_ptr(), face.as_ptr());
+        }
         self
     }
 }

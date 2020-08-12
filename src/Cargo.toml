@@ -3,6 +3,7 @@ members = [
     "alloc_system",
     "cairo",
     "cairo_demo",
+    "freetype",
     "graphics",
     "graphics_base",
     "graphics_client",

@@ -3,7 +3,7 @@ extern crate alloc_system;
 extern crate rt;
 
 use alloc::sync::Arc;
-use cairo::bindings::*;
+use cairo::bindings::CAIRO_FORMAT_ARGB32;
 use core::char;
 use core::mem;
 use graphics_base::frame_buffer::AsSurfaceMut;

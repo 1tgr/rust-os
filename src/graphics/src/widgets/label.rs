@@ -1,6 +1,6 @@
-use crate::components::{BackColor, OnPaint, Position, Text, TextColor};
+use crate::components::{BackColor, FontFace, OnPaint, Position, Text, TextColor};
 use crate::widgets::WidgetSystem;
-use cairo::cairo::Cairo;
+use cairo::Cairo;
 use graphics_base::system::System;
 use graphics_base::types::Color;
 use graphics_base::Result;
@@ -21,16 +21,24 @@ impl LabelSystem {
 
     fn on_paint(world: &World, entity: Entity, cr: &Cairo) {
         let mut query = world
-            .query_one::<(&Position, Option<&BackColor>, Option<(&Text, Option<&TextColor>)>)>(entity)
+            .query_one::<(
+                &Position,
+                Option<&BackColor>,
+                Option<(&Text, Option<&FontFace>, Option<&TextColor>)>,
+            )>(entity)
             .unwrap();
 
-        if let Some((&Position(pos), back_color, text_and_text_color)) = query.get() {
+        if let Some((&Position(pos), back_color, text_and_style)) = query.get() {
             if let Some(&BackColor(Color { r, g, b })) = back_color {
                 cr.set_source_rgb(r, g, b).paint();
             }
 
-            if let Some((Text(ref text), text_color)) = text_and_text_color {
+            if let Some((Text(ref text), font_face, text_color)) = text_and_style {
                 let TextColor(Color { r, g, b }) = text_color.cloned().unwrap_or_else(|| TextColor::new(0.0, 0.0, 0.2));
+                if let Some(FontFace(font_face)) = font_face {
+                    cr.set_font_face(&font_face);
+                }
+
                 let font_extents = cr.font_extents();
                 cr.set_source_rgb(r, g, b)
                     .move_to(

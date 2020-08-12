@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 cairo = { path = "../cairo" }
+freetype = { path = "../freetype" }
 graphics = { path = "../graphics" }
 hecs = { version = "0.2", default-features = false, git = "https://github.com/1tgr/hecs.git", rev = "c87707007be7d13d4a727c1531cce535ee8a80cf" }
 

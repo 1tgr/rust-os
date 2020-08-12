@@ -1,6 +1,6 @@
 use alloc::rc::Rc;
 use alloc::string::String;
-use cairo::cairo::Cairo;
+use cairo::Cairo;
 use graphics_base::types::{Color, EventInput, MouseButton, Rect};
 use graphics_base::Result;
 use hecs::{Entity, World};
@@ -21,6 +21,9 @@ pub struct CapturesMouseInput {
 
 #[derive(Clone)]
 pub struct Focus(pub Option<Entity>);
+
+#[derive(Clone)]
+pub struct FontFace(pub Rc<cairo::FontFace<'static>>);
 
 #[derive(Clone)]
 pub struct OnClick(pub Rc<dyn Fn(&mut World, Entity) -> Result<()>>);

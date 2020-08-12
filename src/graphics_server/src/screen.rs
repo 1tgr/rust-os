@@ -1,8 +1,7 @@
 use crate::portal::PortalRef;
 use alloc::sync::Weak;
 use cairo::bindings::{CAIRO_FORMAT_A8, CAIRO_FORMAT_ARGB32, CAIRO_FORMAT_RGB24};
-use cairo::cairo::Cairo;
-use cairo::surface::CairoSurface;
+use cairo::{Cairo, Surface};
 use core::mem;
 use graphics_base::frame_buffer::{AsSurface, AsSurfaceMut, FrameBuffer};
 use graphics_base::types::{EventInput, MouseButton, MouseInputInfo, Rect};
@@ -31,7 +30,7 @@ fn to_sprite(hotspot: (u16, u16)) -> (f64, f64) {
     (hotspot.0 as f64 - CURSOR_HOTSPOT_X, hotspot.1 as f64 - CURSOR_HOTSPOT_Y)
 }
 
-fn surface_from_jpeg_slice(data: &[u8]) -> Result<CairoSurface<'static>> {
+fn surface_from_jpeg_slice(data: &[u8]) -> Result<Surface<'static>> {
     let mut decoder = Decoder::new(data);
     let data = decoder.decode().map_err(|_| Error::NotSupported)?;
 
@@ -55,7 +54,7 @@ fn surface_from_jpeg_slice(data: &[u8]) -> Result<CairoSurface<'static>> {
         PixelFormat::CMYK32 => panic!("CMYK not supported"),
     };
 
-    Ok(CairoSurface::from_vec(data, format, width, height))
+    Ok(Surface::from_vec(data, format, width, height))
 }
 
 pub struct Screen<S> {
@@ -64,8 +63,8 @@ pub struct Screen<S> {
     buttons: [bool; 3],
     screen_size: (u16, u16),
     lfb: S,
-    cursor: CairoSurface<'static>,
-    wallpaper: CairoSurface<'static>,
+    cursor: Surface<'static>,
+    wallpaper: Surface<'static>,
     pub buffers: Vec<ScreenBuffer>,
     pub input_capture: Option<InputCapture>,
 }
@@ -80,7 +79,7 @@ where
         static CURSOR_BYTES: &'static [u8] = include_bytes!("icons8-cursor-32.png");
         static WALLPAPER_BYTES: &'static [u8] = include_bytes!("wallpaper.jpg");
 
-        let cursor = CairoSurface::from_png_slice(CURSOR_BYTES).unwrap();
+        let cursor = Surface::from_png_slice(CURSOR_BYTES).unwrap();
         let cursor_hotspot = (screen_size.0 / 2, screen_size.1 / 2);
         let wallpaper = surface_from_jpeg_slice(WALLPAPER_BYTES).unwrap();
 
@@ -97,7 +96,7 @@ where
         }
     }
 
-    fn draw_buffers(cr: &Cairo, screen_size: (u16, u16), wallpaper: &CairoSurface, buffers: &[ScreenBuffer]) {
+    fn draw_buffers(cr: &Cairo, screen_size: (u16, u16), wallpaper: &Surface, buffers: &[ScreenBuffer]) {
         cr.new_path()
             .move_to(0.0, 0.0)
             .rel_line_to(0.0, screen_size.1 as f64)

@@ -7,10 +7,10 @@ use core::ops::Deref;
 use core::ptr::{self, NonNull};
 use libc::{c_int, c_uchar};
 
-pub struct CairoSurface<'a>(CairoObj<cairo_surface_t>, Cow<'a, [u8]>);
-pub struct CairoSurfaceMut<'a>(CairoObj<cairo_surface_t>, Cow<'a, [u8]>);
+pub struct Surface<'a>(CairoObj<cairo_surface_t>, Cow<'a, [u8]>);
+pub struct SurfaceMut<'a>(CairoObj<cairo_surface_t>, Cow<'a, [u8]>);
 
-impl<'a> CairoSurface<'a> {
+impl<'a> Surface<'a> {
     pub fn from_slice(data: &'a [u8], format: cairo_format_t, width: u16, height: u16) -> Self {
         let stride = crate::stride_for_width(format, width);
         assert_eq!(data.len(), stride * height as usize);
@@ -29,7 +29,7 @@ impl<'a> CairoSurface<'a> {
     }
 }
 
-impl<'a> CairoSurfaceMut<'a> {
+impl<'a> SurfaceMut<'a> {
     pub fn from_slice(data: &'a mut [u8], format: cairo_format_t, width: u16, height: u16) -> Self {
         let stride = crate::stride_for_width(format, width);
         assert_eq!(data.len(), stride * height as usize);
@@ -52,19 +52,19 @@ impl<'a> CairoSurfaceMut<'a> {
     }
 }
 
-impl CairoSurface<'static> {
+impl Surface<'static> {
     pub fn from_png_slice(slice: &[u8]) -> Result<Self> {
-        let CairoSurfaceMut(ptr, data) = CairoSurfaceMut::from_png_slice(slice)?;
+        let SurfaceMut(ptr, data) = SurfaceMut::from_png_slice(slice)?;
         Ok(Self(ptr, data))
     }
 
     pub fn from_vec(data: Vec<u8>, format: cairo_format_t, width: u16, height: u16) -> Self {
-        let CairoSurfaceMut(ptr, data) = CairoSurfaceMut::from_vec(data, format, width, height);
+        let SurfaceMut(ptr, data) = SurfaceMut::from_vec(data, format, width, height);
         Self(ptr, data)
     }
 }
 
-impl CairoSurfaceMut<'static> {
+impl SurfaceMut<'static> {
     pub fn from_png_slice(slice: &[u8]) -> Result<Self> {
         let mut reader = {
             let mut offset = 0;
@@ -114,7 +114,7 @@ impl CairoSurfaceMut<'static> {
     }
 }
 
-impl<'a> Deref for CairoSurface<'a> {
+impl<'a> Deref for Surface<'a> {
     type Target = NonNull<cairo_surface_t>;
 
     fn deref(&self) -> &NonNull<cairo_surface_t> {
@@ -122,7 +122,7 @@ impl<'a> Deref for CairoSurface<'a> {
     }
 }
 
-impl<'a> Deref for CairoSurfaceMut<'a> {
+impl<'a> Deref for SurfaceMut<'a> {
     type Target = NonNull<cairo_surface_t>;
 
     fn deref(&self) -> &NonNull<cairo_surface_t> {

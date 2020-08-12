@@ -41,6 +41,7 @@ checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
 name = "cairo"
 version = "0.0.0"
 dependencies = [
+ "freetype",
  "libc 0.0.0",
  "libc 0.2.70",
 ]
@@ -114,6 +115,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ba6eb47c2131e784a38b726eb54c1e1484904f013e576a25354d0124161af6"
 
 [[package]]
+name = "freetype"
+version = "0.0.0"
+dependencies = [
+ "libc 0.0.0",
+ "libc 0.2.70",
+]
+
+[[package]]
 name = "fuchsia-cprng"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -135,6 +144,7 @@ name = "graphics"
 version = "0.0.0"
 dependencies = [
  "cairo",
+ "freetype",
  "graphics_base",
  "graphics_server",
  "hashbrown",
@@ -165,6 +175,7 @@ version = "0.0.0"
 dependencies = [
  "alloc_system",
  "cairo",
+ "freetype",
  "graphics",
  "hecs",
  "os",
@@ -717,6 +728,7 @@ version = "0.0.0"
 dependencies = [
  "alloc_system",
  "cairo",
+ "freetype",
  "graphics",
  "hecs",
  "os",

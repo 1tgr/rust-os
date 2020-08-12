@@ -1,21 +1,21 @@
 use cairo::bindings::{cairo_format_t, CAIRO_FORMAT_RGB24};
-use cairo::surface::{CairoSurface, CairoSurfaceMut};
+use cairo::{Surface, SurfaceMut};
 use core::ops::{Deref, DerefMut};
 
 pub trait AsSurface {
-    fn as_surface(&self, format: cairo_format_t, size: (u16, u16)) -> CairoSurface;
+    fn as_surface(&self, format: cairo_format_t, size: (u16, u16)) -> Surface;
 }
 
 pub trait AsSurfaceMut {
-    fn as_surface_mut(&mut self, format: cairo_format_t, size: (u16, u16)) -> CairoSurfaceMut;
+    fn as_surface_mut(&mut self, format: cairo_format_t, size: (u16, u16)) -> SurfaceMut;
 }
 
 impl<T> AsSurface for T
 where
     T: Deref<Target = [u8]>,
 {
-    fn as_surface(&self, format: i32, size: (u16, u16)) -> CairoSurface {
-        CairoSurface::from_slice(&*self, format, size.0, size.1)
+    fn as_surface(&self, format: cairo_format_t, size: (u16, u16)) -> Surface {
+        Surface::from_slice(&*self, format, size.0, size.1)
     }
 }
 
@@ -23,8 +23,8 @@ impl<T> AsSurfaceMut for T
 where
     T: DerefMut<Target = [u8]>,
 {
-    fn as_surface_mut(&mut self, format: i32, size: (u16, u16)) -> CairoSurfaceMut {
-        CairoSurfaceMut::from_slice(&mut *self, format, size.0, size.1)
+    fn as_surface_mut(&mut self, format: cairo_format_t, size: (u16, u16)) -> SurfaceMut {
+        SurfaceMut::from_slice(&mut *self, format, size.0, size.1)
     }
 }
 

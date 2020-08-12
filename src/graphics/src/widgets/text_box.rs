@@ -1,6 +1,6 @@
-use crate::components::{Focus, NeedsPaint, OnInput, OnPaint, Parent, Position, Text};
+use crate::components::{Focus, FontFace, NeedsPaint, OnInput, OnPaint, Parent, Position, Text};
 use crate::widgets::WidgetSystem;
-use cairo::cairo::Cairo;
+use cairo::Cairo;
 use graphics_base::system::System;
 use graphics_base::types::{EventInput, MouseButton};
 use graphics_base::Result;
@@ -39,15 +39,21 @@ impl TextBoxSystem {
     }
 
     fn on_paint(world: &World, entity: Entity, cr: &Cairo) {
-        let mut query = world.query_one::<(&Position, Option<&Text>)>(entity).unwrap();
+        let mut query = world
+            .query_one::<(&Position, Option<(&Text, Option<&FontFace>)>)>(entity)
+            .unwrap();
         cr.set_source_rgb(1.0, 1.0, 1.0).paint();
 
-        if let Some((&Position(pos), text)) = query.get() {
+        if let Some((&Position(pos), text_and_style)) = query.get() {
             cr.set_source_rgb(0.0, 0.0, 0.0)
                 .rectangle(0.0, 0.0, pos.width, pos.height)
                 .stroke();
 
-            if let Some(Text(ref text)) = text {
+            if let Some((Text(ref text), font_face)) = text_and_style {
+                if let Some(FontFace(font_face)) = font_face {
+                    cr.set_font_face(&font_face);
+                }
+
                 let font_extents = cr.font_extents();
                 cr.move_to(
                     (pos.height - font_extents.height) / 2.0,

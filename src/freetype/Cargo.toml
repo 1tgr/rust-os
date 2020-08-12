@@ -1,13 +1,10 @@
 [package]
-name = "cairo"
+name = "freetype"
 version = "0.0.0"
 authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
 build = "build.rs"
-links = "cairo"
+links = "freetype"
 edition = "2018"
-
-[dependencies]
-freetype = { path = "../freetype" }
 
 [target.'cfg(not(target_os = "rust_os"))'.dependencies]
 cratesio_libc = { version = "0.2", package = "libc" }

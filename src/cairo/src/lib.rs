@@ -7,6 +7,7 @@ extern crate cratesio_libc as libc;
 
 #[link(name = "c")]
 #[link(name = "cairo")]
+#[link(name = "freetype")]
 #[link(name = "pixman-1")]
 #[link(name = "png16")]
 #[link(name = "z")]
@@ -14,9 +15,16 @@ extern crate cratesio_libc as libc;
 #[cfg_attr(target_os = "rust_os", link(name = "gcc"))]
 extern "C" {}
 
+#[allow(non_camel_case_types)]
 pub mod bindings;
-pub mod cairo;
-pub mod surface;
+
+mod cairo;
+mod font_face;
+mod surface;
+
+pub use cairo::Cairo;
+pub use font_face::FontFace;
+pub use surface::{Surface, SurfaceMut};
 
 use crate::bindings::*;
 use core::fmt;
@@ -64,6 +72,16 @@ impl CairoDrop for cairo_t {
 
     unsafe fn reference_cairo(ptr: *mut Self) -> *mut Self {
         cairo_reference(ptr)
+    }
+}
+
+impl CairoDrop for cairo_font_face_t {
+    unsafe fn drop_cairo(ptr: *mut Self) {
+        cairo_font_face_destroy(ptr)
+    }
+
+    unsafe fn reference_cairo(ptr: *mut Self) -> *mut Self {
+        cairo_font_face_reference(ptr)
     }
 }
 

@@ -29,6 +29,7 @@ Features:
    - Syscall interface (via SYSCALL/SYSRET instructions)
    - C runtime (Newlib)
    - Cairo graphics
+   - FreeType fonts
  - Graphics compositor
 
 Works in progress:

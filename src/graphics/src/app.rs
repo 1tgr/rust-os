@@ -17,7 +17,7 @@ pub struct App {
 impl App {
     pub fn new() -> Self {
         let mut systems: Vec<Box<dyn System>> = Vec::new();
-        systems.push(Box::new(ClientPortalSystemPre));
+        systems.push(Box::new(ClientPortalSystemPre::new()));
         widgets::register(&mut systems);
 
         Self {
