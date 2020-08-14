@@ -1,4 +1,4 @@
-use super::{OSHandle, Result};
+use crate::{OSHandle, Result};
 use alloc::boxed::Box;
 use syscall;
 
@@ -11,6 +11,19 @@ extern "C" fn thread_entry(context: usize) {
 pub struct Thread(OSHandle);
 
 impl Thread {
+    pub fn current_thread_id() -> usize {
+        #[thread_local]
+        static mut CURRENT_THREAD_ID: usize = 0;
+
+        unsafe {
+            if CURRENT_THREAD_ID == 0 {
+                CURRENT_THREAD_ID = syscall::current_thread_id();
+            }
+
+            CURRENT_THREAD_ID
+        }
+    }
+
     pub fn from_raw(handle: OSHandle) -> Self {
         Thread(handle)
     }

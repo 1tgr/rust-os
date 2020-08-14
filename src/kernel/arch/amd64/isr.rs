@@ -139,9 +139,10 @@ pub fn init_once() {
     });
 }
 
-pub unsafe fn set_kernel_stack(ptr: *mut u8) {
-    assert!(Align::is_aligned(ptr, 16));
-    TSS.rsp0 = ptr as u64;
+pub unsafe fn switch(kernel_rsp: *mut u8, fs_base: *mut u8) {
+    assert!(Align::is_aligned(kernel_rsp, 16));
+    TSS.rsp0 = kernel_rsp as u64;
+    cpu::wrmsr(cpu::IA32_FSBASE, fs_base as u64);
 }
 
 #[no_mangle]
@@ -184,13 +185,15 @@ pub extern "C" fn exception(num: u8, regs: &Regs) {
         );
     }
 
+    let fsbase = cpu::rdmsr(cpu::IA32_FSBASE);
     log!(
-        "ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x}",
+        "ss:rsp={:x}:{:-16x}  cs:rip={:x}:{:-16x} rflags={:x} fsbase={:x}",
         regs.ss,
         regs.rsp,
         regs.cs,
         regs.rip,
-        regs.rflags
+        regs.rflags,
+        fsbase
     );
     log!(
         "rax={:-16x} rbx={:-16x} rcx={:-16x} rdx={:-16x}",

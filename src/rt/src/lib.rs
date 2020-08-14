@@ -4,8 +4,5 @@
 #![panic_runtime]
 #![no_std]
 
-extern crate libc;
-extern crate syscall;
-
 mod start;
 mod unwind;

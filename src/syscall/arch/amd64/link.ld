@@ -4,22 +4,25 @@ phys = 0x00001000;
 SECTIONS
 {
   .text phys : AT(phys) {
-    code = .;
     *(.text .text.*)
     *(.rodata .rodata.*)
   }
+  .tdata : {
+    *(.tdata .tdata.* .gnu.linkonce.td.*)
+  }
+  .tbss : {
+    *(.tbss .tbss.* .gnu.linkonce.tb.*)
+    *(.tcommon)
+  }
   .data ALIGN(0x1000) : AT(ADDR(.data))
   {
-    data = .;
-    ctors_start = .;
+    __ctors_start = .;
     KEEP( *(.ctors) )
-    ctors_end = .;
+    __ctors_end = .;
     *(.data .data.*)
   }
   .bss ALIGN(0x1000) : AT(ADDR(.bss))
   {
-    bss = .;
     *(.bss .bss.*)
   }
-  end = .;
 }

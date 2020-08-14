@@ -14,8 +14,5 @@ mod table;
 #[cfg(feature = "kernel")]
 pub use marshal::PackedArgs;
 
-#[cfg(not(feature = "kernel"))]
-pub mod libc_helpers;
-
 pub use error::{ErrNum, Result};
 pub use table::*;

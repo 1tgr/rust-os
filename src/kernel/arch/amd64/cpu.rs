@@ -79,6 +79,7 @@ pub struct Dtr {
 pub const IA32_STAR: u32 = 0xC0000081;
 pub const IA32_LSTAR: u32 = 0xC0000082;
 pub const IA32_SFMASK: u32 = 0xC0000084;
+pub const IA32_FSBASE: u32 = 0xC0000100;
 
 extern "C" {
     pub fn lidt(ptr: &Dtr); // I don't know why I can't get lidt to work via inline asm
@@ -91,6 +92,13 @@ pub fn invlpg<T>(ptr: *const T) {
 pub unsafe fn sysret<T, U>(rip: *const T, rsp: *const U, rdi: usize, rflags: u64) -> ! {
     asm!("cli ; mov $0, %rsp ; sysretq" :: "r"(rsp), "{rcx}" (rip), "{rdi}"(rdi), "{r11}" (rflags) :: "volatile");
     unreachable!()
+}
+
+pub fn rdmsr(reg: u32) -> u64 {
+    let value_hi: u32;
+    let value_lo: u32;
+    unsafe { asm!("rdmsr" : "={edx}" (value_hi), "={eax}" (value_lo) : "{ecx}" (reg)) };
+    (value_hi as u64) << 32 | (value_lo as u64)
 }
 
 pub unsafe fn wrmsr(reg: u32, value: u64) {

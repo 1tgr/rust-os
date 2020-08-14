@@ -1,5 +1,5 @@
-use super::{OSHandle, Result};
-use syscall::{self, Handle};
+use crate::{OSHandle, Result};
+use syscall::Handle;
 
 pub struct Process(OSHandle);
 

@@ -42,8 +42,8 @@ impl SyscallHandler {
 
 impl HandleSyscall for SyscallHandler {
     /*
-    fn log_entry(&self, name: &'static str, args: fmt::Arguments) {
-        if name != "read" && name != "write" && name != "lock_mutex" && name != "unlock_mutex" {
+    fn log_entry(&self, name: &'static str, args: core::fmt::Arguments) {
+        if name != "read" && name != "write" {
             use core::fmt::Write;
             let mut writer = crate::logging::Writer;
             let _ = write!(
@@ -56,8 +56,8 @@ impl HandleSyscall for SyscallHandler {
         }
     }
 
-    fn log_exit(&self, name: &'static str, result: fmt::Arguments) {
-        if name != "read" && name != "write" && name != "lock_mutex" && name != "unlock_mutex" {
+    fn log_exit(&self, name: &'static str, result: core::fmt::Arguments) {
+        if name != "read" && name != "write" {
             use core::fmt::Write;
             let mut writer = crate::logging::Writer;
             let _ = write!(&mut writer, "{:?}\n", result);
@@ -164,12 +164,14 @@ impl HandleSyscall for SyscallHandler {
     fn spawn_thread(&self, entry: extern "C" fn(usize), context: usize) -> Handle {
         let kernel_entry = move || {
             let stack_slice = process::alloc::<u8>(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+
+            if let Some(tls) = process::alloc_tls() {
+                thread::set_tls(tls);
+            }
+
             unsafe {
-                arch_thread::jmp_user_mode(
-                    entry as *const u8,
-                    stack_slice.as_mut_ptr().offset(stack_slice.len() as isize),
-                    context,
-                )
+                let rsp = stack_slice.as_mut_ptr().offset(stack_slice.len() as isize);
+                arch_thread::jmp_user_mode(entry as *const u8, rsp, context)
             }
             // TODO: free stack
         };

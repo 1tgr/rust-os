@@ -1,18 +1,12 @@
-use crate::table as syscall;
-use crate::{Handle, Result};
+use crate::detail::UntypedRecursiveMutex;
+use crate::Thread;
 use core::fmt;
 use core::slice;
-use core::sync::atomic::{AtomicUsize, Ordering};
 use libc::{c_char, c_int, c_void, mode_t, off_t, size_t, ssize_t};
-
-static mut ERRNO: u32 = 0;
-
-extern "C" {
-    static ctors_start: extern "C" fn();
-    static ctors_end: extern "C" fn();
-}
+use syscall::{Handle, Result};
 
 #[allow(non_upper_case_globals)]
+#[thread_local]
 static mut errno: c_int = 0;
 
 #[allow(non_upper_case_globals)]
@@ -54,48 +48,25 @@ pub extern "C" fn sbrk(len: usize) -> *mut u8 {
         Ok(p) => p,
         Err(num) => {
             unsafe {
-                ERRNO = num as u32;
+                errno = num as i32;
             }
             0 as *mut u8
         }
     }
 }
 
-static MALLOC_OWNER: AtomicUsize = AtomicUsize::new(0);
-static mut MALLOC_LOCK_COUNT: usize = 0;
-static mut MALLOC_LOCK: Handle = 0;
+static mut MALLOC_LOCK: Option<UntypedRecursiveMutex> = None;
 
 #[no_mangle]
 pub extern "C" fn __malloc_lock(_reent: *mut c_void) {
-    let current_thread_id = syscall::current_thread_id();
-    assert_ne!(current_thread_id, 0);
-
-    if MALLOC_OWNER.load(Ordering::SeqCst) != current_thread_id {
-        syscall::lock_mutex(unsafe { MALLOC_LOCK }).unwrap();
-        while MALLOC_OWNER.compare_and_swap(0, current_thread_id, Ordering::SeqCst) != 0 {
-            syscall::unlock_mutex(unsafe { MALLOC_LOCK }).unwrap();
-            syscall::lock_mutex(unsafe { MALLOC_LOCK }).unwrap();
-        }
-    }
-
-    unsafe {
-        MALLOC_LOCK_COUNT += 1;
-    }
+    let mutex = unsafe { MALLOC_LOCK.as_ref().unwrap() };
+    mutex.lock();
 }
 
 #[no_mangle]
 pub extern "C" fn __malloc_unlock(_reent: *mut c_void) {
-    let prev_count;
-    unsafe {
-        prev_count = MALLOC_LOCK_COUNT;
-        MALLOC_LOCK_COUNT -= 1;
-    }
-
-    if prev_count == 1 {
-        let current_thread_id = syscall::current_thread_id();
-        assert_eq!(MALLOC_OWNER.swap(0, Ordering::SeqCst), current_thread_id);
-        syscall::unlock_mutex(unsafe { MALLOC_LOCK }).unwrap();
-    }
+    let mutex = unsafe { MALLOC_LOCK.as_ref().unwrap() };
+    mutex.unlock();
 }
 
 #[no_mangle]
@@ -105,7 +76,7 @@ pub unsafe extern "C" fn __assert_fail(
     _line: c_int,
     _function: *const c_char,
 ) -> ! {
-    syscall::exit_thread(-1)
+    Thread::exit(-1)
 }
 
 #[no_mangle]
@@ -179,10 +150,15 @@ pub unsafe extern "C" fn unlink(_c: *const c_char) -> c_int {
 }
 
 pub unsafe fn init() -> Result<()> {
-    MALLOC_LOCK = syscall::create_mutex();
+    MALLOC_LOCK = Some(UntypedRecursiveMutex::new());
 
-    let mut ptr = &ctors_start as *const _;
-    while ptr < &ctors_end {
+    extern "C" {
+        static __ctors_start: extern "C" fn();
+        static __ctors_end: extern "C" fn();
+    }
+
+    let mut ptr = &__ctors_start as *const _;
+    while ptr < &__ctors_end {
         (*ptr)();
         ptr = ptr.offset(1);
     }
@@ -191,6 +167,6 @@ pub unsafe fn init() -> Result<()> {
 }
 
 pub unsafe fn shutdown(code: i32) -> ! {
-    let _ = syscall::close(MALLOC_LOCK);
-    syscall::exit_thread(code)
+    MALLOC_LOCK.as_ref().take();
+    Thread::exit(code)
 }

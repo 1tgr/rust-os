@@ -1,9 +1,13 @@
 #![no_std]
 #![feature(optin_builtin_traits)]
+#![feature(thread_local)]
 
 extern crate alloc;
 extern crate syscall;
 
+pub mod libc_helpers;
+
+mod detail;
 mod file;
 mod mutex;
 mod oshandle;

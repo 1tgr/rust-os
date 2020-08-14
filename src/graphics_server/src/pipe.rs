@@ -4,8 +4,8 @@ use alloc::sync::Arc;
 use core::str;
 use graphics_base::ipc;
 use graphics_base::Result;
+use os::libc_helpers;
 use os::{File, Mutex, Process};
-use syscall::libc_helpers;
 
 pub struct ServerPipe {
     server: ServerApp,

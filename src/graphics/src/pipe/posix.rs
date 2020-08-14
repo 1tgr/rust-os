@@ -152,7 +152,7 @@ impl ClientPipe {
                     *down = self.window.get_mouse_down(button);
                 }
 
-                self.screen.lock().unwrap().update_mouse_state(x, y, 0, buttons)?;
+                self.screen.lock().update_mouse_state(x, y, 0, buttons)?;
             }
         }
     }

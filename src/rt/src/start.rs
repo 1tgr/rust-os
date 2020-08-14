@@ -1,5 +1,5 @@
-use syscall::libc_helpers;
-use syscall::Result;
+use os::libc_helpers;
+use os::Result;
 
 #[lang = "termination"]
 trait Termination {

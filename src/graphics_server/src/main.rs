@@ -9,9 +9,9 @@ use core::mem;
 use graphics_base::frame_buffer::AsSurfaceMut;
 use graphics_base::types::EventInput;
 use graphics_server::{PortalRef, Screen, ServerApp, ServerPipe, ServerPortalSystem};
+use os::libc_helpers;
 use os::{File, Mutex, OSHandle, OSMem, Result, Thread};
 use std::io::Read;
-use syscall::libc_helpers;
 
 fn keyboard_thread(keyboard_focus: Arc<Mutex<Option<PortalRef>>>) -> Result<()> {
     let mut stdin = File::from_raw(OSHandle::from_raw(libc_helpers::stdin));
@@ -21,7 +21,7 @@ fn keyboard_thread(keyboard_focus: Arc<Mutex<Option<PortalRef>>>) -> Result<()> 
 
         let code = unsafe { mem::transmute::<[u8; 4], u32>(buf) } & !0x08000000;
         if let Some(code) = char::from_u32(code) {
-            if let Some(ref portal_ref) = *keyboard_focus.lock().unwrap() {
+            if let Some(ref portal_ref) = *keyboard_focus.lock() {
                 portal_ref.send_input(EventInput::KeyPress { code })?;
             }
         }
@@ -56,7 +56,6 @@ where
 
         screen
             .lock()
-            .unwrap()
             .update_mouse_state_delta(event.dx, event.dy, event.dw, buttons)?;
     }
 }

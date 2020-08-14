@@ -1,11 +1,10 @@
-use super::{OSHandle, Result};
+use crate::detail::UntypedMutex;
 use core::cell::UnsafeCell;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
-use syscall;
 
 pub struct Mutex<T: ?Sized> {
-    handle: OSHandle,
+    mutex: UntypedMutex,
     data: UnsafeCell<T>,
 }
 
@@ -15,40 +14,33 @@ unsafe impl<T: ?Sized + Send> Sync for Mutex<T> {}
 impl<T> Mutex<T> {
     pub fn new(data: T) -> Self {
         Self {
-            handle: OSHandle::from_raw(syscall::create_mutex()),
+            mutex: UntypedMutex::new(),
             data: UnsafeCell::new(data),
         }
     }
 }
 
 impl<T: ?Sized> Mutex<T> {
-    pub fn handle(&self) -> &OSHandle {
-        &self.handle
-    }
-
-    pub fn lock(&self) -> Result<MutexGuard<T>> {
-        syscall::lock_mutex(self.handle().get())?;
-        Ok(MutexGuard::new(self))
+    pub fn lock(&self) -> MutexGuard<T> {
+        self.mutex.lock();
+        MutexGuard {
+            mutex: self,
+            _pd: PhantomData,
+        }
     }
 }
 
 #[must_use]
 pub struct MutexGuard<'mutex, T: ?Sized + 'mutex> {
-    lock: &'mutex Mutex<T>,
+    mutex: &'mutex Mutex<T>,
     _pd: PhantomData<*mut T>,
 }
 
 unsafe impl<'mutex, T: ?Sized + Sync> Sync for MutexGuard<'mutex, T> {}
 
-impl<'mutex, T: ?Sized> MutexGuard<'mutex, T> {
-    fn new(lock: &'mutex Mutex<T>) -> Self {
-        MutexGuard { lock, _pd: PhantomData }
-    }
-}
-
 impl<'mutex, T: ?Sized> Drop for MutexGuard<'mutex, T> {
     fn drop(&mut self) {
-        let _ = syscall::unlock_mutex(self.lock.handle().get());
+        self.mutex.mutex.unlock();
     }
 }
 
@@ -56,12 +48,12 @@ impl<'mutex, T: ?Sized> Deref for MutexGuard<'mutex, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &*self.lock.data.get() }
+        unsafe { &*self.mutex.data.get() }
     }
 }
 
 impl<'mutex, T: ?Sized> DerefMut for MutexGuard<'mutex, T> {
     fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.lock.data.get() }
+        unsafe { &mut *self.mutex.data.get() }
     }
 }

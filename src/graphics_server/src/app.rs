@@ -39,7 +39,7 @@ impl ServerApp {
     ) -> Result<()> {
         match command {
             Command::Checkpoint { id } => {
-                let mut server2client = server2client.lock().unwrap();
+                let mut server2client = server2client.lock();
                 ipc::send_message(&mut *server2client, &Event::Checkpoint { id })?;
             }
 
@@ -93,7 +93,7 @@ impl ServerApp {
                         frame_buffer,
                     );
 
-                    let mut server2client = server2client.lock().unwrap();
+                    let mut server2client = server2client.lock();
                     ipc::send_message(&mut *server2client, &Event::ReuseFrameBuffer { frame_buffer_id })?;
                 }
             }

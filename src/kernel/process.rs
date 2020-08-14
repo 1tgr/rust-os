@@ -53,6 +53,7 @@ impl KObj for SharedMemBlock {
 struct ProcessState {
     handles: Vec<Option<Arc<dyn KObj>>>,
     exit_code: Deferred<i32>,
+    tls: Option<(usize, &'static [u8])>,
 }
 
 impl ProcessState {
@@ -60,6 +61,7 @@ impl ProcessState {
         ProcessState {
             handles,
             exit_code: Deferred::new(),
+            tls: None,
         }
     }
 
@@ -89,6 +91,10 @@ impl ProcessState {
     fn set_deferred(&mut self, d: Deferred<i32>) {
         self.exit_code = d;
     }
+
+    fn set_tls(&mut self, len: usize, data: &'static [u8]) {
+        self.tls = Some((len, data));
+    }
 }
 
 #[derive(Clone)]
@@ -115,7 +121,7 @@ impl Pager {
                     Some(addr) => (false, addr.get()),
                     None => {
                         let addr = try_or_none!(alloc_page());
-                        assert!(addr != 0);
+                        assert_ne!(addr, 0);
                         pages[index] = Some(unsafe { NonZeroUsize::new_unchecked(addr) });
                         (true, addr)
                     }
@@ -280,12 +286,28 @@ impl KObj for Process {
     }
 }
 
+pub fn set_tls(len: usize, data: &'static [u8]) {
+    let process = thread::current_process();
+    let mut state = lock!(process.state);
+    state.set_tls(len, data);
+}
+
+pub fn alloc_tls() -> Option<&'static mut [u8]> {
+    let process = thread::current_process();
+    let state = lock!(process.state);
+    state.tls.map(|(len, data)| {
+        let tls_slice = process::alloc::<u8>(len, true, true).unwrap();
+        tls_slice[..data.len()].copy_from_slice(data);
+        tls_slice
+    })
+}
+
 #[cfg(not(target_arch = "arm"))]
 pub fn spawn(executable: String, handles: Vec<Option<Arc<dyn KObj>>>) -> Result<Arc<Process>> {
     let current = thread::current_process();
     let process = Arc::new(current.spawn(executable.clone(), handles)?);
 
-    let init_in_new_process = move || {
+    let init_in_new_process = move || -> Result<_> {
         let image_slice = unsafe {
             use crate::arch::multiboot::multiboot_module_t;
             use crate::arch::phys_mem::multiboot_info;
@@ -307,51 +329,79 @@ pub fn spawn(executable: String, handles: Vec<Option<Arc<dyn KObj>>>) -> Result<
 
         mem::drop(executable);
 
-        let ehdr = unsafe { *(image_slice.as_ptr() as *const Elf64_Ehdr) };
+        let ehdr = unsafe { &*(image_slice.as_ptr() as *const Elf64_Ehdr) };
         assert_eq!(
             [ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3, ELFCLASS64, ELFDATA2LSB, EV_CURRENT],
             &ehdr.e_ident[0..7]
         );
         assert_eq!((ET_EXEC, EM_X86_64), (ehdr.e_type, ehdr.e_machine));
-        assert!(ehdr.e_entry != 0);
+        assert_ne!(ehdr.e_entry, 0);
 
         let entry = ehdr.e_entry as *const u8;
         let mut slices = Vec::new();
+        let mut tls = None;
         for i in 0..ehdr.e_phnum {
             let phdr_offset = ehdr.e_phoff as isize + (i as isize) * (ehdr.e_phentsize as isize);
-            let phdr = unsafe { *(image_slice.as_ptr().offset(phdr_offset) as *const Elf64_Phdr) };
-            if phdr.p_type != PT_LOAD {
-                continue;
-            }
+            let phdr = unsafe { &*(image_slice.as_ptr().offset(phdr_offset) as *const Elf64_Phdr) };
+            match phdr.p_type {
+                PT_LOAD => {
+                    assert!(phdr.p_memsz >= phdr.p_filesz);
 
-            assert!(phdr.p_memsz >= phdr.p_filesz);
-            let slice =
-                unsafe { process::alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap() };
-            let file_slice = &image_slice[phdr.p_offset as usize..(phdr.p_offset + phdr.p_filesz) as usize];
-            slice[..file_slice.len()].copy_from_slice(file_slice);
-            slices.push(slice);
+                    let slice = unsafe {
+                        process::alloc_at::<u8>(phdr.p_vaddr as *mut u8, phdr.p_memsz as usize, true, true).unwrap()
+                    };
+
+                    let file_slice = &image_slice[phdr.p_offset as usize..(phdr.p_offset + phdr.p_filesz) as usize];
+                    slice[..file_slice.len()].copy_from_slice(file_slice);
+                    slices.push(slice);
+                }
+
+                PT_TLS => {
+                    assert!(phdr.p_memsz >= phdr.p_filesz);
+                    assert!(tls.is_none(), "segment {}: didn't expect another TLS segment", i);
+
+                    let slice = process::alloc::<u8>(phdr.p_filesz as usize, true, false).unwrap();
+                    let file_slice = &image_slice[phdr.p_offset as usize..(phdr.p_offset + phdr.p_filesz) as usize];
+                    slice.copy_from_slice(file_slice);
+                    tls = Some((phdr.p_memsz as usize, slice as &[u8]));
+                }
+
+                PT_GNU_STACK => {
+                    assert_eq!(phdr.p_memsz, 0);
+                }
+
+                _ => {
+                    panic!("segment {}: don't know how to handle type {}", i, phdr.p_type);
+                }
+            }
         }
 
         assert!(slices.iter().any(|slice| slice.contains_ptr(entry)));
 
         let stack_slice = process::alloc::<u8>(phys_mem::PAGE_SIZE * 10, true, true).unwrap();
+
+        if let Some((len, data)) = tls {
+            process::set_tls(len, data);
+        }
+
         Ok((entry, stack_slice))
     };
 
     let deferred = thread::spawn_remote(process.clone(), move || {
-        let result: Result<_> = init_in_new_process();
-        match result {
-            Ok((entry, stack_slice)) => {
-                unsafe {
-                    arch_thread::jmp_user_mode(entry, stack_slice.as_mut_ptr().offset(stack_slice.len() as isize), 0)
-                }
-                // TODO: free stack
-            }
+        let (rip, stack_slice) = match init_in_new_process() {
+            Ok(tuple) => tuple,
+            Err(num) => thread::exit(-(num as i32)),
+        };
 
-            Err(num) => {
-                thread::exit(-(num as i32));
-            }
+        if let Some(tls) = process::alloc_tls() {
+            thread::set_tls(tls);
         }
+
+        unsafe {
+            let rsp = stack_slice.as_mut_ptr().offset(stack_slice.len() as isize);
+            arch_thread::jmp_user_mode(rip, rsp, 0)
+        }
+        // TODO: free stack
     });
 
     process.set_exit_code(deferred);

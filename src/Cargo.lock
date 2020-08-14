@@ -601,7 +601,7 @@ name = "rt"
 version = "0.0.0"
 dependencies = [
  "libc 0.0.0",
- "syscall",
+ "os",
 ]
 
 [[package]]

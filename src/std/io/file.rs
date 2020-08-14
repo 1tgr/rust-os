@@ -2,10 +2,10 @@
 #![stable(feature = "rust-os", since = "1.0.0")]
 
 use crate::fmt;
-use crate::io::{self,Read,Write};
+use crate::io::{self, Read, Write};
 use os::File;
+use os::libc_helpers::{StdoutWriter, StderrWriter};
 use syscall;
-use syscall::libc_helpers::{StdoutWriter,StderrWriter};
 
 #[stable(feature = "rust-os", since = "1.0.0")]
 impl Read for File {

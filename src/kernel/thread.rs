@@ -32,18 +32,20 @@ fn setjmp() -> Option<jmp_buf> {
 struct HWToken {
     process: Arc<Process>,
     stack_ptr: *mut u8,
+    tls_ptr: *mut u8,
 }
 
 impl HWToken {
     pub unsafe fn switch(self) {
         self.process.switch();
-        isr::set_kernel_stack(self.stack_ptr);
+        isr::switch(self.stack_ptr, self.tls_ptr);
     }
 }
 
 struct Thread {
     id: usize,
     stack: &'static mut [u8],
+    tls: Option<&'static mut [u8]>,
     process: Arc<Process>,
     exited: Deferred<i32>,
 }
@@ -54,15 +56,25 @@ impl Thread {
         Thread {
             id: NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed),
             stack,
+            tls: None,
             process,
             exited: Deferred::new(),
         }
     }
 
     pub fn hw_token(&mut self) -> HWToken {
+        let stack_ptr = Align::down(unsafe { self.stack.as_mut_ptr().offset(self.stack.len() as isize) }, 16);
+
+        let tls_ptr = if let Some(slice) = &mut self.tls {
+            unsafe { slice.as_mut_ptr().offset(slice.len() as isize) }
+        } else {
+            0 as *mut u8
+        };
+
         HWToken {
             process: self.process.clone(),
-            stack_ptr: Align::down(unsafe { self.stack.as_mut_ptr().offset(self.stack.len() as isize) }, 16),
+            stack_ptr,
+            tls_ptr,
         }
     }
 }
@@ -205,6 +217,18 @@ where
 pub fn spawn<'a, T: FnOnce() -> i32 + Send + 'a>(start: T) -> Deferred<i32> {
     let process = lock_sched!().current.process.clone();
     spawn_remote(process, start)
+}
+
+pub fn set_tls(tls: &'static mut [u8]) {
+    let hw_token = {
+        let mut state = lock_sched!();
+        state.current.tls = Some(tls);
+        state.current.hw_token()
+    };
+
+    unsafe {
+        hw_token.switch();
+    }
 }
 
 #[cfg(feature = "test")]

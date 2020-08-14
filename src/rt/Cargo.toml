@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 libc = { path = "../libc" }
-syscall = { path = "../syscall" }
+os = { path = "../os" }

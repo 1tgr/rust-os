@@ -1,4 +1,4 @@
-use super::{OSHandle, OSMem, Result};
+use crate::{OSHandle, OSMem, Result};
 use core::ops::{Deref, DerefMut};
 use syscall;
 

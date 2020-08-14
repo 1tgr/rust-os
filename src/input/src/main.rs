@@ -1,8 +1,8 @@
 extern crate alloc_system;
 extern crate rt;
 
+use os::libc_helpers::{stdin, stdout};
 use os::Process;
-use syscall::libc_helpers::{stdin, stdout};
 use syscall::{ErrNum, Result};
 
 fn read_line(buf: &mut Vec<u8>) -> Result<String> {

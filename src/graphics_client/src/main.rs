@@ -36,6 +36,7 @@ fn main() -> Result<()> {
             let portal = world.spawn((
                 ClientPortal,
                 Position::new(i as f64 * 100.0, i as f64 * 100.0, 300.0, 120.0),
+                Text::new(format!("Portal {}", i + 1)),
                 OnInput::new(move |world, _entity, input| {
                     {
                         let Text(text) = &mut *world.get_mut::<Text>(label).unwrap();

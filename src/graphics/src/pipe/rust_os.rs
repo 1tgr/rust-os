@@ -22,7 +22,7 @@ impl AppSync {
     where
         F: FnOnce(&mut World) -> Result<()> + Send + 'static,
     {
-        self.callbacks.lock().unwrap().push(Box::new(f));
+        self.callbacks.lock().push(Box::new(f));
         let _ = ipc::send_message(&mut self.server2client, &Command::Checkpoint { id: 0 });
     }
 }
@@ -50,7 +50,7 @@ impl ClientPipe {
 
     pub fn wait_for_event(&mut self) -> Result<(Event, Vec<Callback>)> {
         let event = ipc::read_message(&mut self.buf, &mut self.server2client)?;
-        let callbacks = mem::replace(&mut *self.callbacks.lock().unwrap(), Vec::new());
+        let callbacks = mem::replace(&mut *self.callbacks.lock(), Vec::new());
         Ok((event, callbacks))
     }
 

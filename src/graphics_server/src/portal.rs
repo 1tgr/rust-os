@@ -30,7 +30,7 @@ mod rust_os {
 
     impl PortalRef {
         pub fn send_input(&self, input: EventInput) -> Result<()> {
-            let mut server2client = self.server2client.lock().unwrap();
+            let mut server2client = self.server2client.lock();
             ipc::send_message(
                 &mut *server2client,
                 &Event::Input {
@@ -178,7 +178,7 @@ where
             }
         }
 
-        *self.input_state.lock().unwrap() = portals.last().map(|p| p.portal_ref.clone());
+        *self.input_state.lock() = portals.last().map(|p| p.portal_ref.clone());
 
         let deleted_entities = self
             .deleted_index
@@ -187,7 +187,6 @@ where
         if !deleted_entities.is_empty() || portals.iter().any(|p| p.needs_paint) {
             self.screen
                 .lock()
-                .unwrap()
                 .update_buffers(portals.iter_mut().rev().map(|portal| {
                     portal.needs_paint = false;
                     portal.as_screen_buffer()

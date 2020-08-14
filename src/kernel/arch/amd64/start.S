@@ -126,6 +126,7 @@ start64_high:
     mov %ax, %ss
     mov %ax, %ds
     mov %ax, %es
+    xor %ax, %ax
     mov %ax, %fs
     mov %ax, %gs
 
