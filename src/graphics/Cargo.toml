@@ -17,4 +17,4 @@ syscall = { path = "../syscall" }
 
 [target.'cfg(not(target_os="rust_os"))'.dependencies]
 graphics_server = { path = "../graphics_server" }
-minifb = "0.17"
+minifb = "0.18"
