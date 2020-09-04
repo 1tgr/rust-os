@@ -7,6 +7,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c251dce3391a07b43218ca070203ecb8f9f520d35ab71312296a59dbceab154"
 
 [[package]]
+name = "ahash"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d66721683190aeea775c737eee925aea24719058d86d815e8ee121dd9f37d19"
+
+[[package]]
 name = "alloc_system"
 version = "0.0.0"
 dependencies = [
@@ -147,7 +153,7 @@ dependencies = [
  "freetype",
  "graphics_base",
  "graphics_server",
- "hashbrown",
+ "hashbrown 0.9.0",
  "hecs",
  "minifb",
  "os",
@@ -160,7 +166,7 @@ version = "0.1.0"
 dependencies = [
  "cairo",
  "corepack",
- "hashbrown",
+ "hashbrown 0.9.0",
  "hecs",
  "os",
  "serde",
@@ -192,7 +198,7 @@ dependencies = [
  "cairo",
  "corepack",
  "graphics_base",
- "hashbrown",
+ "hashbrown 0.9.0",
  "hecs",
  "jpeg-decoder",
  "os",
@@ -205,12 +211,21 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.8.1"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34f595585f103464d8d2f6e9864682d74c1601fed5e07d62b1c9058dba8246fb"
+checksum = "e91b62f79061a0bc2e046024cb7ba44b08419ed238ecbd9adbd787434b9e8c25"
 dependencies = [
- "ahash",
+ "ahash 0.3.4",
  "autocfg 1.0.0",
+]
+
+[[package]]
+name = "hashbrown"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00d63df3d41950fb462ed38308eea019113ad1508da725bbedcd0fa5a85ef5f7"
+dependencies = [
+ "ahash 0.4.4",
 ]
 
 [[package]]
@@ -218,7 +233,7 @@ name = "hecs"
 version = "0.2.12"
 source = "git+https://github.com/1tgr/hecs.git?rev=c87707007be7d13d4a727c1531cce535ee8a80cf#c87707007be7d13d4a727c1531cce535ee8a80cf"
 dependencies = [
- "hashbrown",
+ "hashbrown 0.8.2",
 ]
 
 [[package]]
