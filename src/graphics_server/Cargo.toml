@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 cairo = { path = "../cairo" }
 graphics_base = { path = "../graphics_base" }
-hashbrown = { version = "0.8", default-features = false }
+hashbrown = { version = "0.10", default-features = false }
 hecs = { version = "0.2", default-features = false, features = ["single_threaded"], git = "https://github.com/1tgr/hecs.git", rev = "c87707007be7d13d4a727c1531cce535ee8a80cf" }
 jpeg-decoder = { version = "0.1", default-features = false, git = "https://github.com/1tgr/jpeg-decoder.git", rev = "f63a32c5154485e1d22e01384a9f78c6b1c4225b" }
 serde = { version = "1", default-features = false, features = ["alloc"] }
