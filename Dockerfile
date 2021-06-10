@@ -16,6 +16,7 @@ RUN apt-get update -qq && apt-get install -qq -y \
     libwayland-cursor0 \
     libwayland-dev \
     libxkbcommon-dev \
+    ninja-build \
     python3-pip \
     python3-setuptools \
     zlib1g-dev

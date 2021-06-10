@@ -29,4 +29,4 @@ test-arm32: kernel-arm32
 	python3 test.py qemu-system-arm -M raspi2 -kernel kernel/target/arm32/release/kernel
 
 test-amd64: boot-amd64
-	python3 test.py --screenshot qemu-system-x86_64 -no-kvm -display vnc=:1 -no-reboot -kernel kernel/target/amd64-kernel/stripped/kernel -initrd boot/amd64/initrd.tar
+	python3 test.py --screenshot qemu-system-x86_64 -display vnc=:1 -no-reboot -kernel kernel/target/amd64-kernel/stripped/kernel -initrd boot/amd64/initrd.tar

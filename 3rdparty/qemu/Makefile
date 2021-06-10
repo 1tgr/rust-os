@@ -12,8 +12,8 @@ tools-amd64: ../target/bin/qemu-system-x86_64
 download: src/qemu/configure
 
 src/qemu/configure:
-	git clone git://git.qemu-project.org/qemu.git $(@D)
-	cd $(@D) && git submodule update --init dtc
+	git clone git://git.qemu.org/qemu.git $(@D)
+	cd $(@D) && git checkout 7fe7fae8b48e3f9c647fd685e5155ebc8e6fb84d && git submodule update --init dtc
 
 build/qemu/Makefile: src/qemu/configure Makefile
 	mkdir -p $(@D)
