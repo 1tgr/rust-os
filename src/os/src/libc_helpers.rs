@@ -2,6 +2,7 @@ use crate::detail::UntypedRecursiveMutex;
 use crate::Thread;
 use core::fmt;
 use core::slice;
+use core::sync::atomic::{AtomicUsize, Ordering};
 use libc::{c_char, c_int, c_void, mode_t, off_t, size_t, ssize_t};
 use syscall::{Handle, Result};
 
@@ -44,15 +45,12 @@ pub unsafe extern "C" fn __errno() -> *mut c_int {
 
 #[no_mangle]
 pub extern "C" fn sbrk(len: usize) -> *mut u8 {
-    match syscall::alloc_pages(len) {
-        Ok(p) => p,
-        Err(num) => {
-            unsafe {
-                errno = num as i32;
-            }
-            0 as *mut u8
-        }
-    }
+    const HEAP_SIZE: usize = 16 * 1048 * 1048;
+    static mut HEAP: [u8; HEAP_SIZE] = [0; 16 * 1048 * 1048];
+    static BRK: AtomicUsize = AtomicUsize::new(0);
+    let prev_brk = BRK.fetch_add(len, Ordering::SeqCst);
+    assert!(prev_brk + len <= HEAP_SIZE, "{} + {} > {}", prev_brk, len, HEAP_SIZE);
+    unsafe { &mut HEAP[prev_brk] }
 }
 
 static mut MALLOC_LOCK: Option<UntypedRecursiveMutex> = None;

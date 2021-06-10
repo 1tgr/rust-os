@@ -1,21 +1,19 @@
 [workspace]
 members = [
     "alloc_system",
-    "cairo",
-    "cairo_demo",
-    "freetype",
-    "graphics",
-    "graphics_base",
-    "graphics_client",
-    "graphics_server",
     "hello",
     "input",
     "libc",
     "os",
     "rt",
+    "sprite",
     "std",
     "syscall",
-    "terminal",
+    "ui",
+    "ui_demo",
+    "ui_macros",
+    "ui_server",
+    "ui_types",
 ]
 
 exclude = [

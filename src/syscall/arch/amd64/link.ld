@@ -1,6 +1,6 @@
 OUTPUT_FORMAT(elf64-x86-64)
 ENTRY(main)
-phys = 0x00001000;
+phys = SEGMENT_START("text-segment", 0x00001000);
 SECTIONS
 {
   .text phys : AT(phys) {

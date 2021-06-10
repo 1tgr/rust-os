@@ -36,21 +36,6 @@ RUN 3rdparty/target/bin/x86_64-elf-ld --version
 COPY 3rdparty/newlib 3rdparty/newlib
 RUN make -s -C 3rdparty/newlib && rm -rf 3rdparty/newlib/{src,build}
 
-COPY 3rdparty/zlib 3rdparty/zlib
-RUN make -s -C 3rdparty/zlib && rm -rf 3rdparty/zlib/{src,build}
-
-COPY 3rdparty/libpng 3rdparty/libpng
-RUN make -s -C 3rdparty/libpng && rm -rf 3rdparty/libpng/{src,build}
-
-COPY 3rdparty/freetype 3rdparty/freetype
-RUN make -s -C 3rdparty/freetype && rm -rf 3rdparty/freetype/{src,build}
-
-COPY 3rdparty/pixman 3rdparty/pixman
-RUN make -s -C 3rdparty/pixman && rm -rf 3rdparty/pixman/{src,build}
-
-COPY 3rdparty/cairo 3rdparty/cairo
-RUN make -s -C 3rdparty/cairo && rm -rf 3rdparty/cairo/{src,build}
-
 COPY requirements.txt .
 RUN pip3 install --user -r requirements.txt
 

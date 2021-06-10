@@ -8,12 +8,10 @@ ISO_LAYOUT += initrd.tar.gz
 ISO_LAYOUT += boot/grub/menu.lst=menu.lst
 ISO_LAYOUT += boot/grub/stage2_eltorito=stage2_eltorito_temp
 
-INITRD += ../../target/amd64/stripped/cairo_demo
-INITRD += ../../target/amd64/stripped/graphics_client
-INITRD += ../../target/amd64/stripped/graphics_server
 INITRD += ../../target/amd64/stripped/hello
 INITRD += ../../target/amd64/stripped/input
-INITRD += ../../target/amd64/stripped/terminal
+INITRD += ../../target/amd64/stripped/ui-demo
+INITRD += ../../target/amd64/stripped/ui-server
 
 ifeq ($(shell uname),Darwin)
 TARFLAGS += -s ',.*/,,g'

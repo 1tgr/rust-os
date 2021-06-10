@@ -40,7 +40,7 @@ SECTIONS {
 		*(.bss .bss.*)
 		. = ALIGN(4096);
 		heap_start = .;
-		. = ALIGN(2 * 1024 * 1024);
+		. += 2 * 1024 * 1024;
 		heap_end = .;
 	}
 

@@ -1,7 +1,7 @@
 use core::fmt::Write;
+use core::hint::unreachable_unchecked;
 use core::panic::PanicInfo;
 use os::libc_helpers::StdoutWriter;
-use os::Thread;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -12,5 +12,5 @@ fn panic(info: &PanicInfo) -> ! {
         writeln!(&mut StdoutWriter, "Panic at {}({})", file, line)
     };
 
-    Thread::exit(-(line as i32))
+    unsafe { unreachable_unchecked() }
 }

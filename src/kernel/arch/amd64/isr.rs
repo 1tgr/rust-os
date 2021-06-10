@@ -237,7 +237,7 @@ pub extern "C" fn exception(num: u8, regs: &Regs) {
         log!("");
     }
 
-    unsafe { debug::print_stack_trace(regs.rsp as *const usize) };
+    unsafe { debug::print_stack_trace(regs.rbp as *const usize) };
     loop {}
 }
 

@@ -4,5 +4,9 @@ name = "alloc_system"
 version = "0.0.0"
 edition = "2018"
 
+[features]
+page_alloc = []
+
 [dependencies]
 libc = { path = "../libc" }
+syscall = { path = "../syscall" }

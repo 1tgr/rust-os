@@ -1,0 +1,23 @@
+[package]
+name = "ui-server"
+version = "0.1.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alloc_system = { path = "../alloc_system" }
+euclid = { version = "0.22", default-features = false }
+num-traits = { version = "0.2", default-features = false, features = ["libm"] }
+os = { path = "../os" }
+png-decoder = { git = "https://github.com/bschwind/png-decoder.git" }
+raqote = { git = "https://github.com/1tgr/raqote.git", branch = "no-std", default-features = false }
+rt = { path = "../rt" }
+sprite = { path = "../sprite" }
+sw-composite = { version = "0.7", git = "https://github.com/1tgr/sw-composite.git", branch = "no-std", default-features = false }
+syscall = { path = "../syscall" }
+std = { path = "../std" }
+ui = { path = "../ui" }
+ui-macros = { path = "../ui_macros" }
+ui-types = { path = "../ui_types" }

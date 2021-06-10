@@ -1,7 +1,7 @@
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
-use core::slice;
-use syscall;
+use core::{mem, slice};
+use syscall::{self, Result};
 
 pub struct OSMem<T>(NonNull<T>, usize);
 
@@ -11,9 +11,29 @@ impl<T> OSMem<T>
 where
     T: Copy,
 {
+    pub fn new(len: usize) -> Result<Self> {
+        let byte_len = len * mem::size_of::<T>();
+        unsafe {
+            let ptr = syscall::alloc_pages(byte_len)?;
+            Ok(Self::from_raw(ptr as *mut T, len))
+        }
+    }
+
     pub unsafe fn from_raw(ptr: *mut T, len: usize) -> Self {
         assert!(!ptr.is_null());
-        OSMem(NonNull::new_unchecked(ptr), len)
+        Self(NonNull::new_unchecked(ptr), len)
+    }
+}
+
+impl<T> AsRef<[T]> for OSMem<T> {
+    fn as_ref(&self) -> &[T] {
+        self.deref()
+    }
+}
+
+impl<T> AsMut<[T]> for OSMem<T> {
+    fn as_mut(&mut self) -> &mut [T] {
+        self.deref_mut()
     }
 }
 

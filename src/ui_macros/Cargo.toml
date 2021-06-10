@@ -1,0 +1,17 @@
+[package]
+name = "ui-macros"
+version = "0.1.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+derive-syn-parse = "0.1"
+heck = "0.3"
+proc-macro2 = "1"
+quote = "1"
+syn = "1"

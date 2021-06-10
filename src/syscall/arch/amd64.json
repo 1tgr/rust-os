@@ -6,6 +6,7 @@
     "target-c-int-width": "32",
     "os": "rust_os",
     "arch": "x86_64",
+    "cpu": "opteron",
     "no-compiler-rt": true,
     "disable-redzone": true,
     "eliminate-frame-pointer": false,

@@ -1,0 +1,23 @@
+[package]
+name = "ui"
+version = "0.1.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bit-vec = { version = "0.6", default-features = false }
+euclid = { version = "0.22", default-features = false }
+fontdue = "0.5"
+hashbrown = "0.11"
+lazy_static = { version = "1", features = ["spin_no_std"] }
+mopa = { version = "0.2", features = ["no_std"] }
+num-traits = { version = "0.2", default-features = false }
+os = { path = "../os" }
+raqote = { git = "https://github.com/1tgr/raqote.git", branch = "no-std", default-features = false }
+salsa = { git = "https://github.com/1tgr/salsa.git", branch = "no-std", default-features = false }
+sprite = { path = "../sprite" }
+std = { path = "../std" }
+sw-composite = { version = "0.7", git = "https://github.com/1tgr/sw-composite.git", branch = "no-std", default-features = false }
+ui-types = { path = "../ui_types" }

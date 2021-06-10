@@ -22,7 +22,10 @@ macro_rules! try_or_none {
     ($e:expr) => {{
         match $e {
             Some(e) => e,
-            None => return None,
+            None => {
+                log!("page fault is not handled because: {}", stringify!($e));
+                return None;
+            }
         }
     }};
 }
@@ -31,22 +34,52 @@ macro_rules! try_or_false {
     ($e:expr) => {{
         match $e {
             Some(e) => e,
-            None => return false,
+            None => {
+                log!("page fault is not handled because: {}", stringify!($e));
+                return false;
+            }
         }
     }};
 }
 
-pub struct SharedMemBlock(Mutex<Vec<Option<NonZeroUsize>>>);
-
-impl SharedMemBlock {
-    pub fn new() -> Self {
-        SharedMemBlock(Mutex::new(Vec::new()))
-    }
+pub struct SharedMemBlock {
+    phys: Arc<PhysicalBitmap>,
+    pages: Mutex<Vec<Option<NonZeroUsize>>>,
 }
 
 impl KObj for SharedMemBlock {
     fn shared_mem_block(&self) -> Option<&SharedMemBlock> {
         Some(&self)
+    }
+}
+
+impl SharedMemBlock {
+    fn alloc(&self, offset: usize) -> Option<(bool, usize)> {
+        let mut pages = lock!(self.pages);
+        let index = offset / phys_mem::PAGE_SIZE;
+        if pages.len() <= index {
+            pages.resize(index + 1, None);
+        }
+
+        match pages[index] {
+            Some(addr) => Some((false, addr.get())),
+            None => {
+                let addr = try_or_none!(self.phys.alloc_page().ok());
+                assert_ne!(addr, 0);
+                pages[index] = Some(unsafe { NonZeroUsize::new_unchecked(addr) });
+                Some((true, addr))
+            }
+        }
+    }
+}
+
+impl Drop for SharedMemBlock {
+    fn drop(&mut self) {
+        for page in self.pages.get_mut().drain(..) {
+            if let Some(addr) = page {
+                self.phys.free_page(addr.get())
+            }
+        }
     }
 }
 
@@ -97,39 +130,19 @@ impl ProcessState {
     }
 }
 
-#[derive(Clone)]
 enum Pager {
-    Zeroed,
+    Zeroed(SharedMemBlock),
     Physical(usize),
     Shared(KObjRef<SharedMemBlock>),
 }
 
 impl Pager {
-    fn alloc<AllocPage: Fn() -> Option<usize>>(&self, offset: usize, alloc_page: AllocPage) -> Option<(bool, usize)> {
-        let result = match self {
-            &Pager::Zeroed => (true, try_or_none!(alloc_page())),
-            &Pager::Physical(addr) => (false, addr + offset),
-
-            &Pager::Shared(ref pages) => {
-                let mut pages = lock!(pages.0);
-                let index = offset / phys_mem::PAGE_SIZE;
-                if pages.len() <= index {
-                    pages.resize(index + 1, None);
-                }
-
-                match pages[index] {
-                    Some(addr) => (false, addr.get()),
-                    None => {
-                        let addr = try_or_none!(alloc_page());
-                        assert_ne!(addr, 0);
-                        pages[index] = Some(unsafe { NonZeroUsize::new_unchecked(addr) });
-                        (true, addr)
-                    }
-                }
-            }
-        };
-
-        Some(result)
+    fn alloc(&self, offset: usize) -> Option<(bool, usize)> {
+        match self {
+            Self::Zeroed(block) => block.alloc(offset),
+            Self::Physical(addr) => Some((false, *addr + offset)),
+            Self::Shared(block) => block.alloc(offset),
+        }
     }
 }
 
@@ -137,7 +150,7 @@ impl Pager {
 struct MemBlock {
     user: bool,
     writable: bool,
-    pager: Option<Pager>,
+    pager: Option<Arc<Pager>>,
 }
 
 pub struct Process {
@@ -227,7 +240,7 @@ impl Process {
         let block = MemBlock {
             user,
             writable,
-            pager: Some(pager),
+            pager: Some(Arc::new(pager)),
         };
 
         match ptr_opt {
@@ -408,77 +421,78 @@ pub fn spawn(executable: String, handles: Vec<Option<Arc<dyn KObj>>>) -> Result<
     Ok(process)
 }
 
-pub struct Allocation<T> {
-    len: usize,
+struct Allocation<T> {
     base: Option<*mut T>,
     user: bool,
     writable: bool,
-    pager: Pager,
 }
 
 impl<T> Allocation<T> {
-    fn new(len: usize, pager: Pager) -> Self {
-        Allocation {
-            base: None,
-            len,
-            user: false,
-            writable: false,
-            pager,
+    fn zeroed(self, len: usize) -> Result<&'static mut [T]> {
+        let process = thread::current_process();
+        let base = self.base.map(|ptr| ptr as *mut u8);
+        let byte_len = (len * mem::size_of::<T>()).max(phys_mem::PAGE_SIZE);
+
+        let pager = Pager::Zeroed(SharedMemBlock {
+            phys: process.phys.clone(),
+            pages: Mutex::new(Vec::new()),
+        });
+
+        unsafe {
+            let ptr = process.alloc_inner(base, byte_len, self.user, self.writable, pager)?;
+            Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
         }
     }
 
-    pub fn zeroed(len: usize) -> Self {
-        Allocation::new(len, Pager::Zeroed)
-    }
-
-    pub fn phys(len: usize, addr: usize) -> Self {
-        Allocation::new(len, Pager::Physical(addr))
-    }
-
-    pub fn shared(len: usize, shared: KObjRef<SharedMemBlock>) -> Self {
-        Allocation::new(len, Pager::Shared(shared))
-    }
-
-    pub fn user(mut self, user: bool) -> Self {
-        self.user = user;
-        self
-    }
-
-    pub fn writable(mut self, writable: bool) -> Self {
-        self.writable = writable;
-        self
-    }
-
-    pub fn base(mut self, base: *mut T) -> Self {
-        self.base = Some(base);
-        self
-    }
-
-    pub fn allocate(self) -> Result<&'static mut [T]> {
+    fn phys(self, len: usize, addr: usize) -> Result<&'static mut [T]> {
         let process = thread::current_process();
         let base = self.base.map(|ptr| ptr as *mut u8);
-        let len = (self.len * mem::size_of::<T>()).max(phys_mem::PAGE_SIZE);
+        let byte_len = (len * mem::size_of::<T>()).max(phys_mem::PAGE_SIZE);
+        let pager = Pager::Physical(addr);
+
         unsafe {
-            let ptr = process.alloc_inner(base, len, self.user, self.writable, self.pager)?;
-            Ok(slice::from_raw_parts_mut(ptr as *mut T, self.len))
+            let ptr = process.alloc_inner(base, byte_len, self.user, self.writable, pager)?;
+            Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
+        }
+    }
+
+    fn shared(self, len: usize, block: KObjRef<SharedMemBlock>) -> Result<&'static mut [T]> {
+        let process = thread::current_process();
+        let base = self.base.map(|ptr| ptr as *mut u8);
+        let byte_len = (len * mem::size_of::<T>()).max(phys_mem::PAGE_SIZE);
+        let pager = Pager::Shared(block);
+        unsafe {
+            let ptr = process.alloc_inner(base, byte_len, self.user, self.writable, pager)?;
+            Ok(slice::from_raw_parts_mut(ptr as *mut T, len))
         }
     }
 }
 
 pub fn alloc<T>(len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
-    Allocation::zeroed(len).user(user).writable(writable).allocate()
+    let a = Allocation {
+        base: None,
+        user,
+        writable,
+    };
+    a.zeroed(len)
 }
 
 pub unsafe fn alloc_at<T>(base: *mut T, len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
-    Allocation::zeroed(len)
-        .user(user)
-        .writable(writable)
-        .base(base)
-        .allocate()
+    let a = Allocation {
+        user,
+        writable,
+        base: Some(base),
+    };
+    a.zeroed(len)
 }
 
 pub unsafe fn map_phys<T>(addr: usize, len: usize, user: bool, writable: bool) -> Result<&'static mut [T]> {
-    Allocation::phys(len, addr).user(user).writable(writable).allocate()
+    let a = Allocation {
+        base: None,
+        user,
+        writable,
+    };
+    a.phys(len, addr)
 }
 
 pub fn map_shared<T>(
@@ -487,7 +501,20 @@ pub fn map_shared<T>(
     user: bool,
     writable: bool,
 ) -> Result<&'static mut [T]> {
-    Allocation::shared(len, block).user(user).writable(writable).allocate()
+    let a = Allocation {
+        user,
+        writable,
+        base: None,
+    };
+    a.shared(len, block)
+}
+
+pub fn create_shared_mem() -> SharedMemBlock {
+    let process = thread::current_process();
+    SharedMemBlock {
+        phys: process.phys.clone(),
+        pages: Mutex::new(Vec::new()),
+    }
 }
 
 pub fn free(ptr: *mut u8) -> bool {
@@ -527,7 +554,7 @@ pub fn resolve_page_fault(ptr: *mut u8) -> bool {
 
     let pager = try_or_false!(block.pager);
     let offset = ptr::bytes_between(slice.as_mut_ptr(), ptr);
-    let (dirty, addr) = try_or_false!(pager.alloc(offset, || process.phys.alloc_page().ok()));
+    let (dirty, addr) = try_or_false!(pager.alloc(offset));
 
     unsafe {
         if dirty {
@@ -620,13 +647,19 @@ pub mod test {
 
         fn can_share_memory() {
             thread::with_scheduler(|| {
-                let shared = KObjRef::new(Arc::new(SharedMemBlock::new()), |kobj| kobj.shared_mem_block()).unwrap();
+                let shared = KObjRef::new(Arc::new(process::create_shared_mem()), |kobj| kobj.shared_mem_block()).unwrap();
                 let p = thread::current_process();
                 let shared1 = shared.clone();
                 let shared2 = shared.clone();
 
                 let d1 = thread::spawn_remote(Arc::new(p.spawn("can_share_memory(d1)".into(), vec![]).unwrap()), || unsafe {
-                    let slice = Allocation::shared(0x1000, shared1).base(0x1000_0000 as *mut u8).user(true).writable(true).allocate().unwrap();
+                    let a = Allocation {
+                        base: Some(0x1000_0000 as *mut u8),
+                        user: true,
+                        writable: true
+                    };
+
+                    let slice = a.shared(0x1000, shared1).unwrap();
                     assert_eq!(0, intrinsics::volatile_load(slice.as_ptr()));
                     intrinsics::volatile_store(slice.as_mut_ptr(), 123);
                     0
@@ -635,7 +668,13 @@ pub mod test {
                 d1.get();
 
                 let d2 = thread::spawn_remote(Arc::new(p.spawn("can_share_memory(d2)".into(), vec![]).unwrap()), || unsafe {
-                    let slice = Allocation::shared(0x1000, shared2).base(0x2000_0000 as *mut u8).user(true).allocate().unwrap();
+                    let a = Allocation {
+                        base: Some(0x2000_0000 as *mut u8),
+                        user: true,
+                        writable: false
+                    };
+
+                    let slice = a.shared(0x1000, shared2).unwrap();
                     assert_eq!(123, intrinsics::volatile_load(slice.as_ptr()));
                     0
                 });
