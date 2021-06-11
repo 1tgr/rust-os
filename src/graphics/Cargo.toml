@@ -8,7 +8,7 @@ edition = "2018"
 cairo = { path = "../cairo" }
 freetype = { path = "../freetype" }
 graphics_base = { path = "../graphics_base" }
-hashbrown = { version = "0.8", default-features = false }
+hashbrown = { version = "0.11", default-features = false }
 hecs = { version = "0.2", default-features = false, features = ["single_threaded"], git = "https://github.com/1tgr/hecs.git", rev = "c87707007be7d13d4a727c1531cce535ee8a80cf" }
 
 [target.'cfg(target_os="rust_os")'.dependencies]
@@ -17,4 +17,4 @@ syscall = { path = "../syscall" }
 
 [target.'cfg(not(target_os="rust_os"))'.dependencies]
 graphics_server = { path = "../graphics_server" }
-minifb = "0.17"
+minifb = "0.19"
