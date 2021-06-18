@@ -7,6 +7,7 @@ use crate::mutex::UntypedMutex;
 use crate::phys_mem;
 use crate::prelude::*;
 use crate::process::{self, SharedMemBlock};
+use crate::semaphore::Semaphore;
 use crate::singleton::{DropSingleton, Singleton};
 use crate::thread;
 use alloc::sync::Arc;
@@ -154,6 +155,7 @@ impl HandleSyscall for SyscallHandler {
     fn lock_mutex(&self, mutex: Handle) -> Result<()> {
         let mutex = process::resolve_handle_ref(mutex, |kobj| kobj.mutex())?;
         unsafe { mutex.lock_unsafe() }
+        Ok(())
     }
 
     fn unlock_mutex(&self, mutex: Handle) -> Result<()> {
@@ -191,5 +193,20 @@ impl HandleSyscall for SyscallHandler {
     fn duplicate_handle(&self, handle: Handle) -> Result<Handle> {
         let kobj = process::resolve_handle_obj(handle)?;
         Ok(process::make_handle(kobj))
+    }
+
+    fn create_semaphore(&self, value: usize) -> Handle {
+        process::make_handle(Arc::new(Semaphore::new(value)))
+    }
+
+    fn wait_semaphore(&self, semaphore: Handle) -> Result<()> {
+        let semaphore = process::resolve_handle_ref(semaphore, |kobj| kobj.semaphore())?;
+        semaphore.wait();
+        Ok(())
+    }
+
+    fn post_semaphore(&self, semaphore: Handle) -> Result<()> {
+        let semaphore = process::resolve_handle_ref(semaphore, |kobj| kobj.semaphore())?;
+        semaphore.post()
     }
 }

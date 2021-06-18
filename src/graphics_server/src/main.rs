@@ -68,14 +68,7 @@ fn main() -> Result<()> {
     let keyboard_focus = Arc::new(Mutex::new(None));
     let mut app = ServerApp::new();
     app.add_system(ServerPortalSystem::new(screen.clone(), keyboard_focus.clone()));
-
-    Thread::spawn(move || mouse_thread(screen).map(|()| 0).unwrap_or_else(|num| -(num as i32)));
-
-    Thread::spawn(move || {
-        keyboard_thread(keyboard_focus)
-            .map(|()| 0)
-            .unwrap_or_else(|num| -(num as i32))
-    });
-
+    Thread::spawn(move || mouse_thread(screen).unwrap());
+    Thread::spawn(move || keyboard_thread(keyboard_focus).unwrap());
     ServerPipe::new(app, "terminal")?.run()
 }

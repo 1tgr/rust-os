@@ -2,6 +2,7 @@ use crate::deferred::Deferred;
 use crate::io::{AsyncRead, Read, Write};
 use crate::mutex::UntypedMutex;
 use crate::process::{Process, SharedMemBlock};
+use crate::semaphore::Semaphore;
 use alloc::sync::Arc;
 use core::mem;
 use core::ops::Deref;
@@ -27,6 +28,9 @@ pub trait KObj {
         None
     }
     fn mutex(&self) -> Option<&UntypedMutex> {
+        None
+    }
+    fn semaphore(&self) -> Option<&Semaphore> {
         None
     }
 }

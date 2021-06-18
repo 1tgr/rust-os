@@ -56,6 +56,8 @@ mod prelude;
 #[cfg(not(target_arch = "arm"))]
 mod process;
 mod ptr;
+#[cfg(not(target_arch = "arm"))]
+mod semaphore;
 mod singleton;
 mod tar;
 #[cfg(not(target_arch = "arm"))]
@@ -89,6 +91,8 @@ fn run_tests() {
         mutex::test::TESTS,
         #[cfg(not(target_arch = "arm"))]
         process::test::TESTS,
+        #[cfg(not(target_arch = "arm"))]
+        semaphore::test::TESTS,
         #[cfg(not(target_arch = "arm"))]
         demo::TESTS,
     ];

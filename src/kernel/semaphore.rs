@@ -1,85 +1,57 @@
 use crate::kobj::KObj;
-use crate::spin;
+use crate::spin::Mutex;
 use crate::thread::{self, BlockedThread};
 use alloc::collections::vec_deque::VecDeque;
 use syscall::{ErrNum, Result};
 
-struct UntypedMutexState {
+struct SemaphoreState {
     waiters: VecDeque<BlockedThread>,
-    locked: bool,
+    value: usize,
 }
 
-pub struct UntypedMutex {
-    state: spin::Mutex<UntypedMutexState>,
+pub struct Semaphore {
+    state: Mutex<SemaphoreState>,
 }
 
-unsafe impl Send for UntypedMutex {}
-unsafe impl Sync for UntypedMutex {}
+unsafe impl Send for Semaphore {}
+unsafe impl Sync for Semaphore {}
 
-impl UntypedMutex {
-    pub fn new() -> Self {
-        UntypedMutex {
-            state: spin::Mutex::new(UntypedMutexState {
+impl Semaphore {
+    pub fn new(value: usize) -> Self {
+        Semaphore {
+            state: Mutex::new(SemaphoreState {
                 waiters: VecDeque::new(),
-                locked: false,
+                value,
             }),
         }
     }
 
-    pub unsafe fn lock_unsafe(&self) {
+    pub fn wait(&self) {
         let mut state = lock!(self.state);
-        if state.locked {
+        if let Some(value) = state.value.checked_sub(1) {
+            state.value = value;
+        } else {
             thread::block(move |thread| {
                 state.waiters.push_back(thread);
             });
-        } else {
-            state.locked = true;
         }
     }
 
-    pub unsafe fn unlock_unsafe(&self) -> Result<()> {
+    pub fn post(&self) -> Result<()> {
         let mut state = lock!(self.state);
-        if !state.locked {
-            return Err(ErrNum::NotSupported);
-        }
-
         if let Some(thread) = state.waiters.pop_front() {
             thread.resume();
         } else {
-            state.locked = false;
+            state.value = state.value.checked_add(1).ok_or(ErrNum::InvalidArgument)?;
         }
 
         Ok(())
     }
-
-    pub fn lock(&self) -> UntypedMutexGuard {
-        unsafe {
-            self.lock_unsafe();
-        }
-        UntypedMutexGuard::new(self)
-    }
 }
 
-impl KObj for UntypedMutex {
-    fn mutex(&self) -> Option<&UntypedMutex> {
+impl KObj for Semaphore {
+    fn semaphore(&self) -> Option<&Semaphore> {
         Some(self)
-    }
-}
-
-#[must_use]
-pub struct UntypedMutexGuard<'a> {
-    lock: &'a UntypedMutex,
-}
-
-impl<'a> UntypedMutexGuard<'a> {
-    pub fn new(lock: &'a UntypedMutex) -> Self {
-        UntypedMutexGuard { lock }
-    }
-}
-
-impl<'a> Drop for UntypedMutexGuard<'a> {
-    fn drop(&mut self) {
-        unsafe { self.lock.unlock_unsafe().unwrap() }
     }
 }
 
@@ -92,29 +64,30 @@ pub mod test {
     use core::fmt::Write;
 
     test! {
-        fn can_lock_single_thread() {
+        fn single_thread_does_not_block() {
             thread::with_scheduler(|| {
-                let m = UntypedMutex::new();
-                let _g: UntypedMutexGuard = m.lock();
+                let s = Semaphore::new(1);
+                s.wait();
                 thread::schedule();
             });
         }
 
-        fn can_lock_lots_of_threads() {
+        fn lots_of_threads_can_block() {
             thread::with_scheduler(|| {
-                let m = Arc::new(UntypedMutex::new());
+                let s = Arc::new(Semaphore::new(1));
                 let mut deferreds = Vec::new();
 
                 for i in 0..5 {
-                    let m = m.clone();
+                    let s = s.clone();
 
                     let d = thread::spawn(move || {
                         let _ = write!(logging::Writer, ">");
-                        let _g: UntypedMutexGuard = m.lock();
+                        s.wait();
                         let _ = write!(logging::Writer, ".");
                         thread::schedule();
 
                         let _ = write!(logging::Writer, "<");
+                        s.post().expect("post returned Err");
                         i
                     });
 

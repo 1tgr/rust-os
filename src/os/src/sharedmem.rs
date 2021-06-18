@@ -1,4 +1,5 @@
 use crate::{OSHandle, OSMem, Result};
+use core::mem;
 use core::ops::{Deref, DerefMut};
 use syscall;
 
@@ -10,15 +11,19 @@ fn align_up(value: usize, round: usize) -> usize {
     align_down(value + round - 1, round)
 }
 
-pub struct SharedMem {
+pub struct SharedMem<T> {
     handle: OSHandle,
     writable: bool,
-    mem: OSMem,
+    mem: OSMem<T>,
 }
 
-impl SharedMem {
+impl<T> SharedMem<T>
+where
+    T: Copy,
+{
     pub fn from_raw(handle: OSHandle, len: usize, writable: bool) -> Result<Self> {
-        let ptr = syscall::map_shared_mem(handle.get(), len, writable)?;
+        let byte_len = len * mem::size_of::<T>();
+        let ptr = syscall::map_shared_mem(handle.get(), byte_len, writable)? as *mut T;
         let mem = unsafe { OSMem::from_raw(ptr, len) };
         Ok(Self { handle, writable, mem })
     }
@@ -28,36 +33,39 @@ impl SharedMem {
         Self::from_raw(handle, len, writable)
     }
 
-    pub fn as_handle(&self) -> &OSHandle {
-        &self.handle
-    }
-
-    pub fn into_inner(self) -> (OSHandle, OSMem) {
-        (self.handle, self.mem)
-    }
-
     pub fn resize(&mut self, new_len: usize) -> Result<()> {
-        let old_len = self.mem.len();
-        if align_up(new_len, 4096) == align_up(old_len, 4096) {
+        let old_byte_len = self.mem.len() * mem::size_of::<T>();
+        let new_byte_len = new_len * mem::size_of::<T>();
+        if align_up(new_byte_len, 4096) == align_up(old_byte_len, 4096) {
             return Ok(());
         }
 
-        let ptr = syscall::map_shared_mem(self.handle.get(), new_len, self.writable)?;
+        let ptr = syscall::map_shared_mem(self.handle.get(), new_byte_len, self.writable)? as *mut T;
         self.mem = unsafe { OSMem::from_raw(ptr, new_len) };
         Ok(())
     }
 }
 
-impl Deref for SharedMem {
-    type Target = [u8];
+impl<T> SharedMem<T> {
+    pub fn as_handle(&self) -> &OSHandle {
+        &self.handle
+    }
 
-    fn deref(&self) -> &[u8] {
+    pub fn into_inner(self) -> (OSHandle, OSMem<T>) {
+        (self.handle, self.mem)
+    }
+}
+
+impl<T> Deref for SharedMem<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &[T] {
         self.mem.as_ref()
     }
 }
 
-impl DerefMut for SharedMem {
-    fn deref_mut(&mut self) -> &mut [u8] {
+impl<T> DerefMut for SharedMem<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
         self.mem.as_mut()
     }
 }

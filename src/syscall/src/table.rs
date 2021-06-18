@@ -35,5 +35,8 @@ syscalls! {
     fn spawn_thread(entry: extern fn(usize), context: usize) -> Handle => 17,
     fn schedule() -> () => 18,
     fn current_thread_id() -> usize => 19,
-    fn duplicate_handle(handle: Handle) -> Result<Handle> => 20
+    fn duplicate_handle(handle: Handle) -> Result<Handle> => 20,
+    fn create_semaphore(value: usize) -> Handle => 21,
+    fn wait_semaphore(semaphore: Handle) -> Result<()> => 22,
+    fn post_semaphore(semaphore: Handle) -> Result<()> => 23
 }
