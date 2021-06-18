@@ -3,7 +3,7 @@ use core::ops::{Deref, DerefMut};
 use os::{OSHandle, SharedMem};
 
 pub struct FrameBuffer {
-    data: SharedMem,
+    data: SharedMem<u8>,
 }
 
 impl FrameBuffer {

@@ -1,5 +1,7 @@
+use core::mem::ManuallyDrop;
 use syscall::{self, Handle, Result};
 
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct OSHandle(Handle);
 
 impl OSHandle {
@@ -9,6 +11,11 @@ impl OSHandle {
 
     pub fn get(&self) -> Handle {
         self.0
+    }
+
+    pub fn into_inner(self) -> Handle {
+        let this = ManuallyDrop::new(self);
+        this.0
     }
 
     pub fn duplicate(&self) -> Result<Self> {
