@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(optin_builtin_traits)]
+#![feature(lang_items)]
 #![feature(thread_local)]
 
 extern crate alloc;
@@ -13,6 +13,7 @@ mod mutex;
 mod oshandle;
 mod osmem;
 mod process;
+mod semaphore;
 mod sharedmem;
 mod thread;
 
@@ -21,6 +22,7 @@ pub use self::mutex::*;
 pub use self::oshandle::*;
 pub use self::osmem::*;
 pub use self::process::*;
+pub use self::semaphore::*;
 pub use self::sharedmem::*;
 pub use self::thread::*;
 
