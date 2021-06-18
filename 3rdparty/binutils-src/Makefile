@@ -5,7 +5,7 @@ ROOT=$(abspath $(CURDIR)/..)
 
 all: tools-arm32 tools-amd64
 
-tools-arm32: ../target/bin/arm-none-eabi-ld
+tools-arm32: ../target/bin/arm-eabi-ld
 
 tools-amd64: ../target/bin/x86_64-elf-ld
 
@@ -22,14 +22,14 @@ src/$(BINUTILS)/configure: src/$(BINUTILS).tar.gz
 build/arm32/$(BINUTILS)/Makefile: src/$(BINUTILS)/configure Makefile
 	mkdir -p $(@D)
 	cd $(@D) && $(CURDIR)/$< \
-		--silent --prefix=$(ROOT)/target --target=arm-none-eabi
+		--silent --prefix=$(ROOT)/target --target=arm-eabi
 
 build/amd64/$(BINUTILS)/Makefile: src/$(BINUTILS)/configure Makefile
 	mkdir -p $(@D)
 	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(ROOT)/target --target=x86_64-elf
 
-../target/bin/arm-none-eabi-ld: build/arm32/$(BINUTILS)/Makefile
+../target/bin/arm-eabi-ld: build/arm32/$(BINUTILS)/Makefile
 	$(MAKE) -C $(<D)
 	$(MAKE) -C $(<D) install
 

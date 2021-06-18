@@ -24,15 +24,12 @@ RUN apt-get update -qq && apt-get install -qq -y \
 ENV PATH=$PATH:/root/.cargo/bin
 WORKDIR /build
 
-COPY 3rdparty/binutils 3rdparty/binutils
-RUN make -s -C 3rdparty/binutils && rm -rf 3rdparty/binutils/{src,build}
-RUN 3rdparty/target/bin/arm-none-eabi-ld --version
-RUN 3rdparty/target/bin/x86_64-elf-ld --version
-
-COPY 3rdparty/gcc 3rdparty/gcc
-RUN make -s -C 3rdparty/gcc && rm -rf 3rdparty/gcc/{src,build}
-RUN 3rdparty/target/bin/arm-none-eabi-gcc --version
+COPY 3rdparty/toolchain-binary 3rdparty/toolchain-binary
+RUN make -s -C 3rdparty/toolchain-binary && rm -rf 3rdparty/toolchain-binary/{src,build}
+RUN 3rdparty/target/bin/arm-eabi-gcc --version
+RUN 3rdparty/target/bin/arm-eabi-ld --version
 RUN 3rdparty/target/bin/x86_64-elf-gcc --version
+RUN 3rdparty/target/bin/x86_64-elf-ld --version
 
 COPY 3rdparty/newlib 3rdparty/newlib
 RUN make -s -C 3rdparty/newlib && rm -rf 3rdparty/newlib/{src,build}
