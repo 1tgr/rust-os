@@ -42,9 +42,10 @@ jobs:
         libwayland-cursor0
         libwayland-dev
         libxkbcommon-dev
-        ninja-build
         python3-pip
         python3-setuptools
+        qemu-system-arm
+        qemu-system-x86
         zlib1g-dev
     - name: make setup-${{ matrix.arch }}
       run: make -s setup-${{ matrix.arch }}
