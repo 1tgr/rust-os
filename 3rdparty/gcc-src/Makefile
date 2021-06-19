@@ -5,7 +5,7 @@ ROOT=$(abspath $(CURDIR)/..)
 
 all: tools-arm32 tools-amd64
 
-tools-arm32: ../target/bin/arm-none-eabi-gcc
+tools-arm32: ../target/bin/arm-eabi-gcc
 
 tools-amd64: ../target/bin/x86_64-elf-gcc
 
@@ -22,14 +22,14 @@ src/$(GCC)/configure: src/$(GCC).tar.xz
 build/arm32/$(GCC)/Makefile: src/$(GCC)/configure Makefile
 	mkdir -p $(@D)
 	cd $(@D) && $(CURDIR)/$< \
-		--silent --prefix=$(ROOT)/target --target=arm-none-eabi --disable-nls --enable-languages=c,c++ --without-headers
+		--silent --prefix=$(ROOT)/target --target=arm-eabi --disable-nls --enable-languages=c,c++ --without-headers
 
 build/amd64/$(GCC)/Makefile: src/$(GCC)/configure Makefile
 	mkdir -p $(@D)
 	cd $(@D) && $(CURDIR)/$< \
 		--silent --prefix=$(ROOT)/target --target=x86_64-elf --disable-nls --enable-languages=c,c++ --without-headers
 
-../target/bin/arm-none-eabi-gcc: build/arm32/$(GCC)/Makefile ../target/bin/arm-none-eabi-ld
+../target/bin/arm-eabi-gcc: build/arm32/$(GCC)/Makefile ../target/bin/arm-eabi-ld
 	$(MAKE) -C $(<D) all-gcc
 	$(MAKE) -C $(<D) all-target-libgcc
 	$(MAKE) -C $(<D) install-gcc

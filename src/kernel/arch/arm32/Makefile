@@ -1,7 +1,7 @@
 OBJS = start.o setjmp.o
 RUSTUP_RUN = RUST_TARGET_PATH=${CURDIR}/../../../syscall/arch RUSTFLAGS=-Dwarnings
 CC = gcc
-TARGET = arm-none-eabi
+TARGET = arm-eabi
 OBJDUMP = $(TARGET)-objdump
 CFLAGS += -g -I ../../../newlib/$(TARGET)/include
 

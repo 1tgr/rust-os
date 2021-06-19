@@ -1,5 +1,3 @@
-DIRS += binutils
-DIRS += gcc
 DIRS += newlib
 DIRS += zlib
 DIRS += libpng
@@ -8,15 +6,16 @@ DIRS += pixman
 DIRS += cairo
 DIRS += qemu
 
-.PHONY: all tools-arm32 tools-amd64 download
+all: tools-arm32-src tools-amd64-src
 
-all: tools-arm32 tools-amd64
+tools-arm32-binary:
+	set -e && for dir in toolchain-binary $(DIRS); do $(MAKE) -C $$dir tools-arm32; done
 
-tools-arm32:
-	set -e && for dir in $(DIRS); do $(MAKE) -C $$dir tools-arm32; done
+tools-amd64-binary:
+	set -e && for dir in toolchain-binary $(DIRS); do $(MAKE) -C $$dir tools-amd64; done
 
-tools-amd64:
-	set -e && for dir in $(DIRS); do $(MAKE) -C $$dir tools-amd64; done
+tools-arm32-src:
+	set -e && for dir in binutils-src gcc-src $(DIRS); do $(MAKE) -C $$dir tools-arm32; done
 
-download:
-	set -e && for dir in $(DIRS); do $(MAKE) -C $$dir download; done
+tools-amd64-src:
+	set -e && for dir in binutils-src gcc-src $(DIRS); do $(MAKE) -C $$dir tools-amd64; done
