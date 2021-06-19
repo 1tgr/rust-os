@@ -4,7 +4,6 @@ DIRS += libpng
 DIRS += freetype
 DIRS += pixman
 DIRS += cairo
-DIRS += qemu
 
 all: tools-arm32-src tools-amd64-src
 

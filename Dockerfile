@@ -19,6 +19,8 @@ RUN apt-get update -qq && apt-get install -qq -y \
     ninja-build \
     python3-pip \
     python3-setuptools \
+    qemu-system-arm \
+    qemu-system-x86 \
     zlib1g-dev
 
 ENV PATH=$PATH:/root/.cargo/bin
@@ -48,11 +50,6 @@ RUN make -s -C 3rdparty/pixman && rm -rf 3rdparty/pixman/{src,build}
 
 COPY 3rdparty/cairo 3rdparty/cairo
 RUN make -s -C 3rdparty/cairo && rm -rf 3rdparty/cairo/{src,build}
-
-COPY 3rdparty/qemu 3rdparty/qemu
-RUN make -s -C 3rdparty/qemu && rm -rf 3rdparty/qemu/{src,build}
-RUN 3rdparty/target/bin/qemu-system-arm --version
-RUN 3rdparty/target/bin/qemu-system-x86_64 --version
 
 COPY requirements.txt .
 RUN pip3 install --user -r requirements.txt
