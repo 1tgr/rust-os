@@ -1,5 +1,2 @@
-[target.amd64.cairo]
-rustc-link-search = ["../3rdparty/target/lib", "../3rdparty/target/lib/gcc/x86_64-elf/10.2.0"]
-
 [target.amd64.libc]
 rustc-link-search = ["../3rdparty/target/x86_64-elf/lib"]

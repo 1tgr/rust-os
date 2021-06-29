@@ -33,7 +33,7 @@ test! {
 
             let stdin = Arc::new(Keyboard::new());
             let stdout = Arc::new(Vga::new());
-            let process = process::spawn("graphics_server".into(), vec![Some(stdin), Some(stdout)]).unwrap();
+            let process = process::spawn("ui-server".into(), vec![Some(stdin), Some(stdout)]).unwrap();
             assert_eq!(0, process.exit_code().poll());
         });
     }

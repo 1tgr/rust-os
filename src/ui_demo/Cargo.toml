@@ -1,0 +1,19 @@
+[package]
+name = "ui-demo"
+version = "0.1.0"
+authors = ["Tim Robinson <tim.g.robinson@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alloc_system = { path = "../alloc_system" }
+euclid = { version = "0.22", default-features = false }
+os = { path = "../os" }
+num-traits = { version = "0.2", default-features = false, features = ["libm"] }
+raqote = { git = "https://github.com/1tgr/raqote.git", branch = "no-std", default-features = false }
+rt = { path = "../rt" }
+syscall = { path = "../syscall" }
+std = { path = "../std" }
+ui = { path = "../ui" }
+ui-macros = { path = "../ui_macros" }

@@ -6,7 +6,7 @@ use crate::kobj::KObj;
 use crate::mutex::UntypedMutex;
 use crate::phys_mem;
 use crate::prelude::*;
-use crate::process::{self, SharedMemBlock};
+use crate::process;
 use crate::semaphore::Semaphore;
 use crate::singleton::{DropSingleton, Singleton};
 use crate::thread;
@@ -129,7 +129,8 @@ impl HandleSyscall for SyscallHandler {
     }
 
     fn create_shared_mem(&self) -> Handle {
-        process::make_handle(Arc::new(SharedMemBlock::new()))
+        let block = process::create_shared_mem();
+        process::make_handle(Arc::new(block))
     }
 
     fn map_shared_mem(&self, block: Handle, len: usize, writable: bool) -> Result<*mut u8> {

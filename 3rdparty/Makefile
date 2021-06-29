@@ -1,9 +1,4 @@
 DIRS += newlib
-DIRS += zlib
-DIRS += libpng
-DIRS += freetype
-DIRS += pixman
-DIRS += cairo
 
 all: tools-arm32-src tools-amd64-src
 

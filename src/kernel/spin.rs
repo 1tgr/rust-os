@@ -166,6 +166,10 @@ impl<T> Mutex<T> {
     pub unsafe fn destroy(&'static self) {
         // nothing to do
     }
+
+    pub fn get_mut(&mut self) -> &mut T {
+        unsafe { &mut *self.data.get() }
+    }
 }
 
 impl<'a, T> Deref for MutexGuard<'a, T> {
