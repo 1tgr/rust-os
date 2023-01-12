@@ -8,7 +8,7 @@ edition = "2018"
 cairo = { path = "../cairo" }
 freetype = { path = "../freetype" }
 graphics_base = { path = "../graphics_base" }
-hashbrown = { version = "0.11", default-features = false }
+hashbrown = { version = "0.13", default-features = false }
 hecs = { version = "0.2", default-features = false, features = ["single_threaded"], git = "https://github.com/1tgr/hecs.git", rev = "c87707007be7d13d4a727c1531cce535ee8a80cf" }
 
 [target.'cfg(target_os="rust_os")'.dependencies]
